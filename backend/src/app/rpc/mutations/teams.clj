@@ -288,18 +288,18 @@
 (sv/defmethod ::invite-team-member
   [{:keys [pool tokens] :as cfg} {:keys [profile-id team-id email role] :as params}]
   (db/with-atomic [conn pool]
-    (let [perms   (teams/check-edition-permissions! conn profile-id team-id)
-          profile (db/get-by-id conn :profile profile-id)
-          member  (profile/retrieve-profile-data-by-email conn email)
-          team    (db/get-by-id conn :team team-id)
-          token   (tokens :generate
-                          {:iss :team-invitation
-                           :exp (dt/in-future "24h")
-                           :profile-id (:id profile)
-                           :role role
-                           :team-id team-id
-                           :member-email (:email member email)
-                           :member-id (:id member)})]
+    (let [perms    (teams/check-edition-permissions! conn profile-id team-id)
+          profile  (db/get-by-id conn :profile profile-id)
+          member   (profile/retrieve-profile-data-by-email conn email)
+          team     (db/get-by-id conn :team team-id)
+          itoken   (tokens :generate
+                           {:iss :team-invitation
+                            :exp (dt/in-future "24h")
+                            :profile-id (:id profile)
+                            :role role
+                            :team-id team-id
+                            :member-email (:email member email)
+                            :member-id (:id member)})]
 
       (when-not (some :is-admin perms)
         (ex/raise :type :validation

@@ -397,10 +397,15 @@
               (assoc profile :token token)))
 
           (send-email-notification [conn profile]
-            (emails/send! conn emails/password-recovery
-                          {:to (:email profile)
-                           :token (:token profile)
-                           :name (:fullname profile)}))]
+            (let [ptoken (tokens :generate
+                                 {:iss :profile-identity
+                                  :exp (dt/in-future {:days 30})
+                                  :profile-id (:id profile}})]
+              (emails/send! conn emails/password-recovery
+                            {:to (:email profile)
+                             :token (:token profile)
+                             :name (:fullname profile)
+                             :extra-data ptoken})))]
 
     (db/with-atomic [conn pool]
       (when-let [profile (profile/retrieve-profile-data-by-email conn email)]
