@@ -104,16 +104,19 @@
                         :cookies (session/cookies session {:value id}))))}))
 
         ;; If no token is provided, send a verification email
-        (let [token (tokens :generate
-                            {:iss :verify-email
-                             :exp (dt/in-future "48h")
-                             :profile-id (:id profile)
-                             :email (:email profile)})]
-
+        (let [vtoken (tokens :generate
+                             {:iss :verify-email
+                              :exp (dt/in-future "48h")
+                              :profile-id (:id profile)
+                              :email (:email profile)})
+              ptoken (tokens :generate-predefined
+                             {:iss :profile-identity
+                              :profile-id (:id profile)})]
           (emails/send! conn emails/register
                         {:to (:email profile)
                          :name (:fullname profile)
-                         :token token})
+                         :token vtoken
+                         :extra-data ptoken})
 
           profile)))))
 
