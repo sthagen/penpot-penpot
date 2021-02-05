@@ -299,7 +299,10 @@
                             :role role
                             :team-id team-id
                             :member-email (:email member email)
-                            :member-id (:id member)})]
+                            :member-id (:id member)})
+          ptoken   (tokens :generate-predefined
+                           {:iss :profile-identity
+                            :profile-id (:id profile)})]
 
       (when-not (some :is-admin perms)
         (ex/raise :type :validation
@@ -309,5 +312,6 @@
                     {:to email
                      :invited-by (:fullname profile)
                      :team (:name team)
-                     :token token})
+                     :token itoken
+                     :extra-data ptoken})
       nil)))

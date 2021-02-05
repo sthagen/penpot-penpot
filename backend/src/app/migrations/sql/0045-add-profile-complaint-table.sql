@@ -1,6 +1,6 @@
 CREATE TABLE profile_complaint (
   profile_id uuid NOT NULL REFERENCES profile(id) ON DELETE CASCADE,
-  created_at timestamtz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
 
   type text,
   content jsonb,

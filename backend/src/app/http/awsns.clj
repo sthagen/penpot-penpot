@@ -14,149 +14,151 @@
    [app.common.spec :as us]
    [app.db :as db]
    [app.tasks :as tasks]
-   [app.util.time :as dt]
-   [app.util.json :as json]
    [app.util.http :as http]
+   [app.util.json :as json]
+   [app.util.time :as dt]
+   [clojure.pprint :refer [pprint]]
    [clojure.spec.alpha :as s]
    [clojure.tools.logging :as log]
    [cuerdas.core :as str]
-   [integrant.core :as ig]))
+   [integrant.core :as ig]
+   [jsonista.core :as j]))
 
 (declare parse-json)
-(declare parse-params)
-(declare retrieve-contacts)
-(declare retrieve-profile)
-(declare process-message)
+(declare parse-notification)
+(declare process-notification)
 
-(def MAX-BOUNCES 3)
+(defn- pprint-message
+  [message]
+  (binding [clojure.pprint/*print-right-margin* 120]
+    (with-out-str (pprint message))))
 
 (defmethod ig/pre-init-spec ::handler [_]
   (s/keys :req-un [::db/pool]))
 
 (defmethod ig/init-key ::handler
-  [_ {:keys [pool shared-key] :as cfg}]
+  [_ {:keys [pool] :as cfg}]
   (fn [request]
-    (let [skey  (get-in request [:query-params "shared-key"])
-          body  (parse-json (slurp (:body request)))
+    (let [body  (parse-json (slurp (:body request)))
+
+          body  {"Type" "Notification"
+                 "Message" (json/encode-str body)}
+
           mtype (get body "Type")]
-
-      (when (not= skey shared-key)
-        (log/warnf "Unauthorized request from webhook ('%s')." skey)
-        (ex/raise :type :not-authorized
-                  :code :invalid-shared-key))
-
       (cond
         (= mtype "SubscriptionConfirmation")
         (let [surl   (get body "SubscribeURL")
               stopic (get body "TopicArn")]
           ;; TODO: timeout
           (log/infof "Subscription received (topic=%s, url=%s)" stopic surl)
-          (http/send! {:uri uri :method :post}))
+          (http/send! {:uri surl :method :post}))
 
         (= mtype "Notification")
         (when-let [message (parse-json (get body "Message"))]
-          (log/infof "Received: %s" (pr-str message))
-          (let [notification (parse-notification message)]
-            (process-notification notification)))
+          ;; (log/infof "Received: %s" (pr-str message))
+          (let [notification (parse-notification cfg message)]
+            (process-notification cfg notification)))
 
         :else
-        (log/warnf "Unexpected data received: %s" (pr-str params)))
+        (log/warn (str "Unexpected data received.\n"
+                       (pprint-message body))))
 
       {:status 200 :body ""})))
 
+(defn- parse-bounce
+  [data]
+  {:type        :bounce
+   :kind        (str/lower (get data "bounceType"))
+   :category    (str/lower (get data "bounceSubType"))
+   :feedback-id (get data "feedbackId")
+   :timestamp   (get data "timestamp")
+   :recipients  (->> (get data "bouncedRecipients")
+                     (mapv (fn [item]
+                             {:email (get item "emailAddress")
+                              :status (get item "status")
+                              :action (get item "action")
+                              :dcode  (get item "diagnosticCode")})))})
+
+(defn- parse-complaint
+  [data]
+  {:type          :complaint
+   :user-agent    (get data "userAgent")
+   :category      (get data "complaintSubType")
+   :feedback-type (get data "complaintFeedbackType")
+   :arrival-date  (get data "arrivalDate")
+   :feedback-id   (get data "feedbackId")
+   :recipients    (->> (get data "complainedRecipients")
+                       (mapv #(get % "emailAddress")))})
+
+(defn- extract-headers
+  [mail]
+  (reduce (fn [acc item]
+            (let [key (get item "name")
+                  val (get item "value")]
+              (assoc acc (str/lower key) val)))
+          {}
+          (get mail "headers")))
+
+(defn- extract-identity
+  [{:keys [tokens] :as cfg} headers]
+  (when-let [tdata (get headers "x-penpot-data")]
+    (let [result (tokens :verify {:token tdata :iss :profile-identity})]
+      (:profile-id result))))
+
 (defn- parse-notification
-[message]
-(condp = (get message "notificationType")
-  "Bounce"
-      (let [reason     (get message "bounce")
-            recipients (->> (get reason "bouncedRecipients")
-                            (map (fn [item]
-                                   {:email (get item "emailAddress")
-                                    :status (get item "status")
-                                    :action (get item "action")
-                                    :dcode  (get item "diagnosticCode")})))
-            mdata      {:type :bounce
-                        :kind (get reason "bounceType")
-                        :feedback-id (get reason "feedbackId")
-                        :timestamp (get reason "timestamp")}]
-
-        (for [recipient recipients]
-          {:type :bounce
-           :email (:email recipient)
-           :mdata (assoc mdata :recipient recipient)}))
-
-      "Complaint"
-      (let [reason (get message "complaint")
-            emails (->> (get reason "complainedRecipients")
-                        (map #(get % "emailAddress")))
-
-            mdata  {:type :complaint
-                    :user-agent (get reason "userAgent")
-                    :feedback-type (get reason "complaintFeedbackType")
-                    :recieved-at (get reason "arrivalDate")
-                    :feedback-id (get reason "feedbackId")}]
-        (for [email emails]
-          {:type :complaint
-           :email email
-           :mdata (assoc mdata :email email)}))
-
-      nil)))
+  [cfg message]
+  (let [type (get message "notificationType")
+        data (case type
+               "Bounce" (parse-bounce (get message "bounce"))
+               "Complaint" (parse-complaint (get message "complaint"))
+               {:type (keyword (str/lower type))
+                :message message})]
+    (when data
+      (let [mail (get message "mail")]
+        (when-not mail
+          (ex/raise :type :internal
+                    :code :incomplete-notification
+                    :hint "no email data received, please enable full headers report"))
+        (let [headers (extract-headers mail)
+              mail    {:destination (get mail "destination")
+                       :source      (get mail "source")
+                       :timestamp   (get mail "timestamp")
+                       :subject     (get-in mail ["commonHeaders" "subject"])
+                       :headers     headers}]
+          (assoc data
+                 :mail mail
+                 :profile-id (extract-identity cfg headers)))))))
 
 (defn- parse-json
   [v]
   (ex/ignoring
-   (json/decode v)))
+   (j/read-value v)))
 
+(defn- register-complaint-for-profile
+  [{:keys [pool]} {:keys [type profile-id] :as message}]
+  (db/insert! pool :profile-complaint
+              {:profile-id profile-id
+               :type (name type)
+               :content (db/tjson message)}))
 
-(defn process-message
-  [{:keys [pool] :as cfg} {:keys [type email mdata] :as message}]
-  (log/debugf "Procesing message: %s" (pr-str message))
-  (db/with-atomic [conn pool]
-    (let [contacts    (retrieve-contacts conn email)
-          profile     (retrieve-profile conn email)
-          now         (dt/now)]
+(defn process-notification
+  [{:keys [pool] :as cfg} {:keys [type profile-id] :as message}]
+  (log/debug (str "Procesing message:\n" (pprint-message message)))
+  (cond
+    ;; In this case we receive a bounce/complaint notification without
+    ;; confirmed identity, we just emit a warning but do nothing about
+    ;; it because this is not a normal case. All notifications should
+    ;; come with profile identity.
+    (nil? profile-id)
+    (log/warn (str "A notification without identity recevied from AWS\n"
+                   (pprint-message message)))
 
-      (log/debugf "Found contacts: %s" (pr-str contacts))
-      (log/debugf "Found profile %s" (pr-str profile))
+    (or (= :bounce type)
+        (= :complaint type))
+    (register-complaint-for-profile cfg message)
 
-      (doseq [contact contacts]
-        (if (or (>= (:bounces contact) (dec MAX-BOUNCES))
-                (= type :complaint))
-          (db/update! conn :contact
-                      {:is-disabled true
-                       :is-paused true
-                       :disable-reason (db/tjson mdata)
-                       :bounces MAX-BOUNCES
-                       :bounced-at now}
-                      {:id (:id contact)})
-          (db/update! conn :contact
-                      {:is-paused true
-                       :pause-reason (db/tjson mdata)
-                       :bounces (inc (:bounces contact))
-                       :bounced-at now}
-                  {:id (:id contact)}))
-        (when (not= (:id profile) (:owner-id contact))
-          (db/insert! conn :profile-incident
-                      {:profile-id (:owner-id contact)
-                       :created-at now
-                       :type (name type)
-                       :mdata (db/tjson mdata)})))
-      (when profile
-        (db/insert! conn :profile-incident
-                    {:profile-id (:id profile)
-                     :created-at now
-                     :type (name type)
-                     :mdata (db/tjson mdata)})))))
+    :else
+    (log/warn (str "Unrecognized message received from AWS\n"
+                   (pprint-message message)))))
 
-(defn retrieve-contacts
-  [conn email]
-  (let [sql "select * from contact
-              where (params->>'~:email') = ?
-                and type = 'email'
-                for update"]
-    (db/exec! conn [sql email])))
-
-(defn retrieve-profile
-  [conn email]
-  (db/get-by-params conn :profile {:email email}))
 

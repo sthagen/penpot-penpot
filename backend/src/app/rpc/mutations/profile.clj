@@ -397,10 +397,9 @@
               (assoc profile :token token)))
 
           (send-email-notification [conn profile]
-            (let [ptoken (tokens :generate
+            (let [ptoken (tokens :generate-predefined
                                  {:iss :profile-identity
-                                  :exp (dt/in-future {:days 30})
-                                  :profile-id (:id profile}})]
+                                  :profile-id (:id profile)})]
               (emails/send! conn emails/password-recovery
                             {:to (:email profile)
                              :token (:token profile)
