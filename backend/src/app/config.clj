@@ -57,7 +57,6 @@
    :registration-domain-whitelist ""
 
    :telemetry-enabled false
-   :telemetry-with-taiga true
    :telemetry-uri "https://telemetry.penpot.app/"
 
    ;; LDAP auth disabled by default. Set ldap-auth-host to enable
@@ -246,5 +245,5 @@
 (def config (read-config env))
 (def test-config (read-test-config env))
 
-(def default-deletion-delay
-  (dt/duration {:hours 48}))
+(def deletion-delay
+  (dt/duration {:days 7}))
