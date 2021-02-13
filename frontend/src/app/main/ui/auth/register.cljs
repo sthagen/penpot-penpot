@@ -23,6 +23,7 @@
    [app.util.i18n :refer [tr t]]
    [app.util.router :as rt]
    [app.util.timers :as tm]
+   [beicon.core :as rx]
    [cljs.spec.alpha :as s]
    [cuerdas.core :as str]
    [rumext.alpha :as mf]))
@@ -64,13 +65,17 @@
            (reset! submitted? false)
            (case (:code error)
              :registration-disabled
-             (st/emit! (dm/error (tr "errors.registration-disabled")))
+             (rx/of (dm/error (tr "errors.registration-disabled")))
+
+             :email-has-permanent-bounces
+             (let [email (get @form [:data :email])]
+               (rx/of (dm/error (tr "errors.email-has-permanent-bounces" email))))
 
              :email-already-exists
              (swap! form assoc-in [:errors :email]
                     {:message "errors.email-already-exists"})
 
-             (st/emit! (dm/error (tr "errors.unexpected-error"))))))
+             (rx/throw error))))
 
         on-success
         (mf/use-callback
