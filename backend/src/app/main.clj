@@ -49,7 +49,7 @@
     :app.telemetry/migrations
     {}
 
-    :app.redis/redis
+    :app.msgbus/msgbus
     {:uri (:redis-uri config)}
 
     :app.tokens/tokens
@@ -95,7 +95,7 @@
      :svgparse    (ig/ref :app.svgparse/handler)
      :storage     (ig/ref :app.storage/storage)
      :sns-webhook (ig/ref :app.http.awsns/handler)
-     :error-report-handler (ig/ref :app.error-reporter/handler)}
+     :error-report-handler (ig/ref :app.loggers.mattermost/handler)}
 
     :app.http.assets/handlers
     {:metrics           (ig/ref :app.metrics/metrics)
@@ -170,12 +170,12 @@
      :tokens  (ig/ref :app.tokens/tokens)
      :metrics (ig/ref :app.metrics/metrics)
      :storage (ig/ref :app.storage/storage)
-     :redis   (ig/ref :app.redis/redis)
+     :msgbus  (ig/ref :app.msgbus/msgbus)
      :rlimits (ig/ref :app.rlimits/all)
      :svgc    (ig/ref :app.svgparse/svgc)}
 
     :app.notifications/handler
-    {:redis   (ig/ref :app.redis/redis)
+    {:msgbus  (ig/ref :app.msgbus/msgbus)
      :pool    (ig/ref :app.db/pool)
      :session (ig/ref :app.http.session/session)
      :metrics (ig/ref :app.metrics/metrics)}
@@ -280,12 +280,21 @@
     :app.sprops/props
     {:pool (ig/ref :app.db/pool)}
 
-    :app.error-reporter/reporter
+    :app.loggers.zmq/receiver
+    {:endpoint (:loggers-zmq-uri config)}
+
+    :app.loggers.loki/reporter
+    {:uri      (:loggers-loki-uri config)
+     :receiver (ig/ref :app.loggers.zmq/receiver)
+     :executor (ig/ref :app.worker/executor)}
+
+    :app.loggers.mattermost/reporter
     {:uri      (:error-report-webhook config)
+     :receiver (ig/ref :app.loggers.zmq/receiver)
      :pool     (ig/ref :app.db/pool)
      :executor (ig/ref :app.worker/executor)}
 
-    :app.error-reporter/handler
+    :app.loggers.mattermost/handler
     {:pool (ig/ref :app.db/pool)}
 
     :app.storage/storage
