@@ -4,9 +4,11 @@
 
 ### :sparkles: New features
 
-- Add major refactor of internal pubsub/redis code; improves scalability and performance #640
-- Add optional loki integration.
-- Bounce & Complaint handling.
+- Add major refactor of internal pubsub/redis code; improves scalability and performance [#640](https://github.com/penpot/penpot/pull/640)
+- Add optional loki integration [#645](https://github.com/penpot/penpot/pull/645)
+- Add emailcatcher and ldap test containers to devenv. [#506](https://github.com/penpot/penpot/pull/506)
+- Add more presets for artboard [#654](https://github.com/penpot/penpot/pull/654)
+- Bounce & Complaint handling [#635](https://github.com/penpot/penpot/pull/635)
 - Disable groups interactions when holding "Ctrl" key (deep selection)
 - New action in context menu to "edit" some shapes (binded to key "Enter")
 
@@ -19,6 +21,14 @@
 - Have language change notification written in the new language [Taiga #1205](https://tree.taiga.io/project/penpot/issue/1205)
 - Properly handle errors on github, gitlab and ldap auth backends.
 - Properly mark profile auth backend (on first register/ auth with 3rd party auth provider).
+- Fix corner cases on invitation/signup flows.
+- Add more improvements to french translation strings [#591](https://github.com/penpot/penpot/pull/591)
+
+
+### :heart: Community contributions by (Thank you!)
+
+- girafic [#538](https://github.com/penpot/penpot/pull/654)
+- arkhi [#591](https://github.com/penpot/penpot/pull/591)
 
 
 ## 1.2.0-alpha
