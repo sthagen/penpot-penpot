@@ -15,7 +15,7 @@
    [app.common.spec :as us]
    [app.config :as cfg]
    [app.db :as db]
-   [app.emails :as emails]
+   [app.emails :as eml]
    [app.rpc.queries.profile :as profile]
    [clojure.spec.alpha :as s]
    [integrant.core :as ig]))
@@ -61,13 +61,13 @@
 (defn send-feedback
   [pool profile params]
   (let [params      (us/conform ::feedback params)
-        destination (cfg/get :feedback-destination)
-        reply-to    (cfg/get :feedback-reply-to)]
-    (emails/send! pool emails/feedback
-                  {:to       destination
-                   :profile  profile
-                   :reply-to (:from params)
-                   :email    (:from params)
-                   :subject  (:subject params)
-                   :content  (:content params)})
+        destination (cfg/get :feedback-destination)]
+    (eml/send! {::eml/conn pool
+                ::eml/factory eml/feedback
+                :to       destination
+                :profile  profile
+                :reply-to (:from params)
+                :email    (:from params)
+                :subject  (:subject params)
+                :content  (:content params)})
     nil))

@@ -5,7 +5,7 @@
 ;; This Source Code Form is "Incompatible With Secondary Licenses", as
 ;; defined by the Mozilla Public License, v. 2.0.
 ;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.rpc.mutations.files
   (:require
@@ -16,12 +16,13 @@
    [app.common.uuid :as uuid]
    [app.config :as cfg]
    [app.db :as db]
+   [app.rpc.permissions :as perms]
    [app.rpc.queries.files :as files]
    [app.rpc.queries.projects :as proj]
-   [app.tasks :as tasks]
    [app.util.blob :as blob]
    [app.util.services :as sv]
    [app.util.time :as dt]
+   [app.worker :as wrk]
    [clojure.spec.alpha :as s]))
 
 ;; --- Helpers & Specs
@@ -47,14 +48,13 @@
     (proj/check-edition-permissions! conn profile-id project-id)
     (create-file conn params)))
 
-(defn- create-file-profile
-  [conn {:keys [profile-id file-id] :as params}]
-  (db/insert! conn :file-profile-rel
-              {:profile-id profile-id
-               :file-id file-id
-               :is-owner true
-               :is-admin true
-               :can-edit true}))
+
+(defn create-file-role
+  [conn {:keys [file-id profile-id role]}]
+  (let [params {:file-id file-id
+                :profile-id profile-id}]
+    (->> (perms/assign-role-flags params role)
+         (db/insert! conn :file-profile-rel))))
 
 (defn create-file
   [conn {:keys [id name project-id is-shared]
@@ -68,8 +68,8 @@
                           :name name
                           :is-shared is-shared
                           :data (blob/encode data)})]
-    (->> (assoc params :file-id id)
-         (create-file-profile conn))
+    (->> (assoc params :file-id id :role :owner)
+         (create-file-role conn))
     (assoc file :data data)))
 
 
@@ -126,9 +126,11 @@
     (files/check-edition-permissions! conn profile-id id)
 
     ;; Schedule object deletion
-    (tasks/submit! conn {:name "delete-object"
-                         :delay cfg/deletion-delay
-                         :props {:id id :type :file}})
+    (wrk/submit! {::wrk/task :delete-object
+                  ::wrk/delay cfg/deletion-delay
+                  ::wrk/conn conn
+                  :id id
+                  :type :file})
 
     (mark-file-deleted conn params)))
 

@@ -5,30 +5,18 @@
 [![License: MPL-2.0][uri_license_image]][uri_license]
 [![Gitter](https://badges.gitter.im/sereno-xyz/community.svg)](https://gitter.im/penpot/community)
 [![Managed with Taiga.io](https://img.shields.io/badge/managed%20with-TAIGA.io-709f14.svg)](https://tree.taiga.io/project/penpot/ "Managed with Taiga.io")
+[![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/penpot/penpot)
 
 
 # PENPOT #
 
-We’re excited to share that Uxbox is now Penpot! We’re changing the name, but keeping the same project essence. Stay in the loop for more news coming early 2021. Alpha release is close!
+Penpot is the first Open Source design and prototyping platform meant
+for cross-domain teams. Non dependent on operating systems, Penpot is
+web based and works with open web standards (SVG). For all and
+empowered by the community.
 
-![PENPOT](https://raw.githubusercontent.com/penpot/penpot/develop/docs/screenshot.png)
+![PENPOT](https://penpot.app/images/workspace-ui.jpg)
 
-
-## Introduction ##
-
-The open-source solution for design and prototyping. PENPOT is
-currently at an early development stage but we are working hard to
-bring you the beta version as soon as possible. Follow the project
-progress in Twitter or Github and stay tuned!
-
-
-## SVG based ##
-
-Penpot works with SVG, a standard format, for all your designs and
-prototypes . This means that all your stuff in Penpot is portable and
-editable in many other vector tools and easy to use on the web.
-
-[See SVG specification](https://www.w3.org/Graphics/SVG/)
 
 ## Contributing ##
 
@@ -43,7 +31,7 @@ Please refer to the [Contributing Guide](./CONTRIBUTING.md)
 
 ## Documentation ##
 
-Please refer to [docs/ directory](./docs/).
+Please refer to the [help center](https://help.penpot.app).
 
 
 ## License ##
@@ -52,4 +40,9 @@ Please refer to [docs/ directory](./docs/).
 This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+This Source Code Form is "Incompatible With Secondary Licenses", as
+defined by the Mozilla Public License, v. 2.0.
+
+Copyright (c) UXBOX Labs SL
 ```

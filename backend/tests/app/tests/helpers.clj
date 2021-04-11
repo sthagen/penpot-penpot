@@ -13,7 +13,7 @@
    [app.common.pages :as cp]
    [app.common.spec :as us]
    [app.common.uuid :as uuid]
-   [app.config :as cfg]
+   [app.config :as cf]
    [app.db :as db]
    [app.main :as main]
    [app.media]
@@ -38,22 +38,31 @@
 (def ^:dynamic *system* nil)
 (def ^:dynamic *pool* nil)
 
+(def defaults
+  {:database-uri "postgresql://postgres/penpot_test"
+   :redis-uri "redis://redis/1"})
+
 (def config
-  (merge {:redis-uri "redis://redis/1"
-          :database-uri "postgresql://postgres/penpot_test"
-          :storage-fs-directory "/tmp/app/storage"
-          :migrations-verbose false}
-         cfg/config))
+  (->> (cf/read-env "penpot-test")
+       (merge cf/defaults defaults)
+       (us/conform ::cf/config)))
 
 (defn state-init
   [next]
-  (let [config (-> (main/build-system-config config)
+  (let [config (-> main/system-config
+                   (assoc-in [:app.msgbus/msgbus :redis-uri] (:redis-uri config))
+                   (assoc-in [:app.db/pool :uri] (:database-uri config))
+                   (assoc-in [:app.db/pool :username] (:database-username config))
+                   (assoc-in [:app.db/pool :password] (:database-password config))
+                   (assoc-in [[:app.main/main :app.storage.fs/backend] :directory] "/tmp/app/storage")
                    (dissoc :app.srepl/server
                            :app.http/server
                            :app.http/router
                            :app.notifications/handler
-                           :app.http.auth/google
-                           :app.http.auth/gitlab
+                           :app.http.oauth/google
+                           :app.http.oauth/gitlab
+                           :app.http.oauth/github
+                           :app.http.oauth/all
                            :app.worker/scheduler
                            :app.worker/worker)
                    (d/deep-merge
@@ -143,6 +152,10 @@
                                 :name (str "file" i)}
                                params))))
 
+(defn mark-file-deleted*
+  ([params] (mark-file-deleted* *pool* params))
+  ([conn {:keys [id] :as params}]
+   (#'files/mark-file-deleted conn {:id id})))
 
 (defn create-team*
   ([i params] (create-team* *pool* i params))
@@ -152,13 +165,25 @@
          team (#'teams/create-team conn {:id id
                                          :profile-id profile-id
                                          :name (str "team" i)})]
-     (#'teams/create-team-profile conn
-                                  {:team-id id
-                                   :profile-id profile-id
-                                   :is-owner true
-                                   :is-admin true
-                                   :can-edit true})
+     (#'teams/create-team-role conn
+                               {:team-id id
+                                :profile-id profile-id
+                                :role :owner})
      team)))
+
+(defn create-file-media-object*
+  ([params] (create-file-media-object* *pool* params))
+  ([conn {:keys [name width height mtype file-id is-local media-id]
+          :or {name "sample" width 100 height 100 mtype "image/svg+xml" is-local true}}]
+   (db/insert! conn :file-media-object
+               {:id (uuid/next)
+                :file-id file-id
+                :is-local is-local
+                :name name
+                :media-id media-id
+                :width  width
+                :height height
+                :mtype  mtype})))
 
 (defn link-file-to-library*
   ([params] (link-file-to-library* *pool* params))
@@ -181,37 +206,39 @@
                :created-at (or created-at (dt/now))
                :content (db/tjson {})}))
 
+(defn create-team-role*
+  ([params] (create-team-role* *pool* params))
+  ([conn {:keys [team-id profile-id role] :or {role :owner}}]
+   (#'teams/create-team-role conn {:team-id team-id
+                                  :profile-id profile-id
+                                  :role role})))
 
-(defn create-team-permission*
-  ([params] (create-team-permission* *pool* params))
-  ([conn {:keys [team-id profile-id is-owner is-admin can-edit]
-          :or {is-owner true is-admin true can-edit true}}]
-   (db/insert! conn :team-profile-rel {:team-id team-id
-                                       :profile-id profile-id
-                                       :is-owner is-owner
-                                       :is-admin is-admin
-                                       :can-edit can-edit})))
+(defn create-project-role*
+  ([params] (create-project-role* *pool* params))
+  ([conn {:keys [project-id profile-id role] :or {role :owner}}]
+   (#'projects/create-project-role conn {:project-id project-id
+                                         :profile-id profile-id
+                                         :role role})))
 
-(defn create-project-permission*
-  ([params] (create-project-permission* *pool* params))
-  ([conn {:keys [project-id profile-id is-owner is-admin can-edit]
-          :or {is-owner true is-admin true can-edit true}}]
-   (db/insert! conn :project-profile-rel {:project-id project-id
-                                          :profile-id profile-id
-                                          :is-owner is-owner
-                                          :is-admin is-admin
-                                          :can-edit can-edit})))
+(defn create-file-role*
+  ([params] (create-file-role* *pool* params))
+  ([conn {:keys [file-id profile-id role] :or {role :owner}}]
+   (#'files/create-file-role conn {:file-id file-id
+                                   :profile-id profile-id
+                                   :role role})))
 
-(defn create-file-permission*
-  ([params] (create-file-permission* *pool* params))
-  ([conn {:keys [file-id profile-id is-owner is-admin can-edit]
-          :or {is-owner true is-admin true can-edit true}}]
-   (db/insert! conn :project-profile-rel {:file-id file-id
-                                          :profile-id profile-id
-                                          :is-owner is-owner
-                                          :is-admin is-admin
-                                          :can-edit can-edit})))
-
+(defn update-file*
+  ([params] (update-file* *pool* params))
+  ([conn {:keys [file-id changes session-id profile-id revn]
+          :or {session-id (uuid/next) revn 0}}]
+   (let [file   (db/get-by-id conn :file file-id)
+         msgbus (:app.msgbus/msgbus *system*)]
+     (#'files/update-file {:conn conn :msgbus msgbus}
+                          {:file file
+                           :revn revn
+                           :changes changes
+                           :session-id session-id
+                           :profile-id profile-id}))))
 
 ;; --- RPC HELPERS
 
@@ -308,8 +335,10 @@
   "Helper for mock app.config/get"
   [data]
   (fn
-    ([key] (get (merge config data) key))
-    ([key default] (get (merge config data) key default))))
+    ([key]
+     (get data key (get @cf/config key)))
+    ([key default]
+     (get data key (get @cf/config key default)))))
 
 (defn reset-mock!
   [m]

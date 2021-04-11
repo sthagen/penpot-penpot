@@ -14,19 +14,17 @@
    [app.db :as db]
    [app.metrics :as mtx]
    [app.util.async :as aa]
+   [app.util.logging :as l]
    [app.util.time :as dt]
    [app.util.transit :as t]
    [app.worker :as wrk]
    [clojure.core.async :as a]
    [clojure.spec.alpha :as s]
-   [clojure.tools.logging :as log]
    [integrant.core :as ig]
    [ring.adapter.jetty9 :as jetty]
    [ring.middleware.cookies :refer [wrap-cookies]]
    [ring.middleware.keyword-params :refer [wrap-keyword-params]]
-   [ring.middleware.params :refer [wrap-params]])
-  (:import
-   org.eclipse.jetty.websocket.api.WebSocketAdapter))
+   [ring.middleware.params :refer [wrap-params]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Http Handler
@@ -55,7 +53,7 @@
 
         mtx-messages
         (mtx/create
-         {:name "websocket_message_count"
+         {:name "websocket_message_total"
           :registry (:registry metrics)
           :labels ["op"]
           :type :counter
@@ -151,7 +149,7 @@
                                   :out-ch out-ch
                                   :sub-ch sub-ch)]
 
-                (log/tracef "on-connect %s" (:session-id cfg))
+                (l/trace :event "connect" :session (:session-id cfg))
 
                 ;; Forward all messages from out-ch to the websocket
                 ;; connection
@@ -165,26 +163,30 @@
                   ;; Subscribe to corresponding topics
                   (a/<! (msgbus :sub {:topics [file-id team-id] :chan sub-ch}))
                   (a/<! (handle-connect cfg))
+
+                  ;; when connection is closed
+                  (mtx-aconn :dec)
+                  (mtx-sessions :observe (/ (inst-ms (dt/duration-between created-at (dt/now))) 1000.0))
+
+                  ;; close subscription
                   (a/close! sub-ch))))
 
-            (on-error [_conn e]
-              (mtx-aconn :dec)
-              (mtx-sessions :observe (/ (inst-ms (dt/duration-between created-at (dt/now))) 1000.0))
-              (log/tracef "on-error %s (%s)" (:session-id cfg) (ex-message e))
+            (on-error [_conn _e]
+              (l/trace :event "error" :session (:session-id cfg))
+
               (a/close! out-ch)
               (a/close! rcv-ch))
 
             (on-close [_conn _status _reason]
-              (mtx-aconn :dec)
-              (mtx-sessions :observe (/ (inst-ms (dt/duration-between created-at (dt/now))) 1000.0))
-              (log/tracef "on-close %s" (:session-id cfg))
+              (l/trace :event "close" :session (:session-id cfg))
+
               (a/close! out-ch)
               (a/close! rcv-ch))
 
             (on-message [_ws message]
               (let [message (t/decode-str message)]
                 (when-not (a/offer! rcv-ch message)
-                  (log/warn "droping ws input message, channe full"))))]
+                  (l/warn :msg "drop messages"))))]
 
       {:on-connect on-connect
        :on-error on-error
@@ -194,100 +196,58 @@
 
 ;; --- CONNECTION INIT
 
+(declare send-presence)
 (declare handle-message)
 (declare start-loop!)
 
 (defn- handle-connect
-  [{:keys [conn] :as cfg}]
+  [cfg]
   (a/go
-    (try
-      (aa/<? (handle-message cfg {:type :connect}))
-      (aa/<? (start-loop! cfg))
-      (aa/<? (handle-message cfg {:type :disconnect}))
-      (catch Throwable err
-        (log/errorf err "unexpected exception on websocket handler")
-        (let [session (.getSession ^WebSocketAdapter conn)]
-          (when session
-            (.disconnect session)))))))
+    (a/<! (handle-message cfg {:type :connect}))
+    (a/<! (start-loop! cfg))
+    (a/<! (handle-message cfg {:type :disconnect}))))
 
 (defn- start-loop!
   [{:keys [rcv-ch out-ch sub-ch session-id] :as cfg}]
-  (aa/go-try
-   (loop []
-     (let [timeout    (a/timeout 30000)
-           [val port] (a/alts! [rcv-ch sub-ch timeout])]
+  (a/go-loop []
+    (let [timeout    (a/timeout 30000)
+          [val port] (a/alts! [rcv-ch sub-ch timeout])]
+      (cond
+        ;; Process message coming from connected client
+        (and (= port rcv-ch) (some? val))
+        (do
+          (a/<! (handle-message cfg val))
+          (recur))
 
-       (cond
-         ;; Process message coming from connected client
-         (and (= port rcv-ch) (some? val))
-         (do
-           (aa/<? (handle-message cfg val))
-           (recur))
+        ;; Process message coming from pubsub.
+        (and (= port sub-ch) (some? val))
+        (do
+          (when-not (= (:session-id val) session-id)
+            ;; If we receive a connect message of other user, we need
+            ;; to send an update presence to all participants.
+            (when (= :connect (:type val))
+              (a/<! (send-presence cfg :presence)))
 
-         ;; If message comes from subscription channel; we just need
-         ;; to foreward it to the output channel.
-         (and (= port sub-ch) (some? val))
-         (do
-           (when-not (= (:session-id val) session-id)
-             (a/>! out-ch val))
-           (recur))
+            ;; Then, just forward the message
+            (a/>! out-ch val))
+          (recur))
 
-         ;; When timeout channel is signaled, we need to send a ping
-         ;; message to the output channel. TODO: we need to make this
-         ;; more smart.
-         (= port timeout)
-         (do
-           (a/>! out-ch {:type :ping})
-           (recur))
+        ;; When timeout channel is signaled, we need to send a ping
+        ;; message to the output channel. TODO: we need to make this
+        ;; more smart.
+        (= port timeout)
+        (do
+          (a/>! out-ch {:type :ping})
+          (recur))))))
 
-         :else
-         nil)))))
-
-;; --- PRESENCE HANDLING API
-
-(def ^:private
-  sql:retrieve-presence
-  "select * from presence
-    where file_id=?
-      and (clock_timestamp() - updated_at) < '5 min'::interval")
-
-(def ^:private
-  sql:update-presence
-  "insert into presence (file_id, session_id, profile_id, updated_at)
-   values (?, ?, ?, clock_timestamp())
-       on conflict (file_id, session_id, profile_id)
-       do update set updated_at=clock_timestamp()")
-
-(defn- retrieve-presence
-  [{:keys [pool file-id] :as cfg}]
-  (let [rows (db/exec! pool [sql:retrieve-presence file-id])]
-    (mapv (juxt :session-id :profile-id) rows)))
-
-(defn- retrieve-presence*
-  [{:keys [executor] :as cfg}]
-  (aa/with-thread executor
-    (retrieve-presence cfg)))
-
-(defn- update-presence
-  [{:keys [pool file-id session-id profile-id] :as cfg}]
-  (let [sql [sql:update-presence file-id session-id profile-id]]
-    (db/exec-one! pool sql)))
-
-(defn- update-presence*
-  [{:keys [executor] :as cfg}]
-  (aa/with-thread executor
-    (update-presence cfg)))
-
-(defn- delete-presence
-  [{:keys [pool file-id session-id profile-id] :as cfg}]
-  (db/delete! pool :presence {:file-id file-id
-                              :profile-id profile-id
-                              :session-id session-id}))
-
-(defn- delete-presence*
-  [{:keys [executor] :as cfg}]
-  (aa/with-thread executor
-    (delete-presence cfg)))
+(defn send-presence
+  ([cfg] (send-presence cfg :presence))
+  ([{:keys [msgbus session-id profile-id file-id]} type]
+   (a/go
+     (a/<! (msgbus :pub {:topic file-id
+                         :message {:type type
+                                   :session-id session-id
+                                   :profile-id profile-id}})))))
 
 ;; --- INCOMING MSG PROCESSING
 
@@ -295,26 +255,16 @@
   (fn [_ message] (:type message)))
 
 (defmethod handle-message :connect
-  [{:keys [file-id msgbus] :as cfg} _message]
-  ;; (log/debugf "profile '%s' is connected to file '%s'" profile-id file-id)
-  (aa/go-try
-   (aa/<? (update-presence* cfg))
-   (let [members (aa/<? (retrieve-presence* cfg))
-         val     {:topic file-id :message {:type :presence :sessions members}}]
-     (a/<! (msgbus :pub val)))))
+  [cfg _]
+  (send-presence cfg :connect))
 
 (defmethod handle-message :disconnect
-  [{:keys [file-id msgbus] :as cfg} _message]
-  ;; (log/debugf "profile '%s' is disconnected from '%s'" profile-id file-id)
-  (aa/go-try
-   (aa/<? (delete-presence* cfg))
-   (let [members (aa/<? (retrieve-presence* cfg))
-         val     {:topic file-id :message {:type :presence :sessions members}}]
-     (a/<! (msgbus :pub val)))))
+  [cfg _]
+  (send-presence cfg :disconnect))
 
 (defmethod handle-message :keepalive
-  [cfg _message]
-  (update-presence* cfg))
+  [_ _]
+  (a/go :nothing))
 
 (defmethod handle-message :pointer-update
   [{:keys [profile-id file-id session-id msgbus] :as cfg} message]
@@ -327,5 +277,7 @@
 (defmethod handle-message :default
   [_ws message]
   (a/go
-    (log/warnf "received unexpected message: %s" message)))
+    (l/log :level :warn
+           :msg "received unexpected message"
+           :message message)))
 

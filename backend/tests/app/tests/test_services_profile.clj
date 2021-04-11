@@ -132,7 +132,7 @@
       (t/is (nil? result)))
 
     ;; Request profile to be deleted
-    (with-mocks [mock {:target 'app.tasks/submit! :return nil}]
+    (with-mocks [mock {:target 'app.worker/submit! :return nil}]
       (let [params {::th/type :delete-profile
                     :profile-id (:id prof)}
             out    (th/mutation! params)]
@@ -140,11 +140,11 @@
 
         ;; check the mock
         (let [mock (deref mock)
-              mock-params (second (:call-args mock))]
+              mock-params (first (:call-args mock))]
           (t/is (:called? mock))
           (t/is (= 1 (:call-count mock)))
-          (t/is (= "delete-profile" (:name mock-params)))
-          (t/is (= (:id prof) (get-in mock-params [:props :profile-id]))))))
+          (t/is (= :delete-profile (:app.worker/task mock-params)))
+          (t/is (= (:id prof) (:profile-id mock-params))))))
 
     ;; query files after profile soft deletion
     (let [params {::th/type :files
@@ -190,6 +190,32 @@
     (t/testing "not allowed email domain"
       (t/is (false? (profile/email-domain-in-whitelist? whitelist "username@somedomain.com"))))))
 
+(t/deftest test-register-with-no-terms-and-privacy
+  (let [data  {::th/type :register-profile
+               :email "user@example.com"
+               :password "foobar"
+               :fullname "foobar"
+               :terms-privacy nil}
+        out   (th/mutation! data)
+        error (:error out)
+        edata (ex-data error)]
+    (t/is (th/ex-info? error))
+    (t/is (= (:type edata) :validation))
+    (t/is (= (:code edata) :spec-validation))))
+
+(t/deftest test-register-with-bad-terms-and-privacy
+  (let [data  {::th/type :register-profile
+               :email "user@example.com"
+               :password "foobar"
+               :fullname "foobar"
+               :terms-privacy false}
+        out   (th/mutation! data)
+        error (:error out)
+        edata (ex-data error)]
+    (t/is (th/ex-info? error))
+    (t/is (= (:type edata) :validation))
+    (t/is (= (:code edata) :invalid-terms-and-privacy))))
+
 (t/deftest test-register-when-registration-disabled
   (with-mocks [mock {:target 'app.config/get
                      :return (th/mock-config-get-with
@@ -197,7 +223,8 @@
     (let [data  {::th/type :register-profile
                  :email "user@example.com"
                  :password "foobar"
-                 :fullname "foobar"}
+                 :fullname "foobar"
+                 :terms-privacy true}
           out   (th/mutation! data)
           error (:error out)
           edata (ex-data error)]
@@ -210,7 +237,8 @@
         data    {::th/type :register-profile
                  :email (:email profile)
                  :password "foobar"
-                 :fullname "foobar"}
+                 :fullname "foobar"
+                 :terms-privacy true}
         out     (th/mutation! data)
         error   (:error out)
         edata   (ex-data error)]
@@ -225,11 +253,12 @@
           data  {::th/type :register-profile
                  :email "user@example.com"
                  :password "foobar"
-                 :fullname "foobar"}
+                 :fullname "foobar"
+                 :terms-privacy true}
           out   (th/mutation! data)]
       ;; (th/print-result! out)
-      (let [mock          (deref mock)
-            [_ _ params]  (:call-args mock)]
+      (let [mock     (deref mock)
+            [params] (:call-args mock)]
         ;; (clojure.pprint/pprint params)
         (t/is (:called? mock))
         (t/is (= (:email data) (:to params)))
@@ -250,7 +279,8 @@
           data  {::th/type :register-profile
                  :email "user@example.com"
                  :password "foobar"
-                 :fullname "foobar"}
+                 :fullname "foobar"
+                 :terms-privacy true}
           _     (th/create-global-complaint-for pool {:type :bounce :email "user@example.com"})
           out   (th/mutation! data)]
       ;; (th/print-result! out)
@@ -270,7 +300,8 @@
           data  {::th/type :register-profile
                  :email "user@example.com"
                  :password "foobar"
-                 :fullname "foobar"}
+                 :fullname "foobar"
+                 :terms-privacy true}
           _     (th/create-global-complaint-for pool {:type :complaint :email "user@example.com"})
           out   (th/mutation! data)]
 

@@ -14,16 +14,16 @@
    [app.common.uuid :as uuid]
    [app.config :as cfg]
    [app.db :as db]
-   [app.emails :as emails]
+   [app.emails :as eml]
    [app.media :as media]
    [app.rpc.mutations.projects :as projects]
    [app.rpc.mutations.teams :as teams]
    [app.rpc.queries.profile :as profile]
    [app.setup.initial-data :as sid]
    [app.storage :as sto]
-   [app.tasks :as tasks]
    [app.util.services :as sv]
    [app.util.time :as dt]
+   [app.worker :as wrk]
    [buddy.hashers :as hashers]
    [clojure.spec.alpha :as s]
    [cuerdas.core :as str]))
@@ -49,8 +49,10 @@
 (declare register-profile)
 
 (s/def ::invitation-token ::us/not-empty-string)
+(s/def ::terms-privacy ::us/boolean)
+
 (s/def ::register-profile
-  (s/keys :req-un [::email ::password ::fullname]
+  (s/keys :req-un [::email ::password ::fullname ::terms-privacy]
           :opt-un [::invitation-token]))
 
 (sv/defmethod ::register-profile {:auth false :rlimit :password}
@@ -62,6 +64,10 @@
   (when-not (email-domain-in-whitelist? (cfg/get :registration-domain-whitelist) (:email params))
     (ex/raise :type :validation
               :code :email-domain-is-not-allowed))
+
+  (when-not (:terms-privacy params)
+    (ex/raise :type :validation
+              :code :invalid-terms-and-privacy))
 
   (db/with-atomic [conn pool]
     (let [cfg     (assoc cfg :conn conn)]
@@ -111,16 +117,19 @@
 
         ;; Don't allow proceed in register page if the email is
         ;; already reported as permanent bounced
-        (when (emails/has-bounce-reports? conn (:email profile))
+        (when (eml/has-bounce-reports? conn (:email profile))
           (ex/raise :type :validation
                     :code :email-has-permanent-bounces
                     :hint "looks like the email has one or many bounces reported"))
 
-        (emails/send! conn emails/register
-                      {:to (:email profile)
-                       :name (:fullname profile)
-                       :token vtoken
-                       :extra-data ptoken})
+        (eml/send! {::eml/conn conn
+                    ::eml/factory eml/register
+                    :public-uri (:public-uri cfg)
+                    :to (:email profile)
+                    :name (:fullname profile)
+                    :token vtoken
+                    :extra-data ptoken})
+
         (with-meta profile
           {:before-complete (annotate-profile-register metrics profile)})))))
 
@@ -196,21 +205,25 @@
 
 (defn create-profile-relations
   [conn profile]
-  (let [team (teams/create-team conn {:profile-id (:id profile)
-                                      :name "Default"
-                                      :default? true})
-        proj (projects/create-project conn {:profile-id (:id profile)
-                                            :team-id (:id team)
-                                            :name "Drafts"
-                                            :default? true})]
-    (teams/create-team-profile conn {:team-id (:id team)
-                                     :profile-id (:id profile)})
-    (projects/create-project-profile conn {:project-id (:id proj)
-                                           :profile-id (:id profile)})
+  (let [team    (teams/create-team conn {:profile-id (:id profile)
+                                         :name "Default"
+                                         :is-default true})
+        project (projects/create-project conn {:profile-id (:id profile)
+                                               :team-id (:id team)
+                                               :name "Drafts"
+                                               :is-default true})
+        params  {:team-id (:id team)
+                 :profile-id (:id profile)
+                 :project-id (:id project)
+                 :role :owner}]
 
-    (merge (profile/strip-private-attrs profile)
-           {:default-team-id (:id team)
-            :default-project-id (:id proj)})))
+    (teams/create-team-role conn params)
+    (projects/create-project-role conn params)
+
+    (-> profile
+        (profile/strip-private-attrs)
+        (assoc :default-team-id (:id team))
+        (assoc :default-project-id (:id project)))))
 
 ;; --- Mutation: Login
 
@@ -327,7 +340,8 @@
               {:id id}))
 
 (s/def ::update-profile
-  (s/keys :req-un [::id ::fullname ::lang ::theme]))
+  (s/keys :req-un [::id ::fullname]
+          :opt-un [::lang ::theme]))
 
 (sv/defmethod ::update-profile
   [{:keys [pool] :as cfg} params]
@@ -375,8 +389,8 @@
 
 (sv/defmethod ::update-profile-photo
   [{:keys [pool storage] :as cfg} {:keys [profile-id file] :as params}]
-  (media/validate-media-type (:content-type file))
   (db/with-atomic [conn pool]
+    (media/validate-media-type (:content-type file) #{"image/jpeg" "image/png" "image/webp"})
     (let [profile (db/get-by-id conn :profile profile-id)
           _       (media/run cfg {:cmd :info :input {:path (:tempfile file)
                                                      :mtype (:content-type file)}})
@@ -428,7 +442,7 @@
   {:changed true})
 
 (defn- request-email-change
-  [{:keys [conn tokens]} {:keys [profile email] :as params}]
+  [{:keys [conn tokens] :as cfg} {:keys [profile email] :as params}]
   (let [token   (tokens :generate
                         {:iss :change-email
                          :exp (dt/in-future "15m")
@@ -441,22 +455,24 @@
     (when (not= email (:email profile))
       (check-profile-existence! conn params))
 
-    (when-not (emails/allow-send-emails? conn profile)
+    (when-not (eml/allow-send-emails? conn profile)
       (ex/raise :type :validation
                 :code :profile-is-muted
                 :hint "looks like the profile has reported repeatedly as spam or has permanent bounces."))
 
-    (when (emails/has-bounce-reports? conn email)
+    (when (eml/has-bounce-reports? conn email)
       (ex/raise :type :validation
                 :code :email-has-permanent-bounces
                 :hint "looks like the email you invite has been repeatedly reported as spam or permanent bounce"))
 
-    (emails/send! conn emails/change-email
-                  {:to (:email profile)
-                   :name (:fullname profile)
-                   :pending-email email
-                   :token token
-                   :extra-data ptoken})
+    (eml/send! {::eml/conn conn
+                ::eml/factory eml/change-email
+                :public-uri (:public-uri cfg)
+                :to (:email profile)
+                :name (:fullname profile)
+                :pending-email email
+                :token token
+                :extra-data ptoken})
     nil))
 
 
@@ -482,16 +498,18 @@
             (let [ptoken (tokens :generate-predefined
                                  {:iss :profile-identity
                                   :profile-id (:id profile)})]
-              (emails/send! conn emails/password-recovery
-                            {:to (:email profile)
-                             :token (:token profile)
-                             :name (:fullname profile)
-                             :extra-data ptoken})
+              (eml/send! {::eml/conn conn
+                          ::eml/factory eml/password-recovery
+                          :public-uri (:public-uri cfg)
+                          :to (:email profile)
+                          :token (:token profile)
+                          :name (:fullname profile)
+                          :extra-data ptoken})
               nil))]
 
     (db/with-atomic [conn pool]
       (when-let [profile (profile/retrieve-profile-data-by-email conn email)]
-        (when-not (emails/allow-send-emails? conn profile)
+        (when-not (eml/allow-send-emails? conn profile)
           (ex/raise :type :validation
                     :code :profile-is-muted
                     :hint "looks like the profile has reported repeatedly as spam or has permanent bounces."))
@@ -501,7 +519,7 @@
                     :code :profile-not-verified
                     :hint "the user need to validate profile before recover password"))
 
-        (when (emails/has-bounce-reports? conn (:email profile))
+        (when (eml/has-bounce-reports? conn (:email profile))
           (ex/raise :type :validation
                     :code :email-has-permanent-bounces
                     :hint "looks like the email you invite has been repeatedly reported as spam or permanent bounce"))
@@ -568,9 +586,10 @@
     (check-can-delete-profile! conn profile-id)
 
     ;; Schedule a complete deletion of profile
-    (tasks/submit! conn {:name "delete-profile"
-                         :delay cfg/deletion-delay
-                         :props {:profile-id profile-id}})
+    (wrk/submit! {::wrk/task :delete-profile
+                  ::wrk/dalay cfg/deletion-delay
+                  ::wrk/conn conn
+                  :profile-id profile-id})
 
     (db/update! conn :profile
                 {:deleted-at (dt/now)}
