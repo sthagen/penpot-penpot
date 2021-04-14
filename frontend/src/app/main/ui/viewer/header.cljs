@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.ui.viewer.header
   (:require
@@ -188,12 +185,12 @@
         total      (count frames)
         locale     (mf/deref i18n/locale)
         profile    (mf/deref refs/profile)
-        anonymous? (= uuid/zero (:id profile))
+        teams      (mf/deref refs/teams)
 
         team-id    (get-in data [:project :team-id])
 
-        has-permission? (and (not anonymous?)
-                             (contains? (:teams profile) team-id))
+        has-permission? (and (not= uuid/zero (:id profile))
+                             (contains? teams team-id))
 
         project-id (get-in data [:project :id])
         file-id    (get-in data [:file :id])

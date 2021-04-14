@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020-2021 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.data.workspace.texts
   (:require
@@ -176,22 +173,21 @@
 
 (defn update-text-attrs
   [{:keys [id attrs]}]
-  (let [attrs (d/without-nils attrs)]
-    (ptk/reify ::update-text-attrs
-      ptk/UpdateEvent
-      (update [_ state]
-        (d/update-in-when state [:workspace-editor-state id] ted/update-editor-current-inline-styles attrs))
+  (ptk/reify ::update-text-attrs
+    ptk/UpdateEvent
+    (update [_ state]
+      (d/update-in-when state [:workspace-editor-state id] ted/update-editor-current-inline-styles attrs))
 
-      ptk/WatchEvent
-      (watch [_ state stream]
-        (when-not (some? (get-in state [:workspace-editor-state id]))
-          (let [objects   (dwc/lookup-page-objects state)
-                shape     (get objects id)
+    ptk/WatchEvent
+    (watch [_ state stream]
+      (when-not (some? (get-in state [:workspace-editor-state id]))
+        (let [objects   (dwc/lookup-page-objects state)
+              shape     (get objects id)
 
-                update-fn #(update-shape % txt/is-text-node? attrs/merge attrs)
-                shape-ids (cond (= (:type shape) :text)  [id]
-                                (= (:type shape) :group) (cp/get-children id objects))]
-            (rx/of (dwc/update-shapes shape-ids update-fn))))))))
+              update-fn #(update-shape % txt/is-text-node? attrs/merge attrs)
+              shape-ids (cond (= (:type shape) :text)  [id]
+                              (= (:type shape) :group) (cp/get-children id objects))]
+          (rx/of (dwc/update-shapes shape-ids update-fn)))))))
 
 ;; --- RESIZE UTILS
 

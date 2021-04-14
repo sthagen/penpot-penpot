@@ -2,9 +2,6 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
 ;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.data.auth
@@ -47,10 +44,10 @@
     (watch [this state stream]
       (let [team-id (current-team-id profile)
             props   (:props profile)]
-        (rx/merge
-         (rx/of (du/profile-fetched profile)
-                (rt/nav' :dashboard-projects {:team-id team-id}))
-
+        (rx/concat
+         (rx/of (du/profile-fetched profile))
+         (rx/of (du/fetch-teams))
+         (rx/of (rt/nav' :dashboard-projects {:team-id team-id}))
          (when-not (:onboarding-viewed props)
            (->> (rx/of (modal/show {:type :onboarding}))
                 (rx/delay 1000))))))))

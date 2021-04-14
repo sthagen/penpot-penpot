@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.data.workspace.common
   (:require
@@ -803,7 +800,8 @@
                       (gsh/setup-selrect))]
         (rx/of (add-shape shape))))))
 
-(defn image-uploaded [image x y]
+(defn image-uploaded
+  [image {:keys [x y]}]
   (ptk/reify ::image-uploaded
     ptk/WatchEvent
     (watch [_ state stream]

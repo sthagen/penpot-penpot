@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.ui.workspace.viewport.outline
   (:require
@@ -68,9 +65,9 @@
    ::mf/wrap [#(mf/memo' % (mf/check-props ["shapes" "zoom"]))]}
   [props]
   (let [shapes (obj/get props "shapes")
-        zoom (obj/get props "zoom")
-        color (if (or (> (count shapes) 1) (nil? (:shape-ref (first shapes))))
-                "#31EFB8" "#00E0FF")]
+        zoom   (obj/get props "zoom")
+        color  (if (or (> (count shapes) 1) (nil? (:shape-ref (first shapes))))
+                 "#31EFB8" "#00E0FF")]
     (for [shape shapes]
       [:& outline {:key (str "outline-" (:id shape))
                    :shape (gsh/transform-shape shape)
@@ -97,7 +94,8 @@
         shapes (->> outlines-ids
                     (filter #(not= edition %))
                     (map #(get objects %))
-                    (filterv show-outline?))]
+                    (filterv show-outline?)
+                    (filter some?))]
 
     [:g.outlines {:display (when (some? transform) "none")}
      [:& shape-outlines-render {:shapes shapes

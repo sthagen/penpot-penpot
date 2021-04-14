@@ -2,22 +2,19 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.util.i18n
   "A i18n foundation."
   (:require
+   [app.config :as cfg]
+   [app.util.storage :refer [storage]]
+   [app.util.transit :as t]
    [beicon.core :as rx]
    [cuerdas.core :as str]
    [goog.object :as gobj]
    [okulary.core :as l]
-   [rumext.alpha :as mf]
-   [app.config :as cfg]
-   [app.util.storage :refer [storage]]
-   [app.util.transit :as t]))
+   [rumext.alpha :as mf]))
 
 (def supported-locales
   [{:label "English" :value "en"}
@@ -26,6 +23,7 @@
    {:label "Deutsch (community)" :value "de"}
    {:label "Русский (community)" :value "ru"}
    {:label "Türkçe (community)" :value "tr"}
+   {:label "Ελληνική γλώσσα (community)" :value "gr"}
    {:label "简体中文 (community)" :value "zh_cn"}])
 
 (defn- parse-locale
@@ -73,6 +71,7 @@
       (swap! storage assoc ::locale lang)
       (reset! locale lang))
     (do
+      (swap! storage dissoc ::locale)
       (reset! locale (autodetect)))))
 
 (defn reset-locale

@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.data.workspace.libraries
   (:require
@@ -160,14 +157,17 @@
     ptk/WatchEvent
     (watch [_ state stream]
       (let [object (get-in state [:workspace-data :media id])
+            [path name] (cp/parse-path-name new-name)
 
             rchanges [{:type :mod-media
                        :object {:id id
-                                :name new-name}}]
+                                :name name
+                                :path path}}]
 
             uchanges [{:type :mod-media
                        :object {:id id
-                                :name (:name object)}}]]
+                                :name (:name object)
+                                :path (:path object)}}]]
 
         (rx/of (dwc/commit-changes rchanges uchanges {:commit-local? true}))))))
 
@@ -193,7 +193,7 @@
        ptk/WatchEvent
        (watch [_ state s]
          (let [rchg {:type :add-typography
-                     :typography (assoc typography :ts (.now js/Date))}
+                     :typography typography}
                uchg {:type :del-typography
                      :id (:id typography)}]
            (rx/of (dwc/commit-changes [rchg] [uchg] {:commit-local? true})
@@ -253,20 +253,24 @@
   (ptk/reify ::rename-component
     ptk/WatchEvent
     (watch [_ state stream]
-      (let [component (get-in state [:workspace-data :components id])
+      (let [[path name] (cp/parse-path-name new-name)
+            component (get-in state [:workspace-data :components id])
             objects (get component :objects)
+            ; Give the same name to the root shape
             new-objects (assoc-in objects
                                   [(:id component) :name]
-                                  new-name)
+                                  name)
 
             rchanges [{:type :mod-component
                        :id id
-                       :name new-name
+                       :name name
+                       :path path
                        :objects new-objects}]
 
             uchanges [{:type :mod-component
                        :id id
                        :name (:name component)
+                       :path (:path component)
                        :objects objects}]]
 
         (rx/of (dwc/commit-changes rchanges uchanges {:commit-local? true}))))))
@@ -291,6 +295,7 @@
             rchanges [{:type :add-component
                        :id (:id new-shape)
                        :name new-name
+                       :path (:path component)
                        :shapes new-shapes}]
 
             uchanges [{:type :del-component
@@ -313,6 +318,7 @@
             uchanges [{:type :add-component
                        :id id
                        :name (:name component)
+                       :path (:path component)
                        :shapes (vals (:objects component))}]]
 
         (rx/of (dwc/commit-changes rchanges uchanges {:commit-local? true}))))))

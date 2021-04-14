@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020-2021 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.ui.workspace.viewport
   (:require
@@ -88,7 +85,11 @@
         zoom              (d/check-num zoom 1)
         drawing-tool      (:tool drawing)
         drawing-obj       (:object drawing)
-        selected-shapes   (->> selected (mapv #(get objects %)))
+
+        selected-shapes   (into []
+                                (comp (map #(get objects %))
+                                      (filter some?))
+                                selected)
         selected-frames   (into #{} (map :frame-id) selected-shapes)
 
         ;; Only when we have all the selected shapes in one frame
@@ -292,7 +293,7 @@
           {:page-id page-id}])
 
        [:& widgets/viewport-actions]
-       
+
        (when show-prototypes?
          [:& interactions/interactions
           {:selected selected}])

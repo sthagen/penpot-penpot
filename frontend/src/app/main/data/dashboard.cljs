@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) 2015-2016 Andrey Antukh <niwi@niwi.nz>
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.data.dashboard
   (:require
@@ -65,8 +65,6 @@
 ;; Data Fetching
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; --- Fetch Team
-
 (defn fetch-team
   [{:keys [id] :as params}]
   (letfn [(fetched [team state]
@@ -117,7 +115,7 @@
 (defn fetch-bundle
   [{:keys [id] :as params}]
   (us/assert ::us/uuid id)
-  (ptk/reify ::fetch-team
+  (ptk/reify ::fetch-bundle
     ptk/WatchEvent
     (watch [_ state stream]
       (let [profile (:profile state)]

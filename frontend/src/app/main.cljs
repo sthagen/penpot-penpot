@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main
   (:require
@@ -14,7 +11,7 @@
    [app.config :as cfg]
    [app.main.data.auth :as da]
    [app.main.data.messages :as dm]
-   [app.main.data.users :as udu]
+   [app.main.data.users :as du]
    [app.main.repo :as rp]
    [app.main.store :as st]
    [app.main.ui :as ui]
@@ -79,20 +76,19 @@
 
 (defn init-ui
   []
-  (st/emit! (rt/initialize-router ui/routes)
-            (rt/initialize-history on-navigate))
-
-  (st/emit! (udu/fetch-profile)
-            (udu/fetch-user-teams))
   (mf/mount (mf/element ui/app) (dom/get-element "app"))
-  (mf/mount (mf/element modal) (dom/get-element "modal")))
+  (mf/mount (mf/element modal)  (dom/get-element "modal")))
 
 (defn ^:export init
   []
   (i18n/init! cfg/translations)
   (theme/init! cfg/themes)
   (st/init)
-  (init-ui))
+  (init-ui)
+
+  (st/emit! (rt/initialize-router ui/routes)
+            (rt/initialize-history on-navigate)
+            (du/fetch-profile-and-teams)))
 
 (defn reinit
   []

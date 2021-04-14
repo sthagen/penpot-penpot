@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.ui.viewer
   (:require
@@ -265,19 +262,18 @@
 
 (mf/defc viewer-page
   [{:keys [file-id page-id index token section] :as props}]
-
-  (mf/use-effect
-   (mf/deps file-id page-id token)
-   (st/emitf (dv/initialize props)))
-
   (let [data  (mf/deref refs/viewer-data)
         state (mf/deref refs/viewer-local)]
 
     (mf/use-effect
+     (mf/deps file-id page-id token)
+     (fn []
+       (st/emit! (dv/initialize props))))
+
+    (mf/use-effect
       (mf/deps (:file data))
-      #(when (:file data)
-         (dom/set-html-title (tr "title.viewer"
-                                 (get-in data [:file :name])))))
+      #(when-let [name (get-in data [:file :name])]
+         (dom/set-html-title (tr "title.viewer" name))))
 
     (when (and data state)
       [:& viewer-content

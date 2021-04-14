@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.ui.icons
   (:require-macros [app.main.ui.icons :refer [icon-xref]])
@@ -63,6 +60,8 @@
 (def libraries (icon-xref :libraries))
 (def library (icon-xref :library))
 (def line (icon-xref :line))
+(def listing-enum (icon-xref :listing-enum))
+(def listing-thumbs (icon-xref :listing-thumbs))
 (def line-height (icon-xref :line-height))
 (def loader (icon-xref :loader))
 (def lock (icon-xref :lock))
@@ -120,6 +119,8 @@
 (def shape-vdistribute (icon-xref :shape-vdistribute))
 (def size-horiz (icon-xref :size-horiz))
 (def size-vert (icon-xref :size-vert))
+(def sort-ascending (icon-xref :sort-ascending))
+(def sort-descending (icon-xref :sort-descending))
 (def strikethrough (icon-xref :strikethrough))
 (def stroke (icon-xref :stroke))
 (def sublevel (icon-xref :sublevel))

@@ -5,18 +5,39 @@
 ### :sparkles: New features
 
 - Add integration with gitpod.io (an online IDE) [#807](https://github.com/penpot/penpot/pull/807)
+- Allow to group assets (components and graphics) [Taiga #1289](https://tree.taiga.io/project/penpot/us/1289)
+- Internal: refactor of http client, replace internal xhr usage with more modern Fetch API.
 
 
 ### :bug: Bugs fixed
 
 - Fixes problem with pan and space [#811](https://github.com/penpot/penpot/issues/811)
+- Fixes issue when parsing exponential numbers in paths
 
 ### :arrow_up: Deps updates
+
+### :boom: Breaking changes
+
+- Translations refactor: now penpot uses gettext instead of a custom
+  JSON, and each locale has its own separated file. All translations
+  should be contributed via the weblate.org service.
 
 ### :heart: Community contributions by (Thank you!)
 
 - madmath03 (by [Monogramm](https://github.com/Monogramm)) [#807](https://github.com/penpot/penpot/pull/807)
 - zzkt [#814](https://github.com/penpot/penpot/pull/814)
+
+
+## 1.4.1-alpha
+
+### :bug: Bugs fixed
+
+- Fix typography unlinking.
+- Fix incorrect measures on shapes outside artboard.
+- Fix issues on svg parsing related to numbers with exponents.
+- Fix some race conditions on removing shape from workspace.
+- Fix incorrect state management of user lang selection.
+- Fix email validation usability issue on team invitation lightbox.
 
 
 ## 1.4.0-alpha

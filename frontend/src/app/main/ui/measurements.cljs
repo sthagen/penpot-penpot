@@ -2,21 +2,19 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.ui.measurements
   (:require
-   [rumext.alpha :as mf]
+   [app.common.data :as d]
+   [app.common.geom.point :as gpt]
+   [app.common.geom.shapes :as gsh]
+   [app.common.math :as mth]
+   [app.common.uuid :as uuid]
+   [app.main.store :as st]
    [cuerdas.core :as str]
    [okulary.core :as l]
-   [app.common.data :as d]
-   [app.common.math :as mth]
-   [app.common.geom.shapes :as gsh]
-   [app.common.geom.point :as gpt]
-   [app.main.store :as st]))
+   [rumext.alpha :as mf]))
 
 ;; ------------------------------------------------
 ;; CONSTANTS
@@ -233,7 +231,8 @@
                      :stroke-width (/ select-guide-width zoom)
                      :stroke-dasharray (/ select-guide-dasharray zoom)}}])])
 
-(mf/defc measurement [{:keys [bounds frame selected-shapes hover-shape zoom]}]
+(mf/defc measurement
+  [{:keys [bounds frame selected-shapes hover-shape zoom]}]
   (let [selected-ids          (into #{} (map :id) selected-shapes)
         selected-selrect      (gsh/selection-rect selected-shapes)
         hover-selrect         (:selrect hover-shape)
@@ -244,9 +243,9 @@
       [:g.measurement-feedback {:pointer-events "none"}
        [:& selection-guides {:selrect selected-selrect :bounds bounds :zoom zoom}]
        [:& size-display {:selrect selected-selrect :zoom zoom}]
-       
+
        (if (or (not hover-shape) (not hover-selected-shape?))
-         (when frame
+         (when (and frame (not= uuid/zero (:id frame)))
            [:g.hover-shapes
             [:& distance-display {:from (:selrect frame)
                                   :to selected-selrect

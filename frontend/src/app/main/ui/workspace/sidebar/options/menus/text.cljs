@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.ui.workspace.sidebar.options.menus.text
   (:require
@@ -240,18 +237,19 @@
             (when-not (empty? attrs)
               (st/emit! (dwt/update-text-attrs {:id id :attrs attrs})))))
 
-        typography (cond
-                     (and (:typography-ref-id values)
-                          (not= (:typography-ref-id values) :multiple)
-                          (not= (:typography-ref-file values) file-id))
-                     (-> shared-libs
-                         (get-in [(:typography-ref-file values) :data :typographies (:typography-ref-id values)])
-                         (assoc :file-id (:typography-ref-file values)))
+        typography
+        (cond
+          (and (:typography-ref-id values)
+               (not= (:typography-ref-id values) :multiple)
+               (not= (:typography-ref-file values) file-id))
+          (-> shared-libs
+              (get-in [(:typography-ref-file values) :data :typographies (:typography-ref-id values)])
+              (assoc :file-id (:typography-ref-file values)))
 
-                     (and (:typography-ref-id values)
-                          (not= (:typography-ref-id values) :multiple)
-                          (= (:typography-ref-file values) file-id))
-                     (get typographies (:typography-ref-id values)))
+          (and (:typography-ref-id values)
+               (not= (:typography-ref-id values) :multiple)
+               (= (:typography-ref-file values) file-id))
+          (get typographies (:typography-ref-id values)))
 
         on-convert-to-typography
         (mf/use-callback

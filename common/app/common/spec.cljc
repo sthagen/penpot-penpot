@@ -2,10 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; This Source Code Form is "Incompatible With Secondary Licenses", as
-;; defined by the Mozilla Public License, v. 2.0.
-;;
-;; Copyright (c) 2020 UXBOX Labs SL
+;; Copyright (c) UXBOX Labs SL
 
 (ns app.common.spec
   "Data manipulation and query helper functions."
@@ -24,9 +21,6 @@
 (s/check-asserts true)
 
 ;; --- Constants
-
-(def email-rx
-  #"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 
 (def uuid-rx
   #"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -86,12 +80,6 @@
     v
     ::s/invalid))
 
-(defn- email-conformer
-  [v]
-  (if (and (string? v) (re-matches email-rx v))
-    v
-    ::s/invalid))
-
 (defn keyword-conformer
   [v]
   (cond
@@ -109,7 +97,6 @@
 (s/def ::keyword (s/conformer keyword-conformer name))
 (s/def ::inst inst?)
 (s/def ::string string?)
-(s/def ::email (s/conformer email-conformer str))
 (s/def ::color (s/conformer color-conformer str))
 (s/def ::uuid (s/conformer uuid-conformer str))
 (s/def ::boolean (s/conformer boolean-conformer boolean-unformer))
@@ -133,6 +120,18 @@
         (float? %))
     (>= % min-safe-int)
     (<= % max-safe-int)))
+
+
+;; --- SPEC: email
+
+(let [re  #"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
+      cfn (fn [v]
+            (if (string? v)
+              (if-let [matches (re-seq re v)]
+                (first matches)
+                (do ::s/invalid))
+              ::s/invalid))]
+  (s/def ::email (s/conformer cfn str)))
 
 ;; --- Macros
 
