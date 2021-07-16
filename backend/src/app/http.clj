@@ -125,8 +125,7 @@
     ["/assets" {:middleware [[middleware/format-response-body]
                              [middleware/errors errors/handle]
                              [middleware/cookies]
-                             (:middleware session)
-                             middleware/activity-logger]}
+                             (:middleware session)]}
      ["/by-id/:id" {:get (:objects-handler assets)}]
      ["/by-file-media-id/:id" {:get (:file-objects-handler assets)}]
      ["/by-file-media-id/:id/thumbnail" {:get (:file-thumbnails-handler assets)}]]
@@ -149,18 +148,10 @@
      ["/feedback" {:middleware [(:middleware session)]
                    :post feedback}]
 
-     ["/oauth"
-      ["/google" {:post (get-in oauth [:google :handler])}]
-      ["/google/callback" {:get (get-in oauth [:google :callback-handler])}]
+     ["/auth/oauth/:provider" {:post (:handler oauth)}]
+     ["/auth/oauth/:provider/callback" {:get (:callback-handler oauth)}]
 
-      ["/gitlab" {:post (get-in oauth [:gitlab :handler])}]
-      ["/gitlab/callback" {:get (get-in oauth [:gitlab :callback-handler])}]
-
-      ["/github" {:post (get-in oauth [:github :handler])}]
-      ["/github/callback" {:get (get-in oauth [:github :callback-handler])}]]
-
-     ["/rpc" {:middleware [(:middleware session)
-                           middleware/activity-logger]}
+     ["/rpc" {:middleware [(:middleware session)]}
       ["/query/:type" {:get (:query-handler rpc)
                        :post (:query-handler rpc)}]
       ["/mutation/:type" {:post (:mutation-handler rpc)}]]]]))

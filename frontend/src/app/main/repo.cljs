@@ -6,19 +6,18 @@
 
 (ns app.main.repo
   (:require
-   [beicon.core :as rx]
-   [lambdaisland.uri :as u]
-   [cuerdas.core :as str]
+   [app.common.data :as d]
+   [app.common.uri :as u]
    [app.config :as cfg]
-   [app.util.transit :as t]
-   [app.util.http :as http]))
+   [app.util.http :as http]
+   [beicon.core :as rx]))
 
-(defn- handle-response
+(defn handle-response
   [{:keys [status body] :as response}]
   (cond
     (= 204 status)
     ;; We need to send "something" so the streams listening downstream can act
-    (rx/of :empty)
+    (rx/of nil)
 
     (= 502 status)
     (rx/throw {:type :bad-gateway})
@@ -41,7 +40,7 @@
                :status status
                :data body})))
 
-(def ^:private base-uri (u/uri cfg/public-uri))
+(def ^:private base-uri cfg/public-uri)
 
 (defn- send-query!
   "A simple helper for send and receive transit data on the penpot
@@ -84,29 +83,16 @@
   ([id] (mutation id {}))
   ([id params] (mutation id params)))
 
-(defmethod mutation :login-with-google
-  [id params]
-  (let [uri (u/join base-uri "api/oauth/google")]
-    (->> (http/send! {:method :post :uri uri :query params})
-         (rx/map http/conditional-decode-transit)
-         (rx/mapcat handle-response))))
-
-(defmethod mutation :login-with-gitlab
-  [id params]
-  (let [uri (u/join base-uri "api/oauth/gitlab")]
-    (->> (http/send! {:method :post :uri uri :query params})
-         (rx/map http/conditional-decode-transit)
-         (rx/mapcat handle-response))))
-
-(defmethod mutation :login-with-github
-  [id params]
-  (let [uri (u/join base-uri "api/oauth/github")]
+(defmethod mutation :login-with-oauth
+  [_ {:keys [provider] :as params}]
+  (let [uri    (u/join base-uri "api/auth/oauth/" (d/name provider))
+        params (dissoc params :provider)]
     (->> (http/send! {:method :post :uri uri :query params})
          (rx/map http/conditional-decode-transit)
          (rx/mapcat handle-response))))
 
 (defmethod mutation :send-feedback
-  [id params]
+  [_ params]
   (->> (http/send! {:method :post
                     :uri (u/join base-uri "api/feedback")
                     :body (http/transit-data params)})
@@ -114,19 +100,11 @@
        (rx/mapcat handle-response)))
 
 (defmethod query :export
-  [id params]
+  [_ params]
   (->> (http/send! {:method :post
                     :uri (u/join base-uri "export")
                     :body (http/transit-data params)
                     :response-type :blob})
-       (rx/mapcat handle-response)))
-
-(defmethod query :parsed-svg
-  [id params]
-  (->> (http/send! {:method :post
-                    :uri (u/join base-uri "api/rpc/query/" (name id))
-                    :body (http/transit-data params)})
-       (rx/map http/conditional-decode-transit)
        (rx/mapcat handle-response)))
 
 (derive :upload-file-media-object ::multipart-upload)
@@ -136,7 +114,7 @@
 (defmethod mutation ::multipart-upload
   [id params]
   (->> (http/send! {:method :post
-                    :uri  (u/join base-uri "/api/rpc/mutation/" (name id))
+                    :uri  (u/join base-uri "api/rpc/mutation/" (name id))
                     :body (http/form-data params)})
        (rx/map http/conditional-decode-transit)
        (rx/mapcat handle-response)))

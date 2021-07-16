@@ -6,78 +6,38 @@
 
 (ns app.util.storage
   (:require
-   [app.util.transit :as t]
-   [app.util.timers :as tm]
-   [app.common.exceptions :as ex]))
-
-(defn- ^boolean is-worker?
-  []
-  (or (= *target* "nodejs")
-      (not (exists? js/window))))
-
-(defn- decode
-  [v]
-  (ex/ignoring (t/decode v)))
-
-(def local
-  {:get #(decode (.getItem ^js js/localStorage (name %)))
-   :set #(.setItem ^js js/localStorage (name %1) (t/encode %2))})
-
-(def session
-  {:get #(decode (.getItem ^js js/sessionStorage (name %)))
-   :set #(.setItem ^js js/sessionStorage (name %1) (t/encode %2))})
+   [app.common.transit :as t]
+   [app.util.globals :as g]
+   [app.util.timers :as tm]))
 
 (defn- persist
-  [alias storage value]
-  (when-not (is-worker?)
-    (tm/schedule-on-idle
-     (fn [] ((:set storage) alias value)))))
+  [storage prev curr]
+  (run! (fn [key]
+          (let [prev* (get prev key)
+                curr* (get curr key)]
+            (when (not= curr* prev*)
+              (tm/schedule-on-idle
+               #(if (some? curr*)
+                  (.setItem ^js storage (t/encode-str key) (t/encode-str curr*))
+                  (.removeItem ^js storage (t/encode-str key)))))))
+
+        (into #{} (concat (keys curr)
+                          (keys prev)))))
 
 (defn- load
-  [alias storage]
-  (when-not (is-worker?)
-    ((:get storage) alias)))
-
-(defn- make-storage
-  [alias storage]
-  (let [data (atom (load alias storage))]
-    (add-watch data :sub #(persist alias storage %4))
-    (reify
-      Object
-      (toString [_]
-        (str "Storage" (pr-str @data)))
-
-      ICounted
-      (-count [_]
-        (count @data))
-
-      ISeqable
-      (-seq [_]
-        (seq @data))
-
-      IReset
-      (-reset! [self newval]
-        (reset! data newval))
-
-      ISwap
-      (-swap! [self f]
-        (swap! data f))
-      (-swap! [self f x]
-        (swap! data f x))
-      (-swap! [self f x y]
-        (swap! data f x y))
-      (-swap! [self f x y more]
-        (apply swap! data f x y more))
-
-      ILookup
-      (-lookup [_ key]
-        (get @data key nil))
-      (-lookup [_ key not-found]
-        (get @data key not-found)))))
+  [storage]
+  (when storage
+    (let [len (.-length ^js storage)]
+      (reduce (fn [res index]
+                (let [key (.key ^js storage index)
+                      val (.getItem ^js storage key)]
+                  (try
+                    (assoc res (t/decode-str key) (t/decode-str val))
+                    (catch :default _e
+                      res))))
+              {}
+              (range len)))))
 
 
-(defonce storage
-  (make-storage "app" local))
-
-(defonce cache
-  (make-storage "cache" session))
+(defonce storage (atom (load (unchecked-get g/global "localStorage"))))
+(add-watch storage :persistence #(persist js/localStorage %3 %4))

@@ -6,14 +6,12 @@
 
 (ns app.main.ui.components.context-menu
   (:require
-   [rumext.alpha :as mf]
-   [goog.object :as gobj]
    [app.main.ui.components.dropdown :refer [dropdown']]
    [app.main.ui.icons :as i]
-   [app.common.uuid :as uuid]
-   [app.util.data :refer [classnames]]
    [app.util.dom :as dom]
-   [app.util.object :as obj]))
+   [app.util.object :as obj]
+   [goog.object :as gobj]
+   [rumext.alpha :as mf]))
 
 (mf/defc context-menu
   {::mf/wrap-props false}
@@ -22,18 +20,18 @@
   (assert (boolean? (gobj/get props "show")) "missing `show` prop")
   (assert (vector? (gobj/get props "options")) "missing `options` prop")
 
-  (let [open? (gobj/get props "show")
-        on-close (gobj/get props "on-close")
-        options (gobj/get props "options")
+  (let [open?         (gobj/get props "show")
+        on-close      (gobj/get props "on-close")
+        options       (gobj/get props "options")
         is-selectable (gobj/get props "selectable")
-        selected (gobj/get props "selected")
-        top (gobj/get props "top" 0)
-        left (gobj/get props "left" 0)
-        fixed? (gobj/get props "fixed?" false)
-        min-width? (gobj/get props "min-width?" false)
+        selected      (gobj/get props "selected")
+        top           (gobj/get props "top" 0)
+        left          (gobj/get props "left" 0)
+        fixed?        (gobj/get props "fixed?" false)
+        min-width?    (gobj/get props "min-width?" false)
 
-        local (mf/use-state {:offset 0
-                             :levels nil})
+        local         (mf/use-state {:offset 0
+                                     :levels nil})
 
         on-local-close
         (mf/use-callback
@@ -46,14 +44,14 @@
         (mf/use-callback
          (mf/deps top (:offset @local))
          (fn [node]
-           (when (and node (not fixed?))
+           (when (some? node)
              (let [{node-height :height}   (dom/get-bounding-rect node)
                    {window-height :height} (dom/get-window-size)
                    target-offset (if (> (+ top node-height) window-height)
                                    (- node-height)
                                    0)]
 
-               (if (not= target-offset (:offset @local))
+               (when (not= target-offset (:offset @local))
                  (swap! local assoc :offset target-offset))))))
 
         enter-submenu
@@ -81,13 +79,13 @@
 
     (when (and open? (some? (:levels @local)))
       [:> dropdown' props
-       [:div.context-menu {:class (classnames :is-open open?
-                                              :fixed fixed?
-                                              :is-selectable is-selectable)
+       [:div.context-menu {:class (dom/classnames :is-open open?
+                                                  :fixed fixed?
+                                                  :is-selectable is-selectable)
                            :style {:top (+ top (:offset @local))
                                    :left left}}
         (let [level (-> @local :levels peek)]
-          [:ul.context-menu-items {:class (classnames :min-width min-width?)
+          [:ul.context-menu-items {:class (dom/classnames :min-width min-width?)
                                    :ref check-menu-offscreen}
            (when-let [parent-option (:parent-option level)]
              [:*
@@ -103,11 +101,12 @@
                (if (= option-name :separator)
                  [:li.separator]
                  [:li.context-menu-item
-                  {:class (classnames :is-selected (and selected
-                                                        (= option-name selected)))
+                  {:class (dom/classnames :is-selected (and selected (= option-name selected)))
                    :key option-name}
                   (if-not sub-options
-                    [:a.context-menu-action {:on-click option-handler}
+                    [:a.context-menu-action {:on-click #(do (dom/stop-propagation %)
+                                                            (on-close)
+                                                            (option-handler %))}
                      option-name]
                     [:a.context-menu-action.submenu
                      {:data-no-close true

@@ -76,6 +76,7 @@
 
     {:status 500
      :body {:type :server-error
+            :code :assertion
             :data (-> edata
                       (assoc :explain (explain-error edata))
                       (dissoc :data))}}))
@@ -103,6 +104,7 @@
                  :cause error)
         {:status 500
          :body {:type :server-error
+                :code :unexpected
                 :hint (ex-message error)
                 :data edata}}))))
 
@@ -115,7 +117,8 @@
     (l/error :hint "psql exception"
              :error-message (ex-message error)
              :error-id (str (:id cdata))
-             :sql-state state)
+             :sql-state state
+             :cause error)
 
     (cond
       (= state "57014")
@@ -132,7 +135,8 @@
 
       :else
       {:status 500
-       :body {:type :server-timeout
+       :body {:type :server-error
+              :code :psql-exception
               :hint (ex-message error)
               :state state}})))
 

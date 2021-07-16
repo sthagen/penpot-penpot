@@ -6,12 +6,15 @@
 
 (ns app.rpc.queries.files
   (:require
-   [app.common.exceptions :as ex]
    [app.common.pages.migrations :as pmg]
    [app.common.spec :as us]
+   [app.common.uuid :as uuid]
+   [app.config :as cf]
    [app.db :as db]
    [app.rpc.permissions :as perms]
    [app.rpc.queries.projects :as projects]
+   [app.rpc.queries.teams :as teams]
+   [app.storage.impl :as simpl]
    [app.util.blob :as blob]
    [app.util.services :as sv]
    [clojure.spec.alpha :as s]))
@@ -97,7 +100,13 @@
              ppr.is_owner = true or
              ppr.can_edit = true)
    )
-   select distinct f.*
+   select distinct
+          f.id,
+          f.project_id,
+          f.created_at,
+          f.modified_at,
+          f.name,
+          f.is_shared
      from file as f
     inner join projects as pr on (f.project_id = pr.id)
     where f.name ilike ('%' || ? || '%')
@@ -105,18 +114,21 @@
     order by f.created_at asc")
 
 (s/def ::search-files
-  (s/keys :req-un [::profile-id ::team-id ::search-term]))
+  (s/keys :req-un [::profile-id ::team-id]
+          :opt-un [::search-term]))
 
 (sv/defmethod ::search-files
   [{:keys [pool] :as cfg} {:keys [profile-id team-id search-term] :as params}]
-  (let [rows (db/exec! pool [sql:search-files
-                                profile-id team-id
-                                profile-id team-id
-                                search-term])]
-    (into [] decode-row-xf rows)))
+  (when search-term
+    (db/exec! pool [sql:search-files
+                    profile-id team-id
+                    profile-id team-id
+                    search-term])))
 
 
-;; --- Query: Project Files
+;; --- Query: Files
+
+;; DEPRECATED: should be removed probably on 1.6.x
 
 (def ^:private sql:files
   "select f.*
@@ -136,13 +148,48 @@
     (into [] decode-row-xf (db/exec! conn [sql:files project-id]))))
 
 
+;; --- Query: Project Files
+
+(def ^:private sql:project-files
+  "select f.id,
+          f.project_id,
+          f.created_at,
+          f.modified_at,
+          f.name,
+          f.is_shared
+     from file as f
+    where f.project_id = ?
+      and f.deleted_at is null
+    order by f.modified_at desc")
+
+(s/def ::project-files
+  (s/keys :req-un [::profile-id ::project-id]))
+
+(sv/defmethod ::project-files
+  [{:keys [pool] :as cfg} {:keys [profile-id project-id] :as params}]
+  (with-open [conn (db/open pool)]
+    (projects/check-read-permissions! conn profile-id project-id)
+    (db/exec! conn [sql:project-files project-id])))
+
 ;; --- Query: File (By ID)
 
+(defn- retrieve-data*
+  [{:keys [storage] :as cfg} file]
+  (when-let [backend (simpl/resolve-backend storage (cf/get :fdata-storage-backend))]
+    (simpl/get-object-bytes backend file)))
+
+(defn retrieve-data
+  [cfg file]
+  (if (bytes? (:data file))
+    file
+    (assoc file :data (retrieve-data* cfg file))))
+
 (defn retrieve-file
-  [conn id]
-  (-> (db/get-by-id conn :file id)
-      (decode-row)
-      (pmg/migrate-file)))
+  [{:keys [conn] :as cfg} id]
+  (->> (db/get-by-id conn :file id)
+       (retrieve-data cfg)
+       (decode-row)
+       (pmg/migrate-file)))
 
 (s/def ::file
   (s/keys :req-un [::profile-id ::id]))
@@ -150,20 +197,54 @@
 (sv/defmethod ::file
   [{:keys [pool] :as cfg} {:keys [profile-id id] :as params}]
   (db/with-atomic [conn pool]
-    (check-edition-permissions! conn profile-id id)
-    (retrieve-file conn id)))
+    (let [cfg (assoc cfg :conn conn)]
+      (check-edition-permissions! conn profile-id id)
+      (retrieve-file cfg id))))
 
 (s/def ::page
-  (s/keys :req-un [::profile-id ::id ::file-id]))
+  (s/keys :req-un [::profile-id ::file-id]))
+
+(defn remove-thumbnails-frames
+  "Removes from data the children for frames that have a thumbnail set up"
+  [data]
+  (let [filter-shape?
+        (fn [objects [id shape]]
+          (let [frame-id (:frame-id shape)]
+            (or (= id uuid/zero)
+                (= frame-id uuid/zero)
+                (not (some? (get-in objects [frame-id :thumbnail]))))))
+
+        ;; We need to remove from the attribute :shapes its childrens because
+        ;; they will not be sent in the data
+        remove-frame-children
+        (fn [[id shape]]
+          [id (cond-> shape
+                (some? (:thumbnail shape))
+                (assoc :shapes []))])
+
+        update-objects
+        (fn [objects]
+          (into {}
+                (comp (map remove-frame-children)
+                      (filter (partial filter-shape? objects)))
+                objects))]
+
+    (update data :objects update-objects)))
 
 (sv/defmethod ::page
-  [{:keys [pool] :as cfg} {:keys [profile-id file-id id]}]
+  [{:keys [pool] :as cfg} {:keys [profile-id file-id strip-thumbnails]}]
   (db/with-atomic [conn pool]
     (check-edition-permissions! conn profile-id file-id)
-    (let [file (retrieve-file conn file-id)]
-      (get-in file [:data :pages-index id]))))
+    (let [cfg     (assoc cfg :conn conn)
+          file    (retrieve-file cfg file-id)
+          page-id (get-in file [:data :pages 0])]
+      (cond-> (get-in file [:data :pages-index page-id])
+        strip-thumbnails
+        (remove-thumbnails-frames)))))
 
 ;; --- Query: Shared Library Files
+
+;; DEPRECATED: and will be removed on 1.6.x
 
 (def ^:private sql:shared-files
   "select f.*
@@ -179,39 +260,68 @@
   (s/keys :req-un [::profile-id ::team-id]))
 
 (sv/defmethod ::shared-files
-  [{:keys [pool] :as cfg} {:keys [profile-id team-id] :as params}]
+  [{:keys [pool] :as cfg} {:keys [team-id] :as params}]
   (into [] decode-row-xf (db/exec! pool [sql:shared-files team-id])))
+
+
+;; --- Query: Shared Library Files
+
+(def ^:private sql:team-shared-files
+  "select f.id,
+          f.project_id,
+          f.created_at,
+          f.modified_at,
+          f.name,
+          f.is_shared
+     from file as f
+    inner join project as p on (p.id = f.project_id)
+    where f.is_shared = true
+      and f.deleted_at is null
+      and p.deleted_at is null
+      and p.team_id = ?
+    order by f.modified_at desc")
+
+(s/def ::team-shared-files
+  (s/keys :req-un [::profile-id ::team-id]))
+
+(sv/defmethod ::team-shared-files
+  [{:keys [pool] :as cfg} {:keys [team-id] :as params}]
+  (db/exec! pool [sql:team-shared-files team-id]))
 
 
 ;; --- Query: File Libraries used by a File
 
 (def ^:private sql:file-libraries
-  "select fl.*,
-          ? as is_indirect,
-          flr.synced_at as synced_at
-     from file as fl
-    inner join file_library_rel as flr on (flr.library_file_id = fl.id)
-    where flr.file_id = ?
-      and fl.deleted_at is null")
+  "WITH RECURSIVE libs AS (
+     SELECT fl.*, flr.synced_at
+       FROM file AS fl
+       JOIN file_library_rel AS flr ON (flr.library_file_id = fl.id)
+      WHERE flr.file_id = ?::uuid
+    UNION
+     SELECT fl.*, flr.synced_at
+       FROM file AS fl
+       JOIN file_library_rel AS flr ON (flr.library_file_id = fl.id)
+       JOIN libs AS l ON (flr.file_id = l.id)
+   )
+   SELECT l.id,
+          l.data,
+          l.project_id,
+          l.created_at,
+          l.modified_at,
+          l.deleted_at,
+          l.name,
+          l.revn,
+          l.synced_at
+     FROM libs AS l
+    WHERE l.deleted_at IS NULL OR l.deleted_at > now();")
 
 (defn retrieve-file-libraries
-  [conn is-indirect file-id]
-  (let [direct-libraries
-        (into [] decode-row-xf (db/exec! conn [sql:file-libraries is-indirect file-id]))
-
-        select-distinct
-        (fn [used-libraries new-libraries]
-          (remove (fn [new-library]
-                    (some #(= (:id %) (:id new-library)) used-libraries))
-                  new-libraries))]
-
-    (reduce (fn [used-libraries library]
-              (concat used-libraries
-                      (select-distinct
-                        used-libraries
-                        (retrieve-file-libraries conn true (:id library)))))
-            direct-libraries
-            direct-libraries)))
+  [{:keys [conn] :as cfg} is-indirect file-id]
+  (let [xform (comp
+               (map #(assoc % :is-indirect is-indirect))
+               (map #(retrieve-data cfg %))
+               (map decode-row))]
+    (into #{} xform (db/exec! conn [sql:file-libraries file-id]))))
 
 (s/def ::file-libraries
   (s/keys :req-un [::profile-id ::file-id]))
@@ -219,35 +329,39 @@
 (sv/defmethod ::file-libraries
   [{:keys [pool] :as cfg} {:keys [profile-id file-id] :as params}]
   (db/with-atomic [conn pool]
-    (check-edition-permissions! conn profile-id file-id)
-    (retrieve-file-libraries conn false file-id)))
+    (let [cfg (assoc cfg :conn conn)]
+      (check-edition-permissions! conn profile-id file-id)
+      (retrieve-file-libraries cfg false file-id))))
 
+;; --- QUERY: team-recent-files
 
-;; --- Query: Single File Library
+(def sql:team-recent-files
+  "with recent_files as (
+     select f.id,
+            f.project_id,
+            f.created_at,
+            f.modified_at,
+            f.name,
+            f.is_shared,
+            row_number() over w as row_num
+       from file as f
+       join project as p on (p.id = f.project_id)
+      where p.team_id = ?
+        and p.deleted_at is null
+        and f.deleted_at is null
+     window w as (partition by f.project_id order by f.modified_at desc)
+      order by f.modified_at desc
+   )
+   select * from recent_files where row_num <= 10;")
 
-;; TODO: this looks like is duplicate of `::file`
+(s/def ::team-recent-files
+  (s/keys :req-un [::profile-id ::team-id]))
 
-(def ^:private sql:file-library
-  "select fl.*
-     from file as fl
-    where fl.id = ?")
-
-(defn retrieve-file-library
-  [conn file-id]
-  (let [rows (db/exec! conn [sql:file-library file-id])]
-    (when-not (seq rows)
-      (ex/raise :type :not-found))
-    (first (sequence decode-row-xf rows))))
-
-(s/def ::file-library
-  (s/keys :req-un [::profile-id ::file-id]))
-
-(sv/defmethod ::file-library
-  [{:keys [pool] :as cfg} {:keys [profile-id file-id] :as params}]
-  (db/with-atomic [conn pool]
-    (check-edition-permissions! conn profile-id file-id) ;; TODO: this should check read permissions
-    (retrieve-file-library conn file-id)))
-
+(sv/defmethod ::team-recent-files
+  [{:keys [pool] :as cfg} {:keys [profile-id team-id]}]
+  (with-open [conn (db/open pool)]
+    (teams/check-read-permissions! conn profile-id team-id)
+    (db/exec! conn [sql:team-recent-files team-id])))
 
 ;; --- Helpers
 

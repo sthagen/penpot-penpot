@@ -6,9 +6,8 @@
 
 (ns app.worker.impl
   (:require
-   [okulary.core :as l]
-   [app.util.transit :as t]
-   [app.common.pages.changes :as ch]))
+   [app.common.pages.changes :as ch]
+   [okulary.core :as l]))
 
 (enable-console-print!)
 
@@ -39,11 +38,15 @@
 (defmethod handler :update-page-indices
   [{:keys [page-id changes] :as message}]
 
-  (swap! state ch/process-changes changes false)
+  (let [old-objects (get-in @state [:pages-index page-id :objects])]
+    (swap! state ch/process-changes changes false)
 
-  (let [objects (get-in @state [:pages-index page-id :objects])
-        message (assoc message :objects objects)]
-    (handler (-> message
-                 (assoc :cmd :selection/update-index)))
-    (handler (-> message
-                 (assoc :cmd :snaps/update-index)))))
+    (let [new-objects (get-in @state [:pages-index page-id :objects])
+          message (assoc message
+                         :objects new-objects
+                         :new-objects new-objects
+                         :old-objects old-objects)]
+      (handler (-> message
+                   (assoc :cmd :selection/update-index)))
+      (handler (-> message
+                   (assoc :cmd :snaps/update-index))))))

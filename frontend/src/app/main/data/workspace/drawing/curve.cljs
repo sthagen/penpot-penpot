@@ -6,20 +6,19 @@
 
 (ns app.main.data.workspace.drawing.curve
   (:require
-   [beicon.core :as rx]
-   [potok.core :as ptk]
-   [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
    [app.common.geom.shapes.path :as gsp]
-   [app.main.streams :as ms]
-   [app.util.geom.path :as path]
+   [app.common.pages :as cp]
    [app.main.data.workspace.drawing.common :as common]
-   [app.main.data.workspace.common :as dwc]
-   [app.common.pages :as cp]))
+   [app.main.data.workspace.state-helpers :as wsh]
+   [app.main.streams :as ms]
+   [app.util.path.simplify-curve :as ups]
+   [beicon.core :as rx]
+   [potok.core :as ptk]))
 
 (def simplify-tolerance 0.3)
 
-(defn stoper-event? [{:keys [type shift] :as event}]
+(defn stoper-event? [{:keys [type] :as event}]
   (ms/mouse-event? event) (= type :up))
 
 (defn initialize-drawing [state]
@@ -45,7 +44,7 @@
     ptk/UpdateEvent
     (update [_ state]
 
-      (let [objects (dwc/lookup-page-objects state)
+      (let [objects (wsh/lookup-page-objects state)
             content (get-in state [:workspace-drawing :object :content] [])
             position (get-in content [0 :params] nil)
             frame-id  (cp/frame-id-by-position objects position)]
@@ -67,15 +66,14 @@
    state [:workspace-drawing :object]
    (fn [shape]
      (-> shape
-         (update :segments #(path/simplify % simplify-tolerance))
+         (update :segments #(ups/simplify % simplify-tolerance))
          (curve-to-path)))))
 
 (defn handle-drawing-curve []
   (ptk/reify ::handle-drawing-curve
     ptk/WatchEvent
-    (watch [_ state stream]
-      (let [{:keys [flags]} (:workspace-local state)
-            stoper (rx/filter stoper-event? stream)
+    (watch [_ _ stream]
+      (let [stoper (rx/filter stoper-event? stream)
             mouse  (rx/sample 10 ms/mouse-position)]
         (rx/concat
          (rx/of initialize-drawing)
@@ -85,3 +83,4 @@
          (rx/of (setup-frame-curve)
                 finish-drawing-curve
                 common/handle-finish-drawing))))))
+

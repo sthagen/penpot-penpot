@@ -8,7 +8,7 @@ const gulpGzip = require("gulp-gzip");
 const gulpMustache = require("gulp-mustache");
 const gulpPostcss = require("gulp-postcss");
 const gulpRename = require("gulp-rename");
-const gulpSass = require("gulp-sass");
+const gulpSass = require("gulp-sass")(require("sass"));
 const svgSprite = require("gulp-svg-sprite");
 
 const autoprefixer = require("autoprefixer")
@@ -17,6 +17,7 @@ const mkdirp = require("mkdirp");
 const rimraf = require("rimraf");
 const sass = require("sass");
 const gettext = require("gettext-parser");
+const marked = require("marked");
 
 const mapStream = require("map-stream");
 const paths = {};
@@ -32,11 +33,11 @@ paths.dist = "./target/dist/";
 // Templates
 
 function readLocales() {
-  const langs = ["ca", "gr", "en", "es", "fr", "tr", "ru", "zh_cn"];
+  const langs = ["ca", "de", "el", "en", "es", "fr", "tr", "ru", "zh_CN", "pt_BR", "ro"];
   const result = {};
 
   for (let lang of langs) {
-    const content = fs.readFileSync(`./translations/${lang}.po`);
+    const content = fs.readFileSync(`./translations/${lang}.po`, {encoding:"utf-8"});
 
     lang = lang.toLowerCase();
 
@@ -45,17 +46,35 @@ function readLocales() {
 
     for (let key of Object.keys(trdata)) {
       if (key === "") continue;
+      const comments = trdata[key].comments || {};
 
       if (l.isNil(result[key])) {
         result[key] = {};
       }
 
-      const msgstr = trdata[key].msgstr;
-      if (msgstr.length === 1) {
-        result[key][lang] = msgstr[0];
+      const isMarkdown = l.includes(comments.flag, "markdown");
+
+      const msgs = trdata[key].msgstr;
+      if (msgs.length === 1) {
+        let message = msgs[0];
+        if (isMarkdown) {
+          message = marked.parseInline(message);
+        }
+
+        result[key][lang] = message;
       } else {
-        result[key][lang] = msgstr;
+        result[key][lang] = msgs.map((item) => {
+          if (isMarkdown) {
+            return marked.parseInline(item);
+          } else {
+            return item;
+          }
+        });
       }
+      // if (key === "modals.delete-font.title") {
+      //   console.dir(trdata[key], {depth:10});
+      //   console.dir(result[key], {depth:10});
+      // }
     }
   }
 
@@ -68,23 +87,23 @@ function readManifest() {
     const content = JSON.parse(fs.readFileSync(path, {encoding: "utf8"}));
 
     const index = {
-      "config": "/js/config.js?ts=" + Date.now(),
+      "config": "js/config.js?ts=" + Date.now(),
       "polyfills": "js/polyfills.js?ts=" + Date.now(),
     };
 
     for (let item of content) {
-      index[item.name] = "/js/" + item["output-name"];
+      index[item.name] = "js/" + item["output-name"];
     };
 
     return index;
   } catch (e) {
     console.error("Error on reading manifest, using default.");
     return {
-      "config": "/js/config.js",
+      "config": "js/config.js",
       "polyfills": "js/polyfills.js",
-      "main": "/js/main.js",
-      "shared": "/js/shared.js",
-      "worker": "/js/worker.js"
+      "main": "js/main.js",
+      "shared": "js/shared.js",
+      "worker": "js/worker.js"
     };
   }
 }
@@ -138,7 +157,7 @@ gulpSass.compiler = sass;
 
 gulp.task("scss", function() {
   return gulp.src(paths.resources + "styles/main-default.scss")
-    .pipe(gulpSass().on('error', gulpSass.logError))
+    .pipe(gulpSass.sync().on('error', gulpSass.logError))
     .pipe(gulpPostcss([
       autoprefixer,
       // clean({format: "keep-breaks", level: 1})

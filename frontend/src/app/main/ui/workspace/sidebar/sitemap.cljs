@@ -18,8 +18,6 @@
    [app.util.dom :as dom]
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.keyboard :as kbd]
-   [app.util.router :as rt]
-   [cuerdas.core :as str]
    [okulary.core :as l]
    [rumext.alpha :as mf]))
 
@@ -86,12 +84,12 @@
         on-drop
         (mf/use-callback
          (mf/deps id)
-         (fn [side {:keys [id name] :as data}]
+         (fn [side {:keys [id] :as data}]
            (let [index (if (= :bot side) (inc index) index)]
              (st/emit! (dw/relocate-page id index)))))
 
         on-duplicate
-        (fn [event]
+        (fn [_]
           (st/emit! (dw/duplicate-page id)))
 
         [dprops dref]
@@ -101,6 +99,13 @@
          :data {:id id
                 :index index
                 :name (:name page)})]
+
+    (mf/use-effect
+      (mf/deps selected?)
+      (fn []
+        (when selected?
+          (let [node (mf/ref-val dref)]
+            (.scrollIntoViewIfNeeded ^js node)))))
 
     (mf/use-layout-effect
      (mf/deps (:edition @local))
@@ -157,12 +162,12 @@
 (defn- make-page-ref
   [page-id]
   (l/derived (fn [state]
-               (let [page (get-in state [:workspace-file :data :pages-index page-id])]
+               (let [page (get-in state [:workspace-data :pages-index page-id])]
                  (select-keys page [:id :name])))
               st/state =))
 
 (mf/defc page-item-wrapper
-  [{:keys [file-id page-id index deletable? selected?] :as props}]
+  [{:keys [page-id index deletable? selected?] :as props}]
   (let [page-ref (mf/use-memo (mf/deps page-id) #(make-page-ref page-id))
         page     (mf/deref page-ref)]
     [:& page-item {:page page
@@ -190,11 +195,13 @@
 ;; --- Sitemap Toolbox
 
 (mf/defc sitemap
-  [{:keys [layout] :as props}]
-  (let [create      (mf/use-callback #(st/emit! dw/create-empty-page))
+  []
+  (let [file        (mf/deref refs/workspace-file)
+        create      (mf/use-callback
+                     (mf/deps file)
+                     (st/emitf (dw/create-page {:file-id (:id file)
+                                                :project-id (:project-id file)})))
         show-pages? (mf/use-state true)
-
-        file        (mf/deref refs/workspace-file)
 
         toggle-pages
         (mf/use-callback #(reset! show-pages? not))]

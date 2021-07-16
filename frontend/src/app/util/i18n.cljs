@@ -8,9 +8,9 @@
   "A i18n foundation."
   (:require
    [app.config :as cfg]
+   [app.util.globals :as globals]
+   [app.util.object :as obj]
    [app.util.storage :refer [storage]]
-   [app.util.transit :as t]
-   [beicon.core :as rx]
    [cuerdas.core :as str]
    [goog.object :as gobj]
    [okulary.core :as l]
@@ -23,13 +23,14 @@
    {:label "Deutsch (community)" :value "de"}
    {:label "Русский (community)" :value "ru"}
    {:label "Türkçe (community)" :value "tr"}
-   {:label "Ελληνική γλώσσα (community)" :value "gr"}
+   {:label "Rumanian (communit)" :value "ro"}
+   {:label "Portuguese (Brazil, community)" :value "pt_br"}
+   {:label "Ελληνική γλώσσα (community)" :value "el"}
    {:label "简体中文 (community)" :value "zh_cn"}])
 
 (defn- parse-locale
   [locale]
-  (let [locale (-> (.-language js/navigator)
-                   (str/lower)
+  (let [locale (-> (str/lower locale)
                    (str/replace "-" "_"))]
     (cond-> [locale]
       (str/includes? locale "_")
@@ -37,7 +38,7 @@
 
 (def ^:private browser-locales
   (delay
-    (-> (.-language js/navigator)
+    (-> (.-language globals/navigator)
         (parse-locale))))
 
 (defn- autodetect
@@ -51,7 +52,7 @@
         cfg/default-language))))
 
 (defonce translations #js {})
-(defonce locale (l/atom (or (get storage ::locale)
+(defonce locale (l/atom (or (get @storage ::locale)
                             (autodetect))))
 
 ;; The traslations `data` is a javascript object and should be treated
@@ -65,11 +66,17 @@
   (set! translations data))
 
 (defn set-locale!
-  [lang]
-  (if lang
-    (do
-      (swap! storage assoc ::locale lang)
-      (reset! locale lang))
+  [lname]
+  (if lname
+    (let [supported (into #{} (map :value supported-locales))
+          lname     (loop [locales (seq (parse-locale lname))]
+                      (if-let [locale (first locales)]
+                        (if (contains? supported locale)
+                          locale
+                          (recur (rest locales)))
+                        cfg/default-language))]
+      (swap! storage assoc ::locale lname)
+      (reset! locale lname))
     (do
       (swap! storage dissoc ::locale)
       (reset! locale (autodetect)))))
@@ -83,7 +90,7 @@
 
 (deftype C [val]
   IDeref
-  (-deref [o] val))
+  (-deref [_] val))
 
 (defn ^boolean c?
   [r]
@@ -129,6 +136,13 @@
 (defn tr
   ([code] (t @locale code))
   ([code & args] (apply t @locale code args)))
+
+(mf/defc tr-html
+  {::mf/wrap-props false}
+  [props]
+  (let [label    (obj/get props "label")
+        tag-name (obj/get props "tag-name" "p")]
+    [:> tag-name {:dangerouslySetInnerHTML #js {:__html (tr label)}}]))
 
 ;; DEPRECATED
 (defn use-locale

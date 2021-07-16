@@ -5,6 +5,7 @@
 ;; Copyright (c) UXBOX Labs SL
 
 (ns app.main.ui.icons
+  (:refer-clojure :exclude [import mask])
   (:require-macros [app.main.ui.icons :refer [icon-xref]])
   (:require [rumext.alpha :as mf]))
 
@@ -53,6 +54,7 @@
 (def icon-set (icon-xref :icon-set))
 (def icon-verify (icon-xref :icon-verify))
 (def image (icon-xref :image))
+(def import (icon-xref :import))
 (def infocard (icon-xref :infocard))
 (def interaction (icon-xref :interaction))
 (def layers (icon-xref :layers))
@@ -60,12 +62,11 @@
 (def libraries (icon-xref :libraries))
 (def library (icon-xref :library))
 (def line (icon-xref :line))
+(def line-height (icon-xref :line-height))
 (def listing-enum (icon-xref :listing-enum))
 (def listing-thumbs (icon-xref :listing-thumbs))
-(def line-height (icon-xref :line-height))
 (def loader (icon-xref :loader))
 (def lock (icon-xref :lock))
-(def lock-open (icon-xref :lock-open))
 (def logo (icon-xref :uxbox-logo))
 (def logo-icon (icon-xref :uxbox-logo-icon))
 (def logout (icon-xref :logout))
@@ -87,7 +88,6 @@
 (def nodes-remove (icon-xref :nodes-remove))
 (def nodes-separate (icon-xref :nodes-separate))
 (def nodes-snap (icon-xref :nodes-snap))
-(def options (icon-xref :options))
 (def organize (icon-xref :organize))
 (def palette (icon-xref :palette))
 (def pen (icon-xref :pen))
@@ -97,6 +97,7 @@
 (def picker-hsv (icon-xref :picker-hsv))
 (def picker-ramp (icon-xref :picker-ramp))
 (def pin (icon-xref :pin))
+(def pin-fill (icon-xref :pin-fill))
 (def play (icon-xref :play))
 (def plus (icon-xref :plus))
 (def pointer-inner (icon-xref :pointer-inner))
@@ -123,7 +124,6 @@
 (def sort-descending (icon-xref :sort-descending))
 (def strikethrough (icon-xref :strikethrough))
 (def stroke (icon-xref :stroke))
-(def sublevel (icon-xref :sublevel))
 (def text (icon-xref :text))
 (def text-align-center (icon-xref :text-align-center))
 (def text-align-justify (icon-xref :text-align-justify))
@@ -139,7 +139,6 @@
 (def unchain (icon-xref :unchain))
 (def underline (icon-xref :underline))
 (def undo (icon-xref :undo))
-(def undo-history (icon-xref :undo-history))
 (def ungroup (icon-xref :ungroup))
 (def unlock (icon-xref :unlock))
 (def uppercase (icon-xref :uppercase))
@@ -164,7 +163,7 @@
 
 (mf/defc debug-icons-preview
   {::mf/wrap-props false}
-  [props]
+  []
   [:section.debug-icons-preview
    (for [[key val] (sort-by first (ns-publics 'app.main.ui.icons))]
      (when (not= key 'debug-icons-preview)

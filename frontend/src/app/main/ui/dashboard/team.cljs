@@ -7,10 +7,8 @@
 (ns app.main.ui.dashboard.team
   (:require
    [app.common.data :as d]
-   [app.common.exceptions :as ex]
    [app.common.spec :as us]
    [app.config :as cfg]
-   [app.main.constants :as c]
    [app.main.data.dashboard :as dd]
    [app.main.data.messages :as dm]
    [app.main.data.modal :as modal]
@@ -23,31 +21,15 @@
    [app.main.ui.icons :as i]
    [app.util.dom :as dom]
    [app.util.i18n :as i18n :refer [tr]]
-   [app.util.router :as rt]
-   [app.util.time :as dt]
    [cljs.spec.alpha :as s]
-   [okulary.core :as l]
    [rumext.alpha :as mf]))
 
 (mf/defc header
   {::mf/wrap [mf/memo]}
-  [{:keys [section team] :as props}]
-  (let [go-members
-        (mf/use-callback
-         (mf/deps team)
-         (st/emitf (rt/nav :dashboard-team-members {:team-id (:id team)})))
-
-        go-settings
-        (mf/use-callback
-         (mf/deps team)
-         (st/emitf (rt/nav :dashboard-team-settings {:team-id (:id team)})))
-
-        invite-member
-        (mf/use-callback
-         (mf/deps team)
-         (st/emitf (modal/show {:type ::invite-member
-                                :team team})))
-
+  [{:keys [section] :as props}]
+  (let [go-members        (st/emitf (dd/go-to-team-members))
+        go-settings       (st/emitf (dd/go-to-team-settings))
+        invite-member     (st/emitf (modal/show {:type ::invite-member}))
         members-section?  (= section :dashboard-team-members)
         settings-section? (= section :dashboard-team-settings)]
 
@@ -56,7 +38,7 @@
       [:h1 (cond
              members-section? (tr "labels.members")
              settings-section? (tr "labels.settings")
-             nil)]]
+             :else nil)]]
      [:nav
       [:ul
        [:li {:class (when members-section? "active")}
@@ -69,6 +51,16 @@
         (tr "dashboard.invite-profile")]
        [:div])]))
 
+(defn get-available-roles
+  []
+  [{:value "" :label (tr "labels.role")}
+   {:value "admin" :label (tr "labels.admin")}
+   {:value "editor" :label (tr "labels.editor")}
+   ;; Temporarily disabled viewer role
+   ;; https://tree.taiga.io/project/uxboxproject/issue/1083
+   ;; {:value "viewer" :label (tr "labels.viewer")}
+   ])
+
 (s/def ::email ::us/email)
 (s/def ::role  ::us/keyword)
 (s/def ::invite-member-form
@@ -77,52 +69,40 @@
 (mf/defc invite-member-modal
   {::mf/register modal/components
    ::mf/register-as ::invite-member}
-  [{:keys [team] :as props}]
-  (let [roles   [{:value "" :label (tr "labels.role")}
-                 {:value "admin" :label (tr "labels.admin")}
-                 {:value "editor" :label (tr "labels.editor")}]
-                 ;; Temporarily disabled viewer role
-                 ;; https://tree.taiga.io/project/uxboxproject/issue/1083
-                 ;; {:value "viewer" :label (tr "labels.viewer")}]
-
-        initial (mf/use-memo (mf/deps team) (constantly {:team-id (:id team)}))
+  []
+  (let [roles   (mf/use-memo get-available-roles)
+        initial (mf/use-memo (constantly {:role "editor"}))
         form    (fm/use-form :spec ::invite-member-form
                              :initial initial)
         on-success
-        (mf/use-callback
-         (mf/deps team)
-         (st/emitf (dm/success (tr "notifications.invitation-email-sent"))
-                   (modal/hide)))
+        (st/emitf (dm/success (tr "notifications.invitation-email-sent"))
+                  (modal/hide))
 
         on-error
-        (mf/use-callback
-         (mf/deps team)
-         (fn [form {:keys [type code] :as error}]
-           (let [email (get @form [:data :email])]
-             (cond
-               (and (= :validation type)
-                    (= :profile-is-muted code))
-               (dm/error (tr "errors.profile-is-muted"))
+        (fn [form {:keys [type code] :as error}]
+          (let [email (get @form [:data :email])]
+            (cond
+              (and (= :validation type)
+                   (= :profile-is-muted code))
+              (dm/error (tr "errors.profile-is-muted"))
 
-               (and (= :validation type)
-                    (= :member-is-muted code))
-               (dm/error (tr "errors.member-is-muted"))
+              (and (= :validation type)
+                   (= :member-is-muted code))
+              (dm/error (tr "errors.member-is-muted"))
 
-               (and (= :validation type)
-                    (= :email-has-permanent-bounces))
-               (dm/error (tr "errors.email-has-permanent-bounces" email))
+              (and (= :validation type)
+                   (= :email-has-permanent-bounces code))
+              (dm/error (tr "errors.email-has-permanent-bounces" email))
 
-               :else
-               (dm/error (tr "errors.generic"))))))
+              :else
+              (dm/error (tr "errors.generic")))))
 
         on-submit
-        (mf/use-callback
-         (mf/deps team)
-         (fn [form]
-           (let [params (:clean-data @form)
-                 mdata  {:on-success (partial on-success form)
-                         :on-error   (partial on-error form)}]
-             (st/emit! (dd/invite-team-member (with-meta params mdata))))))]
+        (fn [form]
+          (let [params (:clean-data @form)
+                mdata  {:on-success (partial on-success form)
+                        :on-error   (partial on-error form)}]
+            (st/emit! (dd/invite-team-member (with-meta params mdata)))))]
 
     [:div.modal.dashboard-invite-modal.form-container
      [:& fm/form {:on-submit on-submit :form form}
@@ -138,50 +118,39 @@
       [:div.action-buttons
        [:& fm/submit-button {:label (tr "modals.invite-member-confirm.accept")}]]]]))
 
-
 (mf/defc team-member
+  {::mf/wrap [mf/memo]}
   [{:keys [team member profile] :as props}]
   (let [show? (mf/use-state false)
 
         set-role
-        #(st/emit! (dd/update-team-member-role {:team-id (:id team)
-                                                :member-id (:id member)
-                                                :role %}))
-        set-owner-fn
-        (partial set-role :owner)
+        (fn [role]
+          (let [params {:member-id (:id member) :role role}]
+            (st/emit! (dd/update-team-member-role params))))
 
-        set-admin
-        (mf/use-callback (mf/deps team member) (partial set-role :admin))
-
-        set-editor
-        (mf/use-callback (mf/deps team member) (partial set-role :editor))
-
-        set-viewer
-        (mf/use-callback (mf/deps team member) (partial set-role :viewer))
+        set-owner-fn (partial set-role :owner)
+        set-admin    (partial set-role :admin)
+        set-editor   (partial set-role :editor)
+        ;; set-viewer   (partial set-role :viewer)
 
         set-owner
-        (mf/use-callback
-         (mf/deps team member)
-         (st/emitf (modal/show
-                    {:type :confirm
-                     :title (tr "modals.promote-owner-confirm.title")
-                     :message (tr "modals.promote-owner-confirm.message")
-                     :accept-label (tr "modals.promote-owner-confirm.accept")
-                     :on-accept set-owner-fn})))
+        (st/emitf (modal/show
+                   {:type :confirm
+                    :title (tr "modals.promote-owner-confirm.title")
+                    :message (tr "modals.promote-owner-confirm.message")
+                    :accept-label (tr "modals.promote-owner-confirm.accept")
+                    :on-accept set-owner-fn}))
 
         delete-fn
-        (st/emitf (dd/delete-team-member {:team-id (:id team) :member-id (:id member)}))
+        (st/emitf (dd/delete-team-member {:member-id (:id member)}))
 
         delete
-        (mf/use-callback
-         (mf/deps team member)
-         (st/emitf (modal/show
-                    {:type :confirm
-                     :title (tr "modals.delete-team-member-confirm.title")
-                     :message  (tr "modals.delete-team-member-confirm.message")
-                     :accept-label (tr "modals.delete-team-member-confirm.accept")
-                     :on-accept delete-fn})))]
-
+        (st/emitf (modal/show
+                   {:type :confirm
+                    :title (tr "modals.delete-team-member-confirm.title")
+                    :message  (tr "modals.delete-team-member-confirm.message")
+                    :accept-label (tr "modals.delete-team-member-confirm.accept")
+                    :on-accept delete-fn}))]
 
     [:div.table-row
      [:div.table-field.name (:name member)]
@@ -243,23 +212,21 @@
       (for [item members]
         [:& team-member {:member item :team team :profile profile :key (:id item)}])]]))
 
-(defn- members-ref
-  [{:keys [id] :as team}]
-  (l/derived (l/in [:team-members id]) st/state))
-
 (mf/defc team-members-page
   [{:keys [team profile] :as props}]
-  (let [members-ref (mf/use-memo (mf/deps team) #(members-ref team))
-        members-map (mf/deref members-ref)]
+  (let [members-map (mf/deref refs/dashboard-team-members)]
 
     (mf/use-effect
      (mf/deps team)
      (fn []
-       (dom/set-html-title (tr "title.team-members"
-                               (if (:is-default team)
-                                 (tr "dashboard.your-penpot")
-                                 (:name team))))
-       (st/emit! (dd/fetch-team-members team))))
+       (dom/set-html-title
+        (tr "title.team-members"
+            (if (:is-default team)
+              (tr "dashboard.your-penpot")
+              (:name team))))))
+
+    (mf/use-effect
+     (st/emitf (dd/fetch-team-members)))
 
     [:*
      [:& header {:section :dashboard-team-members
@@ -269,42 +236,35 @@
                         :team team
                         :members-map members-map}]]]))
 
-(defn- stats-ref
-  [{:keys [id] :as team}]
-  (l/derived (l/in [:team-stats id]) st/state))
-
 (mf/defc team-settings-page
-  [{:keys [team profile] :as props}]
+  [{:keys [team] :as props}]
   (let [finput      (mf/use-ref)
 
-        members-ref (mf/use-memo (mf/deps team) #(members-ref team))
-        members-map (mf/deref members-ref)
-
+        members-map (mf/deref refs/dashboard-team-members)
         owner       (->> (vals members-map)
                          (d/seek :is-owner))
 
-        stats-ref   (mf/use-memo (mf/deps team) #(stats-ref team))
-        stats       (mf/deref stats-ref)
+        stats       (mf/deref refs/dashboard-team-stats)
 
         on-image-click
         (mf/use-callback #(dom/click (mf/ref-val finput)))
 
         on-file-selected
-        (mf/use-callback
-         (mf/deps team)
-         (fn [file]
-           (st/emit! (dd/update-team-photo {:file file
-                                            :team-id (:id team)}))))]
+        (fn [file]
+          (st/emit! (dd/update-team-photo {:file file})))]
+
 
     (mf/use-effect
-      (mf/deps team)
-      (fn []
-        (dom/set-html-title (tr "title.team-settings"
-                                (if (:is-default team)
-                                  (tr "dashboard.your-penpot")
-                                  (:name team))))
-        (st/emitf (dd/fetch-team-members team)
-                  (dd/fetch-team-stats team))))
+     (mf/deps team)
+     (fn []
+       (dom/set-html-title (tr "title.team-settings"
+                               (if (:is-default team)
+                                 (tr "dashboard.your-penpot")
+                                 (:name team))))))
+
+    (mf/use-effect
+     (st/emitf (dd/fetch-team-members)
+               (dd/fetch-team-stats)))
 
     [:*
      [:& header {:section :dashboard-team-settings
@@ -320,7 +280,7 @@
           [:img {:src (cfg/resolve-team-photo-url team)}]
           [:& file-uploader {:accept "image/jpeg,image/png"
                              :multi false
-                             :input-ref finput
+                             :ref finput
                              :on-selected on-file-selected}]]]
 
         [:div.block.owner-block

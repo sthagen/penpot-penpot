@@ -2,8 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 //
-// Copyright (c) 2015-2016 Andrey Antukh <niwi@niwi.nz>
-// Copyright (c) 2015-2016 Juan de la Cruz <delacruzgarciajuan@gmail.com>
+// Copyright (c) UXBOX Labs SL
 
 .element-options {
   display: flex;
@@ -544,7 +543,7 @@
   padding: 0 $x-small;
 
   &:first-child {
-    justify-content: space-between;
+    justify-content: flex-start;
     margin-left: 0;
   }
 
@@ -734,6 +733,16 @@
 
 .grid-option {
   margin-bottom: 0.5rem;
+  .advanced-options {
+    .row-flex {
+      justify-content: flex-end;
+    }
+    .custom-button {
+      left: 0;
+      position: absolute;
+      top: 12px;
+    }
+  }
 }
 
 .element-set-content .custom-select.input-option {
@@ -809,20 +818,21 @@
   left: 0;
   position: absolute;
   top: 0;
-  width: calc(100% - 8px);
+  width: calc(100%);
   opacity: 0.4;
   z-index: 10;
+  display: flex;
 }
 
 .advanced-options-wrapper {
   width: 100%;
-  padding-left: 0.25rem;
 }
 
 .advanced-options {
-  background-color: #303236;
+  border: 1px solid $color-gray-60;
+  background-color: $color-gray-50;
   border-radius: 4px;
-  padding: 0.5rem;
+  padding: 8px;
   position: relative;
   top: 2px;
   width: 100%;
@@ -865,6 +875,10 @@
   &:hover {
     background: #1F1F1F;
   }
+
+  &.selected {
+    border: 1px solid $color-primary;
+  }
 }
 
 .exports-options,
@@ -893,6 +907,22 @@
   .download-button {
     margin-top: 10px;
   }
+
+  .input-element {
+    width: 100%;
+    flex-shrink: initial;
+  }
+
+  .row-grid-2 {
+    grid-column-gap: 1em;
+  }
+
+  .color-info {
+    input {
+      margin-right: 1em;
+      width: 74px;
+    }
+  }
 }
 
 .shadow-options .color-row-wrap {
@@ -915,6 +945,10 @@
 
     &:hover svg {
         fill: $color-primary;
+    }
+    &.actions-inside {
+      position: absolute;
+      right: 0;
     }
 }
 
@@ -981,6 +1015,7 @@
 
 .spacing-options {
   display: flex;
+  width: 100%;
 }
 
 .asset-section {
@@ -1003,7 +1038,7 @@
     width: 100%;
     max-width: none;
     margin: 0;
-    background: #303236;
+    background-color: #303236;
     border-top: none;
     border-left: none;
     border-right: none;
@@ -1041,53 +1076,365 @@
     .go-to-lib-button {
         transition: border 0.3s, color 0.3s;
         text-align: center;
-        background: $color-gray-60;
+        background: $color-gray-50;
         padding: 0.5rem;
         border-radius: 2px;
         cursor: pointer;
         font-size: 14px;
         margin-top: 1rem;
-        border: 1px solid $color-gray-60;
 
         &:hover {
-            border: 1px solid $color-primary;
-            color: $color-primary;
+            background: $color-primary;
+            color: $color-black;
         }
     }
 }
 
 .multiple-typography {
-    margin: 0.5rem;
-    padding: 0.5rem;
-    border: 1px dashed $color-gray-30;
-    border-radius: 4px;
-    display: flex;
-    justify-content: space-between;
+  margin: 0.5rem;
+  padding: 0.5rem;
+  border: 1px dashed $color-gray-30;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
 
-    .multiple-typography-text,
-    .multiple-typography-button {
-        font-size: $fs13;
-        display: flex;
-        align-items: center;
+  .multiple-typography-text,
+  .multiple-typography-button {
+    font-size: $fs13;
+    display: flex;
+    align-items: center;
+  }
+
+  .multiple-typography-button {
+    cursor: pointer;
+    svg {
+      transition: fill 0.3s;
+      width: 16px;
+      height: 16px;
+      fill: $color-gray-10;
     }
 
-    .multiple-typography-button {
-        cursor: pointer;
-        svg {
-            transition: fill 0.3s;
-            width: 16px;
-            height: 16px;
-            fill: $color-gray-10;
-        }
+    &:hover svg {
+      fill: $color-primary;
+    }
+  }
 
-        &:hover svg {
-            fill: $color-primary;
+  svg {
+  }
+
+  .multiple-typography-button:hover svg {
+  }
+}
+
+.font-selector {
+  background: $color-black;
+  height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: calc(100%);
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  .font-selector-dropdown {
+    background: #303236;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    height: 100%;
+  }
+
+  header {
+    padding: 15px 17px;
+    display: flex;
+    align-items: center;
+    position: relative;
+
+    .backend-filters {
+      padding: $small $medium;
+      // width: 220px;
+      top: 40px;
+      right: 20px;
+    }
+    .backend-filter {
+      display: flex;
+      align-items: center;
+      padding: $small 0;
+      cursor: pointer;
+
+      .checkbox-icon {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: $medium;
+        height: $medium;
+        border: 1px solid $color-gray-30;
+        border-radius: $br-small;
+
+        svg {
+          width: 8px;
+          display: none;
+          height: 8px;
+          fill: $color-black;
         }
+      }
+
+      .backend-name {
+        margin-left: $small;
+        color: $color-gray-50;
+      }
+
+      &.selected {
+        .checkbox-icon {
+          svg {
+            display: inherit;
+          }
+        }
+      }
+
+    }
+
+    input {
+      display: flex;
+      flex-grow: 1;
+      padding: 4px;
+      font-size: $fs12;
+      background: $color-gray-50;
+      border-radius: $br-small;
+      color: $color-gray-20;
+      border: 1px solid $color-gray-30;
+      margin: 0px;
+    }
+
+    .options {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 24px;
+      height: 24px;
+      margin-left: $small;
+
+      svg {
+        width: 16px;
+        height: 16px;
+        fill: $color-gray-20
+      }
+
+      &.active {
+        svg {
+          fill: $color-primary;
+        }
+      }
+    }
+  }
+
+  .fonts-list {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+
+    position: relative;
+    -webkit-box-flex: 1;
+    flex: 1 1 auto;
+  }
+
+  hr {
+    margin-bottom: 0px;
+    margin-top: 0px;
+  }
+
+  .font-item {
+    padding-left: $big;
+    height: $x-big;
+    max-height: $x-big;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: $color-gray-10;
+
+    &.selected {
+      background-color: $color-black;
+      color: $color-primary;
+
+      .icon svg {fill: $color-primary;}
+    }
+
+    &:hover {
+      background-color: $color-primary;
+      color: $color-black;
+    }
+
+    .icon {
+      display: flex;
+      // justify-content: center;
+      align-items: center;
+      // border: 1px solid red;
+      width: $big
+    }
+
+    .label {
+      font-size: 12px;
     }
 
     svg {
+      fill: $color-gray-10;
+      width: 10px;
+      height: 10px;
+    }
+  }
+}
+
+.row-flex.align-top {
+  align-items: flex-start;
+}
+
+.constraints-widget {
+  min-width: 72px;
+  min-height: 72px;
+  position: relative;
+  background-color: $color-gray-60;
+  flex-grow: 0;
+
+  .constraints-box {
+    width: 28px;
+    height: 28px;
+    position: absolute;
+    top: 22px;
+    left: 22px;
+    border: 2px solid $color-gray-50;
+  }
+
+  .constraint-button {
+    position: absolute;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    &::after {
+      content: ' ';
+      background-color: $color-gray-20;
     }
 
-    .multiple-typography-button:hover svg {
+    &.active,
+    &:hover {
+      &::after {
+        background-color: $color-primary;
+      }
     }
+
+    &.top,
+    &.bottom {
+      width: 28px;
+      height: 22px;
+      left: calc(50% - 14px);
+
+      &::after {
+        width: 3px;
+        height: 15px;
+      }
+    }
+
+    &.top {
+      top: 0;
+    }
+
+    &.bottom {
+      bottom: 0;
+    }
+
+    &.left,
+    &.right {
+      width: 22px;
+      height: 28px;
+      top: calc(50% - 14px);
+
+      &::after {
+        width: 15px;
+        height: 3px;
+      }
+    }
+
+    &.left {
+      left: 0;
+    }
+
+    &.right {
+      right: 0;
+    }
+
+    &.centerv {
+      width: 28px;
+      height: 28px;
+      left: calc(50% - 14px);
+      top: calc(50% - 14px);
+
+      &::after {
+        width: 3px;
+        height: 15px;
+      }
+    }
+
+    &.centerh {
+      width: 28px;
+      height: 15px;
+      left: calc(50% - 14px);
+      top: calc(50% - 7px);
+
+      &::after {
+        width: 15px;
+        height: 3px;
+      }
+    }
+  }
+}
+
+.constraints-form {
+  display: flex;
+  flex-grow: 1;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+
+  .input-select {
+    font-size: $fs11;
+    margin: 0 $x-small;
+  }
+
+  svg {
+    width: 15px;
+    height: 15px;
+    margin-left: $medium;
+    fill: $color-gray-20;
+  }
+
+  .left-right svg {
+    transform: rotate(45deg);
+  }
+
+  .top-bottom svg {
+    transform: rotate(-45deg);
+  }
+
+  .fix-when {
+    font-size: $fs11;
+    cursor: pointer;
+
+    span {
+      margin-left: $small;
+    }
+
+    &:hover,
+    &.active {
+      color: $color-primary;
+
+      svg {
+        fill: $color-primary;
+      }
+    }
+  }
+
 }

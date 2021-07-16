@@ -7,16 +7,17 @@
 (ns app.main.ui.onboarding
   (:require
    [app.common.spec :as us]
+   [app.config :as cf]
    [app.main.data.dashboard :as dd]
    [app.main.data.messages :as dm]
    [app.main.data.modal :as modal]
    [app.main.data.users :as du]
    [app.main.store :as st]
-   [app.main.ui.components.forms :as fm :refer [input submit-button form]]
+   [app.main.ui.components.forms :as fm]
    [app.util.dom :as dom]
+   [app.util.object :as obj]
    [app.util.router :as rt]
    [app.util.timers :as tm]
-   [app.util.object :as obj]
    [cljs.spec.alpha :as s]
    [rumext.alpha :as mf]))
 
@@ -33,14 +34,14 @@
 (mf/defc onboarding-start
   [{:keys [next] :as props}]
   [:div.modal-container.onboarding
-   [:div.modal-left
+   [:div.modal-left.welcome
     [:img {:src "images/login-on.jpg" :border "0" :alt "Penpot"}]]
    [:div.modal-right
     [:div.modal-title
      [:h2 "Welcome to Penpot!"]]
-    [:span.release "Alpha version 1.0"]
+    [:span.release "Alpha version " (:main @cf/version)]
     [:div.modal-content
-     [:p "We are very happy to introduce you to the very first Alpha 1.0 release."]
+     [:p "We are very happy to introduce you to the very first Alpha release."]
      [:p "Penpot is still at development stage and there will be constant updates. We hope you enjoy the first stable version."]]
     [:div.modal-navigation
      [:button.btn-secondary {:on-click next} "Continue"]]]
@@ -185,24 +186,24 @@
 (mf/defc onboarding-team-modal
   {::mf/register modal/components
    ::mf/register-as :onboarding-team}
-  [props]
+  []
   (let [close (mf/use-fn (st/emitf (modal/hide)))
         form  (fm/use-form :spec ::team-form
                            :initial {})
         on-success
         (mf/use-callback
-         (fn [form response]
+         (fn [_form response]
            (st/emit! (modal/hide)
                      (rt/nav :dashboard-projects {:team-id (:id response)}))))
 
         on-error
         (mf/use-callback
-         (fn [form response]
+         (fn [_form _response]
            (st/emit! (dm/error "Error on creating team."))))
 
         on-submit
         (mf/use-callback
-         (fn [form event]
+         (fn [form _event]
            (let [mdata  {:on-success (partial on-success form)
                          :on-error   (partial on-error form)}
                  params {:name (get-in @form [:clean-data :name])}]
@@ -238,9 +239,7 @@
 
 (defmulti render-release-notes :version)
 
-(mf/defc release-notes-modal
-  {::mf/register modal/components
-   ::mf/register-as :release-notes}
+(mf/defc release-notes
   [{:keys [version] :as props}]
   (let [slide (mf/use-state :start)
         klass (mf/use-state "fadeInDown")
@@ -285,16 +284,20 @@
       :slide slide
       :version version})))
 
-;; This case should never happen; but if happen just hide inmediatelly
-;; the modal.
-(defmethod render-release-notes :default
+(mf/defc release-notes-modal
+  {::mf/wrap-props false
+   ::mf/register modal/components
+   ::mf/register-as :release-notes}
   [props]
-  (tm/schedule 0 #(st/emit! (modal/hide)))
-  (mf/html [:span ""]))
+  (let [versions (methods render-release-notes)
+        version  (obj/get props "version")]
+    (when (contains? versions version)
+      [:div.relnotes
+       [:> release-notes props]])))
 
 (defmethod render-release-notes "0.0"
   [params]
-  (render-release-notes (assoc params :version "1.4")))
+  (render-release-notes (assoc params :version "1.6")))
 
 (defmethod render-release-notes "1.4"
   [{:keys [slide klass next finish navigate version]}]
@@ -387,6 +390,288 @@
          [:div.modal-content
           [:p "Combining elements visually is an important part of the design process."]
           [:p "This is why the standard blend modes and opacity level are now available for each element."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click finish} "Start!"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 4}]]]]]])))
+
+(defmethod render-release-notes "1.5"
+  [{:keys [slide klass next finish navigate version]}]
+  (mf/html
+   (case @slide
+     :start
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/login-on.jpg" :border "0" :alt "What's new Alpha release 1.5.0"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "What's new?"]]
+         [:span.release "Alpha version " version]
+         [:div.modal-content
+          [:p "Penpot continues growing with new features that improve performance, user experience and visual design."]
+          [:p "We are happy to show you a sneak peak of the most important stuff that the Alpha 1.5.0 version brings."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]]]
+        [:img.deco {:src "images/deco-left.png" :border "0"}]
+        [:img.deco.right {:src "images/deco-right.png" :border "0"}]]]]
+
+     0
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/path-tool.gif" :border "0" :alt "New path tool"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "New features for paths"]]
+         [:div.modal-content
+          [:p "Now you can select snap points on edition, add/remove nodes, merge/join/split nodes."]
+          [:p "The usability and performance of the paths tool has been improved too."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 3}]]]]]]
+
+     1
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/assets-organiz.gif" :border "0" :alt "Manage libraries"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "New libraries organization"]]
+         [:div.modal-content
+          [:p "Penpot now allows to group, multiselect and bulk edition of assets (components and graphics)."]
+          [:p "It is time to have all the libraries well organized and work more efficiently."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 3}]]]]]]
+
+     2
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/smart-inputs.gif" :border "0" :alt "Smart inputs"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "Smart inputs"]]
+         [:div.modal-content
+          [:p "Now you can have more precision in your designs with basic math operations in inputs."]
+          [:p "It's easier to specify by how much you want to change a value and work with measures and distances."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click finish} "Start!"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 3}]]]]]])))
+
+(defmethod render-release-notes "1.6"
+  [{:keys [slide klass next finish navigate version]}]
+  (mf/html
+   (case @slide
+     :start
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/login-on.jpg" :border "0" :alt "What's new Alpha release 1.6.0"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "What's new?"]]
+         [:span.release "Alpha version " version]
+         [:div.modal-content
+          [:p "Penpot continues growing with new features that improve performance, user experience and visual design."]
+          [:p "We are happy to show you a sneak peak of the most important stuff that the Alpha 1.6.0 version brings."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]]]
+        [:img.deco {:src "images/deco-left.png" :border "0"}]
+        [:img.deco.right {:src "images/deco-right.png" :border "0"}]]]]
+
+     0
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/custom-fonts.gif" :border "0" :alt "Upload/use custom fonts"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "Upload/use custom fonts"]]
+         [:div.modal-content
+          [:p "From now on you can upload fonts to a Penpot team and use them across its files. This is one of the most requested features since our first release (we listen!)"]
+          [:p "We hope you enjoy having more typography options and our brand new font selector."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 4}]]]]]]
+
+     1
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/scale-text.gif" :border "0" :alt "Interactively scale text"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "Scale text layers at resizing"]]
+         [:div.modal-content
+          [:p "New main menu option “Scale text (K)” to enable scale text mode."]
+          [:p "Disabled by default, this tool is disabled back after being used."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 4}]]]]]]
+
+     2
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/performance.gif" :border "0" :alt "Performance improvements"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "Performance improvements"]]
+         [:div.modal-content
+          [:p "Penpot brings important improvements handling large files. The performance in managing files in the dashboard has also been improved."]
+          [:p "You should have the feeling that files and layers show up a bit faster :)"]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 4}]]]]]]
+
+     3
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/shapes-to-path.gif" :border "0" :alt "Shapes to path"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "Shapes to path"]]
+         [:div.modal-content
+          [:p "Now you can edit basic shapes like rectangles, circles and image containers by double clicking."]
+          [:p "An easy way to increase speed by working with vectors!"]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click finish} "Start!"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 4}]]]]]])))
+
+
+(defmethod render-release-notes "1.7"
+  [{:keys [slide klass next finish navigate version]}]
+  (mf/html
+   (case @slide
+     :start
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/login-on.jpg" :border "0" :alt "What's new Alpha release 1.7"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "What's new?"]]
+         [:span.release "Alpha version " version]
+         [:div.modal-content
+          [:p "Penpot continues growing with new features that improve performance, user experience and visual design."]
+          [:p "We are happy to show you a sneak peak of the most important stuff that the Alpha 1.7 version brings."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]]]
+        [:img.deco {:src "images/deco-left.png" :border "0"}]
+        [:img.deco.right {:src "images/deco-right.png" :border "0"}]]]]
+
+     0
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/export.gif" :border "0" :alt "Export & Import"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "Export and import Penpot files"]]
+         [:div.modal-content
+          [:p [:strong "Export files from the dashboard to your computer and import them from your computer to your projects."]
+           " This means that Penpot users can freely save and share Penpot files."]
+          [:p "Exported files linked to shared libraries provide
+          different ways to export their assets. Choose the one that
+          suits you better!"]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 4}]]]]]]
+
+     1
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/constraints.gif" :border "0" :alt "Resizing constraints"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "Resizing constraints"]]
+         [:div.modal-content
+          [:p "Constraints allow you to " [:strong "decide how layers will behave when resizing its container"] " being a group or an artboard."]
+          [:p "You can manually set horizontal and vertical
+          constraints for every layer. This is especially useful to
+          control how your designs look when working with responsive
+          components."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 4}]]]]]]
+
+     2
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/group-components.gif" :border "0" :alt "Library assets management improvements"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "Library assets management"]]
+         [:div.modal-content
+          [:p [:strong "Collapse/expand groups"] " at any nesting level, so you don’t have to manage their visibility individually."]
+          [:p "Penpot " [:strong "remembers the last library state"] ", so you don’t have to collapse a group you want hidden every time."]
+          [:p "Easily " [:strong "rename and ungroup"] " asset groups."]]
+         [:div.modal-navigation
+          [:button.btn-secondary {:on-click next} "Continue"]
+          [:& navigation-bullets
+           {:slide @slide
+            :navigate navigate
+            :total 4}]]]]]]
+
+     3
+     [:div.modal-overlay
+      [:div.animated {:class @klass}
+       [:div.modal-container.onboarding.feature
+        [:div.modal-left
+         [:img {:src "images/features/copy-paste.gif" :border "0" :alt "Paste components from file to file"}]]
+        [:div.modal-right
+         [:div.modal-title
+          [:h2 "Paste components from file to file"]]
+         [:div.modal-content
+          [:p "Do you sometimes copy and paste component copies that belong to a library already shared by the original and destination files? From now on, those component copies are aware of this and will retain their linkage to the library."]]
          [:div.modal-navigation
           [:button.btn-secondary {:on-click finish} "Start!"]
           [:& navigation-bullets

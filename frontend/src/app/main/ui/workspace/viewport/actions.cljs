@@ -12,6 +12,7 @@
    [app.main.data.workspace :as dw]
    [app.main.data.workspace.drawing :as dd]
    [app.main.data.workspace.libraries :as dwl]
+   [app.main.data.workspace.path :as dwdp]
    [app.main.store :as st]
    [app.main.streams :as ms]
    [app.main.ui.workspace.viewport.utils :as utils]
@@ -23,13 +24,12 @@
    [beicon.core :as rx]
    [cuerdas.core :as str]
    [rumext.alpha :as mf])
-  (:import goog.events.WheelEvent
-           goog.events.KeyCodes))
+  (:import goog.events.WheelEvent))
 
 (defn on-mouse-down
-  [{:keys [id blocked hidden type]} drawing-tool text-editing? edition edit-path selected]
+  [{:keys [id blocked hidden type]} selected edition drawing-tool text-editing? node-editing? drawing-path? create-comment?]
   (mf/use-callback
-   (mf/deps id blocked hidden type drawing-tool text-editing? edition edit-path selected)
+   (mf/deps id blocked hidden type selected edition drawing-tool text-editing? node-editing? drawing-path? create-comment?)
    (fn [bevent]
      (when (or (dom/class? (dom/get-target bevent) "viewport-controls")
                (dom/class? (dom/get-target bevent) "viewport-selrect"))
@@ -56,17 +56,21 @@
            (when (and (not= edition id) text-editing?)
              (st/emit! dw/clear-edition-mode))
 
-           (when (and (or (not edition) (not= edition id)) (not blocked) (not hidden) (not (#{:comments :path} drawing-tool)))
+           (when (and (not text-editing?)
+                      (not blocked)
+                      (not hidden)
+                      (not create-comment?)
+                      (not drawing-path?))
              (cond
                drawing-tool
                (st/emit! (dd/start-drawing drawing-tool))
 
-               (and edit-path (contains? edit-path edition))
-               ;; Handle node select-drawing. NOP at the moment
-               nil
+               node-editing?
+               ;; Handle path node area selection
+               (st/emit! (dwdp/handle-area-selection shift?))
 
                (or (not id) (and frame? (not selected?)))
-               (st/emit! (dw/handle-selection shift?))
+               (st/emit! (dw/handle-area-selection shift?))
 
                (not drawing-tool)
                (st/emit! (when (or shift? (not selected?))
@@ -138,13 +142,13 @@
                     (not selected?)
                     (not edition)
                     (not drawing-path?)
-                    (not (#{:comments :path} drawing-tool)))
+                    (not drawing-tool))
            (st/emit! (dw/select-shape (:id @hover)))))))))
 
 (defn on-double-click
-  [hover hover-ids drawing-path? objects]
+  [hover hover-ids drawing-path? objects edition]
   (mf/use-callback
-   (mf/deps @hover @hover-ids drawing-path?)
+   (mf/deps @hover @hover-ids drawing-path? edition)
    (fn [event]
      (dom/stop-propagation event)
      (let [ctrl? (kbd/ctrl? event)
@@ -154,9 +158,7 @@
            {:keys [id type] :as shape} @hover
 
            frame? (= :frame type)
-           group? (= :group type)
-           text?  (= :text type)
-           path?  (= :path type)]
+           group? (= :group type)]
 
        (st/emit! (ms/->MouseEvent :double-click ctrl? shift? alt?))
 
@@ -170,13 +172,9 @@
                  (reset! hover-ids (into [] (rest @hover-ids)))
                  (st/emit! (dw/select-shape (:id selected))))
 
-               (or text? path?)
+               (not= id edition)
                (st/emit! (dw/select-shape id)
-                         (dw/start-editing-selected))
-
-               :else
-               ;; Do nothing
-               nil))))))
+                         (dw/start-editing-selected))))))))
 
 (defn on-context-menu
   [hover]
@@ -256,8 +254,7 @@
  (mf/use-callback
   (fn [event]
     (let [bevent  (.getBrowserEvent ^js event)
-          key     (.-keyCode ^js event)
-          key     (.normalizeKeyCode KeyCodes key)
+          key     (.-key ^js event)
           ctrl?   (kbd/ctrl? event)
           shift?  (kbd/shift? event)
           alt?    (kbd/alt? event)
@@ -277,8 +274,7 @@
 (defn on-key-up []
  (mf/use-callback
   (fn [event]
-    (let [key    (.-keyCode event)
-          key    (.normalizeKeyCode KeyCodes key)
+    (let [key    (.-key event)
           ctrl?  (kbd/ctrl? event)
           shift? (kbd/shift? event)
           alt?   (kbd/alt? event)
@@ -288,8 +284,7 @@
       (st/emit! (ms/->KeyboardEvent :up key shift? ctrl? alt? meta?))))))
 
 (defn on-mouse-move [viewport-ref zoom]
-  (let [last-position (mf/use-var nil)
-        viewport (mf/ref-val viewport-ref)]
+  (let [last-position (mf/use-var nil)]
     (mf/use-callback
      (mf/deps zoom)
      (fn [event]
@@ -475,7 +470,7 @@
 
 (defn on-resize [viewport-ref]
  (mf/use-callback
-  (fn [event]
+  (fn [_]
     (let [node (mf/ref-val viewport-ref)
           prnt (dom/get-parent node)
           size (dom/get-client-size prnt)]

@@ -10,7 +10,6 @@
    [app.common.exceptions :as ex]
    [app.common.spec :as us]
    [app.common.uuid :as uuid]
-   [app.config :as cfg]
    [app.db :as db]
    [app.emails :as eml]
    [app.media :as media]
@@ -21,7 +20,6 @@
    [app.storage :as sto]
    [app.util.services :as sv]
    [app.util.time :as dt]
-   [app.worker :as wrk]
    [clojure.spec.alpha :as s]
    [datoteka.core :as fs]))
 
@@ -135,13 +133,6 @@
         (ex/raise :type :validation
                   :code :only-owner-can-delete-team))
 
-      ;; Schedule object deletion
-      (wrk/submit! {::wrk/task :delete-object
-                    ::wrk/delay cfg/deletion-delay
-                    ::wrk/conn conn
-                    :id id
-                    :type :team})
-
       (db/update! conn :team
                   {:deleted-at (dt/now)}
                   {:id id})
@@ -249,7 +240,9 @@
 
 (declare upload-photo)
 
-(s/def ::file ::media/upload)
+(s/def ::content-type ::media/image-content-type)
+(s/def ::file (s/and ::media/upload (s/keys :req-un [::content-type])))
+
 (s/def ::update-team-photo
   (s/keys :req-un [::profile-id ::team-id ::file]))
 
@@ -307,7 +300,7 @@
           team     (db/get-by-id conn :team team-id)
           itoken   (tokens :generate
                            {:iss :team-invitation
-                            :exp (dt/in-future "6h")
+                            :exp (dt/in-future "48h")
                             :profile-id (:id profile)
                             :role role
                             :team-id team-id

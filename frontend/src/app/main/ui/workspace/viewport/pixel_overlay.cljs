@@ -7,21 +7,18 @@
 (ns app.main.ui.workspace.viewport.pixel-overlay
   (:require
    [app.common.uuid :as uuid]
-   [app.main.data.colors :as dwc]
    [app.main.data.modal :as modal]
+   [app.main.data.workspace.colors :as dwc]
    [app.main.refs :as refs]
    [app.main.store :as st]
-   [app.main.ui.context :as muc]
    [app.main.ui.cursors :as cur]
    [app.main.ui.workspace.shapes :refer [shape-wrapper frame-wrapper]]
    [app.util.dom :as dom]
    [app.util.keyboard :as kbd]
    [app.util.object :as obj]
-   [app.util.timers :as timers]
    [beicon.core :as rx]
    [cuerdas.core :as str]
    [goog.events :as events]
-   [okulary.core :as l]
    [promesa.core :as p]
    [rumext.alpha :as mf])
   (:import goog.events.EventType))
@@ -54,11 +51,8 @@
   {::mf/wrap-props false}
   [props]
   (let [vport         (unchecked-get props "vport")
-        vbox          (unchecked-get props "vbox")
         viewport-ref  (unchecked-get props "viewport-ref")
         viewport-node (mf/ref-val viewport-ref)
-        options       (unchecked-get props "options")
-        svg-ref       (mf/use-ref nil)
         canvas-ref    (mf/use-ref nil)
         img-ref       (mf/use-ref nil)
 
@@ -67,11 +61,11 @@
         handle-keydown
         (mf/use-callback
          (fn [event]
-           (when (and (kbd/esc? event))
-             (do (dom/stop-propagation event)
-                 (dom/prevent-default event)
-                 (st/emit! (dwc/stop-picker))
-                 (modal/disallow-click-outside!)))))
+           (when (kbd/esc? event)
+             (dom/stop-propagation event)
+             (dom/prevent-default event)
+             (st/emit! (dwc/stop-picker))
+             (modal/disallow-click-outside!))))
 
         handle-mouse-move-picker
         (mf/use-callback
@@ -130,7 +124,7 @@
          (mf/deps img-ref)
          (fn []
            (let [img-node (mf/ref-val img-ref)
-                 svg-node #_(mf/ref-val svg-ref) (dom/get-element "render")
+                 svg-node (dom/get-element "render")
                  xml  (-> (js/XMLSerializer.)
                           (.serializeToString svg-node)
                           js/encodeURIComponent
@@ -157,21 +151,19 @@
          #(rx/dispose! sub))))
 
     (mf/use-effect
-     #_(mf/deps svg-ref)
      (fn []
        (let [config #js {:attributes true
                          :childList true
                          :subtree true
                          :characterData true}
-             svg-node #_(mf/ref-val svg-ref) (dom/get-element "render")
+             svg-node (dom/get-element "render")
              observer (js/MutationObserver. handle-svg-change)
              ]
          (.observe observer svg-node config)
          (handle-svg-change)
 
          ;; Disconnect on unmount
-         #(.disconnect observer)
-         )))
+         #(.disconnect observer))))
 
     [:*
      [:div.pixel-overlay
@@ -191,17 +183,4 @@
                  :height (:height vport 0)
                  :style {:position "absolute"
                          :width "100%"
-                         :height "100%"}}]
-
-       #_[:& (mf/provider muc/embed-ctx) {:value true}
-        [:svg.viewport
-         {:ref svg-ref
-          :preserveAspectRatio "xMidYMid meet"
-          :width (:width vport 0)
-          :height (:height vport 0)
-          :view-box (format-viewbox vbox)
-          :style {:position "absolute"
-                  :width "100%"
-                  :height "100%"
-                  :background-color (get options :background "#E8E9EA")}}
-         [:& overlay-frames]]]]]]))
+                         :height "100%"}}]]]]))

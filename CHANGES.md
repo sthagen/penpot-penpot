@@ -4,15 +4,226 @@
 
 ### :sparkles: New features
 
-- Add integration with gitpod.io (an online IDE) [#807](https://github.com/penpot/penpot/pull/807)
-- Allow to group assets (components and graphics) [Taiga #1289](https://tree.taiga.io/project/penpot/us/1289)
-- Internal: refactor of http client, replace internal xhr usage with more modern Fetch API.
+### :bug: Bugs fixed
+
+### :arrow_up: Deps updates
+### :boom: Breaking changes
+### :heart: Community contributions by (Thank you!)
+
+## 1.7.0-alpha
+
+### :sparkles: New features
+
+- Allow nested asset groups [Taiga #1716](https://tree.taiga.io/project/penpot/us/1716).
+- Allow to ungroup assets [Taiga #1719](https://tree.taiga.io/project/penpot/us/1719).
+- Allow to rename assets groups [Taiga #1721](https://tree.taiga.io/project/penpot/us/1721).
+- Component constraints (left, right, left and right, center, scale...) [Taiga #1125](https://tree.taiga.io/project/penpot/us/1125).
+- Export elements to PDF [Taiga #519](https://tree.taiga.io/project/penpot/us/519).
+- Memorize collapse state of assets in panel [Taiga #1718](https://tree.taiga.io/project/penpot/us/1718).
+- Headers button sets and menus review [Taiga #1663](https://tree.taiga.io/project/penpot/us/1663).
+- Preserve components if possible, when pasted into a different file [Taiga #1063](https://tree.taiga.io/project/penpot/issue/1063).
+- Add the ability to offload file data to a cheaper storage when file becomes inactive.
+- Import/Export Penpot files from dashboard.
+- Double click won't make a shape a path until you change a node [Taiga #1796](https://tree.taiga.io/project/penpot/us/1796)
+- Incremental area selection [#779](https://github.com/penpot/penpot/discussions/779)
+
+### :bug: Bugs fixed
+
+- Process numeric input changes only if the value actually changed.
+- Remove unnecesary redirect from history when user goes to workspace from dashboard [Taiga #1820](https://tree.taiga.io/project/penpot/issue/1820).
+- Detach shapes from deleted assets [Taiga #1850](https://tree.taiga.io/project/penpot/issue/1850).
+- Fix tooltip position on view application [Taiga #1819](https://tree.taiga.io/project/penpot/issue/1819).
+- Fix dashboard navigation on moving file to other team [Taiga #1817](https://tree.taiga.io/project/penpot/issue/1817).
+- Fix workspace header presence styles and invalid link [Taiga #1813](https://tree.taiga.io/project/penpot/issue/1813).
+- Fix color-input wrong behavior (on workspace page color) [Taiga #1795](https://tree.taiga.io/project/penpot/issue/1795).
+- Fix file contextual menu in shared libraries at dashboard [Taiga #1865](https://tree.taiga.io/project/penpot/issue/1865).
+- Fix problem with color picker and fonts [#1049](https://github.com/penpot/penpot/issues/1049)
+- Fix negative values in blur [Taiga #1815](https://tree.taiga.io/project/penpot/issue/1815)
+- Fix problem when editing color in group [Taiga #1816](https://tree.taiga.io/project/penpot/issue/1816)
+- Fix resize/rotate with mouse buttons different than left [#1060](https://github.com/penpot/penpot/issues/1060)
+- Fix header partialy visible on fullscreen viewer mode [Taiga #1875](https://tree.taiga.io/project/penpot/issue/1875)
+- Fix dynamic alignment enabled with hidden objects [#1063](https://github.com/penpot/penpot/issues/1063)
+
+
+### :arrow_up: Deps updates
+### :boom: Breaking changes
+### :heart: Community contributions by (Thank you!)
+
+## 1.6.5-alpha
+
+### :bug: Bugs fixed
+
+- Fix problem with paths editing after flip [#1040](https://github.com/penpot/penpot/issues/1040)
+
+## 1.6.4-alpha
+
+### :sparkles: Minor improvements
+
+-  Decrease default bulk buffers on storage tasks.
+-  Reduce file_change preserve interval to 24h.
+
+### :bug: Bugs fixed
+
+- Don't allow rename drafts project.
+- Fix custom font deletion task.
+- Fix custom font rendering on exporting shapes.
+- Fix font loading on viewer app.
+- Fix problem when moving files with drag & drop.
+- Fix unexpected exception on searching without term.
+- Properly handle nil values on `update-shapes` function.
+- Replace frame term usage by artboard on viewer app.
+
+
+## 1.6.3-alpha
+
+### :bug: Bugs fixed
+
+- Fix problem with merge and join nodes [#990](https://github.com/penpot/penpot/issues/990)
+- Fix problem with empty path editing.
+- Fix problem with create component.
+- Fix problem with move-objects.
+- Fix problem with merge and join nodes.
+
+## 1.6.2-alpha
+
+### :bug: Bugs fixed
+
+- Add better auth module logging.
+- Add missing `email` scope to OIDC backend.
+- Add missing cause prop on error loging.
+- Fix empty font-family handling on custom fonts page.
+- Fix incorrect unicode code points handling on draft-to-penpot conversion.
+- Fix some problems with paths.
+- Fix unexpected exception on duplicate project.
+- Fix unexpected exception when user leaves typography name empty.
+- Improve error report on uploading invalid image to library.
+- Minor fix on previous commit.
+- Minor improvements on svg uploading on libraries.
+
+
+## 1.6.1-alpha
+
+### :bug: Bugs fixed
+
+- Add safety check on reg-objects change impl.
+- Fix custom fonts embbedding issue.
+- Fix dashboard ordering issue.
+- Fix problem when creating a component with empty data.
+- Fix problem with moving shapes into frames.
+- Fix problems with mov-objects.
+- Fix unexpected excetion related to rounding integers.
+- Fix wrong type usage on libraries changes.
+- Improve editor lifecycle management.
+- Make the navigation async by default.
+
+
+## 1.6.0-alpha
+
+### :sparkles: New features
+
+- Add improved workspace font selector [Taiga US #292](https://tree.taiga.io/project/penpot/us/292).
+- Add option to interactively scale text [Taiga #1527](https://tree.taiga.io/project/penpot/us/1527)
+- Add performance improvements on dashboard data loading.
+- Add performance improvements to indexes handling on workspace.
+- Add the ability to upload/use custom fonts (and automatically generate all needed webfonts) [Taiga US #292](https://tree.taiga.io/project/penpot/us/292).
+- Transform shapes to path on double click
+- Translate automatic names of new files and projects.
+- Use shift instead of ctrl/cmd to keep aspect ratio [Taiga 1697](https://tree.taiga.io/project/penpot/issue/1697).
+- New translations: Portuguese (Brazil) and Romanias. 
 
 
 ### :bug: Bugs fixed
 
-- Fixes problem with pan and space [#811](https://github.com/penpot/penpot/issues/811)
-- Fixes issue when parsing exponential numbers in paths
+- Remove interactions when the destination artboard is deleted [Taiga #1656](https://tree.taiga.io/project/penpot/issue/1656).
+- Fix problem with fonts that ends with numbers [#940](https://github.com/penpot/penpot/issues/940).
+- Fix problem with imported SVG on editing paths [#971](https://github.com/penpot/penpot/issues/971)
+- Fix problem with color picker positioning
+- Fix order on color palette [#961](https://github.com/penpot/penpot/issues/961)
+- Fix issue when group creation leaves an empty group [#1724](https://tree.taiga.io/project/penpot/issue/1724)
+- Fix problem with :multiple for colors and typographies [#1668](https://tree.taiga.io/project/penpot/issue/1668)
+- Fix problem with locked shapes when change parents [#974](https://github.com/penpot/penpot/issues/974)
+- Fix problem with new nodes in paths [#978](https://github.com/penpot/penpot/issues/978)
+
+### :arrow_up: Deps updates
+
+- Update exporter dependencies (puppeteer), that fixes some unexpected exceptions.
+- Update string manipulation library.
+
+
+### :boom: Breaking changes
+
+- The OIDC setting `PENPOT_OIDC_SCOPES` has changed the default semantics. Before this
+  configuration added scopes to the default set. Now it replaces it, so use with care, because
+  penpot requires at least `name` and `email` props found on the user info object.
+
+### :heart: Community contributions by (Thank you!)
+
+- Translations: Portuguese (Brazil) and Romanias.
+
+
+## 1.5.4-alpha
+
+### :bug: Bugs fixed
+
+- Fix issues on group rendering.
+- Fix problem with text editing auto-height [Taiga #1683](https://tree.taiga.io/project/penpot/issue/1683)
+
+
+## 1.5.3-alpha
+
+### :bug: Bugs fixed
+
+- Fix problem undo/redo.
+
+## 1.5.2-alpha
+
+### :bug: Bugs fixed
+
+- Fix problem with `close-path` command [#917](https://github.com/penpot/penpot/issues/917)
+- Fix wrong query for obtain the profile default project-id
+- Fix problems with empty paths and shortcuts [#923](https://github.com/penpot/penpot/issues/923)
+
+## 1.5.1-alpha
+
+### :bug: Bugs fixed
+
+- Fix issue with bitmap image clipboard.
+- Fix issue when removing all path points.
+- Increase default team invitation token expiration to 48h.
+- Fix wrong error message when an expired token is used.
+
+
+## 1.5.0-alpha
+
+### :sparkles: New features
+
+- Add integration with gitpod.io (an online IDE) [#807](https://github.com/penpot/penpot/pull/807)
+- Allow basic math operations in inputs [Taiga 1383](https://tree.taiga.io/project/penpot/us/1383)
+- Autocomplete color names in hex inputs [Taiga 1596](https://tree.taiga.io/project/penpot/us/1596)
+- Allow to group assets (components and graphics) [Taiga #1289](https://tree.taiga.io/project/penpot/us/1289)
+- Change icon of pinned projects [Taiga 1298](https://tree.taiga.io/project/penpot/us/1298)
+- Internal: refactor of http client, replace internal xhr usage with more modern Fetch API.
+- New features for paths: snap points on edition, add/remove nodes, merge/join/split nodes. [Taiga #907](https://tree.taiga.io/project/penpot/us/907)
+- Add OpenID-Connect support.
+- Reimplement social auth providers on top of the generic openid impl.
+
+### :bug: Bugs fixed
+
+- Fix problem with pan and space [#811](https://github.com/penpot/penpot/issues/811)
+- Fix issue when parsing exponential numbers in paths
+- Remove legacy system user and team [#843](https://github.com/penpot/penpot/issues/843)
+- Fix ordering of copy pasted objects [Taiga #1618](https://tree.taiga.io/project/penpot/issue/1617)
+- Fix problems with blending modes [#837](https://github.com/penpot/penpot/issues/837)
+- Fix problem with zoom an selection rect [#845](https://github.com/penpot/penpot/issues/845)
+- Fix problem displaying team statistics [#859](https://github.com/penpot/penpot/issues/859)
+- Fix problems with text editor selection [Taiga #1546](https://tree.taiga.io/project/penpot/issue/1546)
+- Fix problem when opening the context menu in dashboard at the bottom [#856](https://github.com/penpot/penpot/issues/856)
+- Fix problem when clicking an interactive group in view mode [#863](https://github.com/penpot/penpot/issues/863)
+- Fix visibility of pages in sitemap when changing page [Taiga #1618](https://tree.taiga.io/project/penpot/issue/1618)
+- Fix visual problem with group invite [Taiga #1290](https://tree.taiga.io/project/penpot/issue/1290)
+- Fix issues with promote owner panel [Taiga #763](https://tree.taiga.io/project/penpot/issue/763)
+- Allow use library colors when defining gradients [Taiga #1614](https://tree.taiga.io/project/penpot/issue/1614)
+- Fix group selrect not updating after alignment [#895](https://github.com/penpot/penpot/issues/895)
 
 ### :arrow_up: Deps updates
 

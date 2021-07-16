@@ -6,27 +6,49 @@
 
 (ns app.main.ui.workspace.shapes.frame
   (:require
-   [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
-   [app.main.data.workspace :as dw]
-   [app.main.refs :as refs]
-   [app.main.store :as st]
-   [app.main.ui.context :as muc]
+   [app.common.pages :as cp]
    [app.main.ui.shapes.frame :as frame]
    [app.main.ui.shapes.shape :refer [shape-container]]
-   [app.util.dom :as dom]
-   [app.util.keyboard :as kbd]
+   [app.main.ui.shapes.text.fontfaces :as ff]
+   [app.util.object :as obj]
    [app.util.timers :as ts]
    [beicon.core :as rx]
-   [okulary.core :as l]
    [rumext.alpha :as mf]))
 
-(defn make-is-moving-ref
-  [id]
-  (let [check-moving (fn [local]
-                       (and (= :move (:transform local))
-                            (contains? (:selected local) id)))]
-    (l/derived check-moving refs/workspace-local)))
+(defn check-frame-props
+  "Checks for changes in the props of a frame"
+  [new-props old-props]
+  (let [new-shape (unchecked-get new-props "shape")
+        old-shape (unchecked-get old-props "shape")
+
+        new-thumbnail? (unchecked-get new-props "thumbnail?")
+        old-thumbnail? (unchecked-get old-props "thumbnail?")
+
+        new-objects (unchecked-get new-props "objects")
+        old-objects (unchecked-get old-props "objects")
+
+        new-children (->> new-shape :shapes (mapv #(get new-objects %)))
+        old-children (->> old-shape :shapes (mapv #(get old-objects %)))]
+    (and (= new-shape old-shape)
+         (= new-thumbnail? old-thumbnail?)
+         (= new-children old-children))))
+
+(mf/defc thumbnail
+  {::mf/wrap-props false}
+  [props]
+  (let [shape (obj/get props "shape")]
+    (when (:thumbnail shape)
+      [:image.frame-thumbnail
+       {:id (str "thumbnail-" (:id shape))
+        :xlinkHref (:thumbnail shape)
+        :x (:x shape)
+        :y (:y shape)
+        :width (:width shape)
+        :height (:height shape)
+        ;; DEBUG
+        ;; :style {:filter "sepia(1)"}
+        }])))
 
 ;; This custom deffered don't deffer rendering when ghost rendering is
 ;; used.
@@ -48,21 +70,36 @@
   [shape-wrapper]
   (let [frame-shape (frame/frame-shape shape-wrapper)]
     (mf/fnc frame-wrapper
-      {::mf/wrap [#(mf/memo' % (mf/check-props ["shape" "objects"])) custom-deferred]
+      {::mf/wrap [#(mf/memo' % check-frame-props) custom-deferred]
        ::mf/wrap-props false}
       [props]
       (let [shape       (unchecked-get props "shape")
             objects     (unchecked-get props "objects")
-            edition     (mf/deref refs/selected-edition)
+            thumbnail?  (unchecked-get props "thumbnail?")
 
-            shape       (gsh/transform-shape shape)
-            children    (mapv #(get objects %) (:shapes shape))
-            ds-modifier (get-in shape [:modifiers :displacement])]
+            shape        (gsh/transform-shape shape)
+            children     (mapv #(get objects %) (:shapes shape))
 
-        (when (and shape (not (:hidden shape)))
+            all-children (cp/get-children-objects (:id shape) objects)
+
+            rendered?   (mf/use-state false)
+
+            show-thumbnail? (and thumbnail? (some? (:thumbnail shape)))
+
+            on-dom
+            (mf/use-callback
+             (fn [node]
+               (ts/schedule-on-idle #(reset! rendered? (some? node)))))]
+
+        (when (some? shape)
           [:g.frame-wrapper {:display (when (:hidden shape) "none")}
-           [:> shape-container {:shape shape}
-            [:& frame-shape
-             {:shape shape
-              :childs children}]]])))))
+
+           (when-not show-thumbnail?
+             [:> shape-container {:shape shape :ref on-dom}
+              [:& ff/fontfaces-style {:shapes all-children}]
+              [:& frame-shape {:shape shape
+                               :childs children}]])
+
+           (when (or (not @rendered?) show-thumbnail?)
+             [:& thumbnail {:shape shape}])])))))
 

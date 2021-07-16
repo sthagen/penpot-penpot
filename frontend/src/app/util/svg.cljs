@@ -6,12 +6,12 @@
 
 (ns app.util.svg
   (:require
-   [app.common.uuid :as uuid]
    [app.common.data :as d]
    [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
    [app.common.math :as mth]
+   [app.common.uuid :as uuid]
    [cuerdas.core :as str]))
 
 ;; Regex for XML ids per Spec
@@ -488,8 +488,9 @@
            filter-values)))
 
 (defn extract-ids [val]
-  (->> (re-seq xml-id-regex val)
-       (mapv second)))
+  (when (some? val)
+    (->> (re-seq xml-id-regex val)
+         (mapv second))))
 
 (defn fix-dot-number
   "Fixes decimal numbers starting in dot but without leading 0"
@@ -538,11 +539,6 @@
                    (str/replace ":" "-")
                    (str/camel)
                    (keyword))))
-
-           (lowercase-key [key]
-             (-> (d/name key)
-                 (str/lower)
-                 (keyword)))
 
            (format-styles [style-str]
              (->> (str/split style-str ";")
@@ -593,7 +589,7 @@
 (defn replace-attrs-ids
   "Replaces the ids inside a property"
   [attrs ids-mapping]
-  (if (and ids-mapping (not (empty? ids-mapping)))
+  (if (and ids-mapping (seq ids-mapping))
     (update-attr-ids attrs (fn [id] (get ids-mapping id id)))
     ;; Ids-mapping is null
     attrs))
@@ -606,7 +602,7 @@
               (reduce visit-node result (:content node))))]
     (visit-node {} content)))
 
-(defn extract-defs [{:keys [tag attrs content] :as node}]
+(defn extract-defs [{:keys [attrs] :as node}]
   (if-not (map? node)
     [{} node]
 
@@ -646,7 +642,7 @@
     (cond
       (nil? to-check)
       result
-      
+
       (checked? to-check)
       (recur result
              checked?
@@ -672,7 +668,7 @@
 
           scale-x (/ width svg-width)
           scale-y (/ height svg-height)]
-      
+
       (gmt/multiply
        (gmt/matrix)
 
@@ -735,7 +731,7 @@
     (let [process-matrix
           (fn [[_ type params]]
             (let [params (->> (re-seq number-regex params)
-                              (filter #(-> % first empty? not))
+                              (filter #(-> % first seq))
                               (map (comp d/parse-double first)))]
               {:type type :params params}))
 
@@ -744,8 +740,6 @@
                         (map to-matrix))]
       (reduce gmt/multiply (gmt/matrix) matrices))
     (gmt/matrix)))
-
-
 
 (defn format-move [[x y]] (str "M" x " " y))
 (defn format-line [[x y]] (str "L" x " " y))
@@ -763,7 +757,7 @@
     (str (format-move head)
          (->> other (map format-line) (str/join " ")))))
 
-(defn polyline->path [{:keys [attrs tag] :as node}]
+(defn polyline->path [{:keys [attrs] :as node}]
   (let [tag :path
         attrs (-> attrs
                   (dissoc :points)
@@ -771,14 +765,14 @@
 
     (assoc node :attrs attrs :tag tag)))
 
-(defn polygon->path [{:keys [attrs tag] :as node}]
+(defn polygon->path [{:keys [attrs] :as node}]
   (let [tag :path
         attrs (-> attrs
                   (dissoc :points)
                   (assoc :d (str (points->path (:points attrs)) "Z")))]
     (assoc node :attrs attrs :tag tag)))
 
-(defn line->path [{:keys [attrs tag] :as node}]
+(defn line->path [{:keys [attrs] :as node}]
   (let [tag :path
         {:keys [x1 y1 x2 y2]} attrs
         attrs (-> attrs
@@ -870,7 +864,7 @@
                  :ratio (calculate-ratio (:width svg-data) (:height svg-data))}]
     (letfn [(fix-length [prop-length val]
               (* (get viewbox prop-length) (/ val 100.)))
-            
+
             (fix-coord [prop-coord prop-length val]
               (+ (get viewbox prop-coord)
                  (fix-length prop-length val)))
@@ -898,7 +892,7 @@
             (fix-percent-attrs-viewbox [attrs]
               (d/mapm fix-percent-attr-viewbox attrs))
 
-            (fix-percent-attr-numeric [attr-key attr-val]
+            (fix-percent-attr-numeric [_ attr-val]
               (let [is-percent? (str/ends-with? attr-val "%")]
                 (if is-percent?
                   (str (let [attr-num (d/parse-double attr-val)]

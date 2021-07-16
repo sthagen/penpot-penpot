@@ -10,10 +10,8 @@
    [app.common.data :as d]
    [app.common.exceptions :as ex]
    [app.util.object :as obj]
-   [app.util.transit :as t]
    [beicon.core :as rx]
-   [cuerdas.core :as str]
-   [promesa.core :as p]))
+   [cuerdas.core :as str]))
 
 (defn- file-reader
   [f]
@@ -28,6 +26,10 @@
 (defn read-file-as-text
   [file]
   (file-reader #(.readAsText %1 file)))
+
+(defn read-file-as-array-buffer
+  [file]
+  (file-reader #(.readAsArrayBuffer %1 file)))
 
 (defn read-file-as-data-url
   [file]
@@ -127,3 +129,14 @@
     :else
     (ex/raise :type :not-supported
               :hint "seems like the current browset does not support fullscreen api.")))
+
+(defn observe-resize
+  [node]
+  (rx/create
+   (fn [subs]
+     (let [obs (js/ResizeObserver.
+                (fn [entries _]
+                  (rx/push! subs entries)))]
+       (.observe ^js obs node)
+       (fn []
+         (.disconnect ^js obs))))))

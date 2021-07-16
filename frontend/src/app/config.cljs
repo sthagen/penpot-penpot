@@ -6,14 +6,14 @@
 
 (ns app.config
   (:require
-   [clojure.spec.alpha :as s]
-   [app.common.data :as d]
    [app.common.spec :as us]
+   [app.common.uri :as u]
    [app.common.version :as v]
+   [app.util.avatars :as avatars]
+   [app.util.dom :as dom]
    [app.util.globals :refer [global location]]
    [app.util.object :as obj]
-   [app.util.dom :as dom]
-   [app.util.avatars :as avatars]
+   [clojure.spec.alpha :as s]
    [cuerdas.core :as str]))
 
 ;; --- Auxiliar Functions
@@ -53,6 +53,11 @@
     :browser
     :webworker))
 
+(defn- parse-flags
+  [global]
+  (let [flags (obj/get global "penpotFlags" "")]
+    (into #{} (map keyword) (str/words flags))))
+
 (defn- parse-version
   [global]
   (-> (obj/get global "penpotVersion")
@@ -69,22 +74,33 @@
 (def google-client-id     (obj/get global "penpotGoogleClientID" nil))
 (def gitlab-client-id     (obj/get global "penpotGitlabClientID" nil))
 (def github-client-id     (obj/get global "penpotGithubClientID" nil))
+(def oidc-client-id       (obj/get global "penpotOIDCClientID" nil))
 (def login-with-ldap      (obj/get global "penpotLoginWithLDAP" false))
 (def registration-enabled (obj/get global "penpotRegistrationEnabled" true))
 (def worker-uri           (obj/get global "penpotWorkerURI" "/js/worker.js"))
 (def translations         (obj/get global "penpotTranslations"))
 (def themes               (obj/get global "penpotThemes"))
+(def analytics            (obj/get global "penpotAnalyticsEnabled" false))
 
-(def public-uri           (or (obj/get global "penpotPublicURI") (.-origin ^js location)))
+(def flags                (delay (parse-flags global)))
 
 (def version              (delay (parse-version global)))
 (def target               (delay (parse-target global)))
 (def browser              (delay (parse-browser)))
 (def platform             (delay (parse-platform)))
 
+(def public-uri
+  (let [uri (u/uri (or (obj/get global "penpotPublicURI")
+                       (.-origin ^js location)))]
+    ;; Ensure that the path always ends with "/"; this ensures that
+    ;; all path join operations works as expected.
+    (cond-> uri
+      (not (str/ends-with? (:path uri) "/"))
+      (update :path #(str % "/")))))
+
 (when (= :browser @target)
   (js/console.log
-   (str/format "Welcome to penpot! Version: '%s'." (:full @version))))
+   (str/format "Welcome to penpot! version='%s' base-uri='%s'." (:full @version) (str public-uri))))
 
 ;; --- Helper Functions
 
@@ -100,18 +116,21 @@
   [{:keys [photo-id fullname name] :as profile}]
   (if (nil? photo-id)
     (avatars/generate {:name (or fullname name)})
-    (str public-uri "/assets/by-id/" photo-id)))
+    (str (u/join public-uri "assets/by-id/" photo-id))))
 
 (defn resolve-team-photo-url
   [{:keys [photo-id name] :as team}]
   (if (nil? photo-id)
     (avatars/generate {:name name})
-    (str public-uri "/assets/by-id/" photo-id)))
+    (str (u/join public-uri "assets/by-id/" photo-id))))
 
 (defn resolve-file-media
   ([media]
    (resolve-file-media media false))
-  ([{:keys [id] :as media} thumnail?]
-   (str public-uri "/assets/by-file-media-id/" id (when thumnail? "/thumbnail"))))
+
+  ([{:keys [id]} thumbnail?]
+   (str (cond-> (u/join public-uri "assets/by-file-media-id/")
+          (true? thumbnail?) (u/join (str id "/thumbnail"))
+          (false? thumbnail?) (u/join (str id))))))
 
 

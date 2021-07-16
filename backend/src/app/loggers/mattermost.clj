@@ -39,38 +39,36 @@
           :opt-un [::uri]))
 
 (defmethod ig/init-key ::reporter
-  [_ {:keys [receiver] :as cfg}]
-  (l/info :msg "intializing mattermost error reporter")
-  (let [output (a/chan (a/sliding-buffer 128)
-                       (filter #(= (:level %) "error")))]
-    (receiver :sub output)
-    (a/go-loop []
-      (let [msg (a/<! output)]
-        (if (nil? msg)
-          (l/info :msg "stoping error reporting loop")
-          (do
-            (a/<! (handle-event cfg msg))
-            (recur)))))
-    output))
+  [_ {:keys [receiver uri] :as cfg}]
+  (when uri
+    (l/info :msg "initializing mattermost error reporter" :uri uri)
+    (let [output (a/chan (a/sliding-buffer 128)
+                         (filter #(= (:level %) "error")))]
+      (receiver :sub output)
+      (a/go-loop []
+        (let [msg (a/<! output)]
+          (if (nil? msg)
+            (l/info :msg "stoping error reporting loop")
+            (do
+              (a/<! (handle-event cfg msg))
+              (recur)))))
+      output)))
 
 (defmethod ig/halt-key! ::reporter
   [_ output]
-  (a/close! output))
+  (when output
+    (a/close! output)))
 
 (defn- send-mattermost-notification!
-  [cfg {:keys [host version id error] :as cdata}]
+  [cfg {:keys [host version id] :as cdata}]
   (try
     (let [uri  (:uri cfg)
-          text (str "Unhandled exception (@channel):\n"
-                    "- detail: " (cfg/get :public-uri) "/dbg/error-by-id/" id "\n"
-                    "- host: `" host "`\n"
-                    "- version: `" version "`\n"
-                    (when error
-                      (str "```\n" (:trace error)  "\n```")))
-          rsp    (http/send! {:uri uri
-                              :method :post
-                              :headers {"content-type" "application/json"}
-                              :body (json/encode-str {:text text})})]
+          text (str "Unhandled exception (host: " host ", url: " (cfg/get :public-uri) "/dbg/error-by-id/" id "\n"
+                    "- profile-id: #" (:profile-id cdata) "\n")
+          rsp  (http/send! {:uri uri
+                            :method :post
+                            :headers {"content-type" "application/json"}
+                            :body (json/encode-str {:text text})})]
       (when (not= (:status rsp) 200)
         (l/error :hint "error on sending data to mattermost"
                  :response (pr-str rsp))))
@@ -111,7 +109,7 @@
   (aa/with-thread executor
     (try
       (let [cdata (parse-event event)]
-        (when (and (:uri cfg) @enabled-mattermost)
+        (when @enabled-mattermost
           (send-mattermost-notification! cfg cdata))
         (persist-on-database! cfg cdata))
       (catch Exception e

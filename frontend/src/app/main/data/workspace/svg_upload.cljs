@@ -10,20 +10,19 @@
    [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
-   [app.common.geom.proportions :as gpr]
    [app.common.pages :as cp]
    [app.common.uuid :as uuid]
+   [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.common :as dwc]
+   [app.main.data.workspace.state-helpers :as wsh]
    [app.main.repo :as rp]
    [app.util.color :as uc]
-   [app.util.geom.path :as ugp]
-   [app.util.object :as obj]
+   [app.util.path.parser :as upp]
    [app.util.svg :as usvg]
    [app.util.uri :as uu]
    [beicon.core :as rx]
    [cuerdas.core :as str]
-   [potok.core :as ptk]
-   [promesa.core :as p]))
+   [potok.core :as ptk]))
 
 (defonce default-rect {:x 0 :y 0 :width 1 :height 1 :rx 0 :ry 0})
 (defonce default-circle {:r 0 :cx 0 :cy 0})
@@ -161,9 +160,9 @@
         (gsh/setup-selrect))))
 
 (defn create-path-shape [name frame-id svg-data {:keys [attrs] :as data}]
-  (when (and (contains? attrs :d) (not (empty? (:d attrs)) ))
+  (when (and (contains? attrs :d) (seq (:d attrs)))
     (let [svg-transform (usvg/parse-transform (:transform attrs))
-          path-content (ugp/path->content (:d attrs))
+          path-content (upp/parse-path (:d attrs))
           content (cond-> path-content
                     svg-transform
                     (gsh/transform-content svg-transform))
@@ -385,7 +384,7 @@
   [svg-data file-id position]
   (ptk/reify ::svg-uploaded
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ _ _]
       ;; Once the SVG is uploaded, we need to extract all the bitmap
       ;; images and upload them separatelly, then proceed to create
       ;; all shapes.
@@ -412,12 +411,12 @@
   [svg-data {:keys [x y] :as position}]
   (ptk/reify ::create-svg-shapes
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [it state _]
       (try
         (let [page-id (:current-page-id state)
-              objects (dwc/lookup-page-objects state page-id)
+              objects (wsh/lookup-page-objects state page-id)
               frame-id (cp/frame-id-by-position objects position)
-              selected (get-in state [:workspace-local :selected])
+              selected (wsh/lookup-selected state)
 
               [vb-x vb-y vb-width vb-height] (svg-dimensions svg-data)
               x (- x vb-x (/ vb-width 2))
@@ -462,7 +461,9 @@
 
               rchanges (conj rchanges reg-objects-action)]
 
-          (rx/of (dwc/commit-changes rchanges uchanges {:commit-local? true})
+          (rx/of (dch/commit-changes {:redo-changes rchanges
+                                      :undo-changes uchanges
+                                      :origin it})
                  (dwc/select-shapes (d/ordered-set root-id))))
 
         (catch :default e

@@ -6,19 +6,19 @@
 
 (ns app.main.ui.workspace.sidebar.options.menus.component
   (:require
-   [rumext.alpha :as mf]
    [app.common.pages :as cp]
    [app.main.data.modal :as modal]
+   [app.main.data.workspace :as dw]
+   [app.main.data.workspace.libraries :as dwl]
+   [app.main.data.workspace.undo :as dwu]
    [app.main.refs :as refs]
    [app.main.store :as st]
+   [app.main.ui.components.context-menu :refer [context-menu]]
    [app.main.ui.context :as ctx]
    [app.main.ui.icons :as i]
-   [app.main.ui.components.context-menu :refer [context-menu]]
-   [app.main.data.workspace :as dw]
-   [app.main.data.workspace.common :as dwc]
-   [app.main.data.workspace.libraries :as dwl]
+   [app.util.dom :as dom]
    [app.util.i18n :as i18n :refer [t]]
-   [app.util.dom :as dom]))
+   [rumext.alpha :as mf]))
 
 (def component-attrs [:component-id :component-file :shape-ref])
 
@@ -50,10 +50,10 @@
         do-detach-component (st/emitf (dwl/detach-component id))
         do-reset-component (st/emitf (dwl/reset-component id))
         do-update-component (st/emitf
-                               (dwc/start-undo-transaction)
+                               (dwu/start-undo-transaction)
                                (dwl/update-component id)
                                (dwl/sync-file current-file-id current-file-id)
-                               (dwc/commit-undo-transaction))
+                               (dwu/commit-undo-transaction))
         confirm-update-remote-component (st/emitf
                                           (dwl/update-component id)
                                           (dwl/sync-file current-file-id

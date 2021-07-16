@@ -32,14 +32,19 @@
                 (assoc :suffix "ON CONFLICT DO NOTHING"))]
      (sql/for-insert table key-map opts))))
 
+(defn insert-multi
+  [table cols rows opts]
+  (let [opts (merge default-opts opts)]
+    (sql/for-insert-multi table cols rows opts)))
+
 (defn select
   ([table where-params]
    (select table where-params nil))
   ([table where-params opts]
    (let [opts (merge default-opts opts)
          opts (cond-> opts
-                (:for-update opts)
-                (assoc :suffix "FOR UPDATE"))]
+                (:for-update opts)    (assoc :suffix "FOR UPDATE")
+                (:for-key-share opts) (assoc :suffix "FOR KEY SHARE"))]
      (sql/for-query table where-params opts))))
 
 (defn update

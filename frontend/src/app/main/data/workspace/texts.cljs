@@ -6,23 +6,21 @@
 
 (ns app.main.data.workspace.texts
   (:require
-   [app.common.math :as mth]
    [app.common.attrs :as attrs]
-   [app.common.text :as txt]
-   [app.common.geom.shapes :as gsh]
-   [app.common.pages :as cp]
    [app.common.data :as d]
-   [app.main.data.workspace.selection :as dws]
+   [app.common.geom.shapes :as gsh]
+   [app.common.math :as mth]
+   [app.common.pages :as cp]
+   [app.common.text :as txt]
+   [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.common :as dwc]
-   [app.main.data.workspace.transforms :as dwt]
-   [app.main.fonts :as fonts]
-   [app.util.object :as obj]
+   [app.main.data.workspace.selection :as dws]
+   [app.main.data.workspace.state-helpers :as wsh]
+   [app.main.data.workspace.undo :as dwu]
+   [app.util.router :as rt]
    [app.util.text-editor :as ted]
    [app.util.timers :as ts]
    [beicon.core :as rx]
-   [cljs.spec.alpha :as s]
-   [goog.object :as gobj]
-   [cuerdas.core :as str]
    [potok.core :as ptk]))
 
 (defn update-editor
@@ -38,7 +36,7 @@
   []
   (ptk/reify ::focus-editor
     ptk/EffectEvent
-    (effect [_ state stream]
+    (effect [_ state _]
       (when-let [editor (:workspace-editor state)]
         (ts/schedule #(.focus ^js editor))))))
 
@@ -51,6 +49,27 @@
         (update state :workspace-editor-state assoc id editor-state)
         (update state :workspace-editor-state dissoc id)))))
 
+(defn finalize-editor-state
+  [{:keys [id] :as shape}]
+  (ptk/reify ::finalize-editor-state
+    ptk/WatchEvent
+    (watch [_ state _]
+      (let [content (-> (get-in state [:workspace-editor-state id])
+                        (ted/get-editor-current-content))]
+
+        (if (ted/content-has-text? content)
+          (let [content (d/merge (ted/export-content content)
+                                 (dissoc (:content shape) :children))]
+            (rx/merge
+             (rx/of (update-editor-state shape nil))
+             (when (and (not= content (:content shape))
+                        (some? (:current-page-id state)))
+               (rx/of
+                (dch/update-shapes [id] #(assoc % :content content))
+                (dwu/commit-undo-transaction)))))
+          (rx/of (dws/deselect-shape id)
+                 (dwc/delete-shapes #{id})))))))
+
 (defn initialize-editor-state
   [{:keys [id content] :as shape} decorator]
   (ptk/reify ::initialize-editor-state
@@ -60,27 +79,18 @@
                  (fn [_]
                    (ted/create-editor-state
                     (some->> content ted/import-content)
-                    decorator))))))
+                    decorator))))
 
-(defn finalize-editor-state
-  [{:keys [id] :as shape}]
-  (ptk/reify ::finalize-editor-state
     ptk/WatchEvent
-    (watch [_ state stream]
-      (let [content (-> (get-in state [:workspace-editor-state id])
-                        (ted/get-editor-current-content))]
-        (if (ted/content-has-text? content)
-          (let [content (d/merge (ted/export-content content)
-                                 (dissoc (:content shape) :children))]
-            (rx/merge
-             (rx/of (update-editor-state shape nil))
-             (when (and (not= content (:content shape))
-                        (some? (:current-page-id state)))
-               (rx/of
-                (dwc/update-shapes [id] #(assoc % :content content))
-                (dwc/commit-undo-transaction)))))
-          (rx/of (dws/deselect-shape id)
-                 (dwc/delete-shapes [id])))))))
+    (watch [_ _ stream]
+      ;; We need to finalize editor on two main events: (1) when user
+      ;; explicitly navigates to other section or page; (2) when user
+      ;; leaves the editor.
+      (->> (rx/merge
+            (rx/filter (ptk/type? ::rt/navigate) stream)
+            (rx/filter #(= ::finalize-editor-state %) stream))
+           (rx/take 1)
+           (rx/map #(finalize-editor-state shape))))))
 
 (defn select-all
   "Select all content of the current editor. When not editor found this
@@ -133,15 +143,15 @@
   [{:keys [id attrs]}]
   (ptk/reify ::update-root-attrs
     ptk/WatchEvent
-    (watch [_ state stream]
-      (let [objects   (dwc/lookup-page-objects state)
+    (watch [_ state _]
+      (let [objects   (wsh/lookup-page-objects state)
             shape     (get objects id)
 
             update-fn #(update-shape % txt/is-root-node? attrs/merge attrs)
             shape-ids (cond (= (:type shape) :text)  [id]
                             (= (:type shape) :group) (cp/get-children id objects))]
 
-        (rx/of (dwc/update-shapes shape-ids update-fn))))))
+        (rx/of (dch/update-shapes shape-ids update-fn))))))
 
 (defn update-paragraph-attrs
   [{:keys [id attrs]}]
@@ -152,9 +162,9 @@
         (d/update-in-when state [:workspace-editor-state id] ted/update-editor-current-block-data attrs))
 
       ptk/WatchEvent
-      (watch [_ state stream]
+      (watch [_ state _]
         (when-not (some? (get-in state [:workspace-editor-state id]))
-          (let [objects   (dwc/lookup-page-objects state)
+          (let [objects   (wsh/lookup-page-objects state)
                 shape     (get objects id)
 
                 merge-fn  (fn [node attrs]
@@ -169,7 +179,7 @@
                 shape-ids (cond (= (:type shape) :text)  [id]
                                 (= (:type shape) :group) (cp/get-children id objects))]
 
-            (rx/of (dwc/update-shapes shape-ids update-fn))))))))
+            (rx/of (dch/update-shapes shape-ids update-fn))))))))
 
 (defn update-text-attrs
   [{:keys [id attrs]}]
@@ -179,15 +189,15 @@
       (d/update-in-when state [:workspace-editor-state id] ted/update-editor-current-inline-styles attrs))
 
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ state _]
       (when-not (some? (get-in state [:workspace-editor-state id]))
-        (let [objects   (dwc/lookup-page-objects state)
+        (let [objects   (wsh/lookup-page-objects state)
               shape     (get objects id)
 
               update-fn #(update-shape % txt/is-text-node? attrs/merge attrs)
               shape-ids (cond (= (:type shape) :text)  [id]
                               (= (:type shape) :group) (cp/get-children id objects))]
-          (rx/of (dwc/update-shapes shape-ids update-fn)))))))
+          (rx/of (dch/update-shapes shape-ids update-fn)))))))
 
 ;; --- RESIZE UTILS
 
@@ -203,8 +213,8 @@
   (ptk/reify ::start-edit-if-selected
     ptk/UpdateEvent
     (update [_ state]
-      (let [objects  (dwc/lookup-page-objects state)
-            selected (->> state :workspace-local :selected (map #(get objects %)))]
+      (let [objects  (wsh/lookup-page-objects state)
+            selected (->> state wsh/lookup-selected (mapv #(get objects %)))]
         (cond-> state
           (and (= 1 (count selected))
                (= (-> selected first :type) :text))
@@ -216,60 +226,43 @@
 (defn resize-text-batch [changes]
   (ptk/reify ::resize-text-batch
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ state _]
       (let [page-id  (:current-page-id state)
-
-            objects0 (get-in state [:workspace-file :data :pages-index page-id :objects])
-            objects1 (get-in state [:workspace-data :pages-index page-id :objects])]
-        (if-not (every? #(contains? objects1(first %)) changes)
+            objects (get-in state [:workspace-data :pages-index page-id :objects])]
+        (if-not (every? #(contains? objects(first %)) changes)
           (rx/empty)
-          (let [change-text-shape
-                (fn [objects [id [new-width new-height]]]
-                  (when (contains? objects id)
-                    (let [shape (get objects id)
-                          {:keys [selrect grow-type overflow-text]} (gsh/transform-shape shape)
-                          {shape-width :width shape-height :height} selrect
 
-                          modifier-width (gsh/resize-modifiers shape :width new-width)
-                          modifier-height (gsh/resize-modifiers shape :height new-height)
+          (let [changes-map (->> changes (into {}))
+                ids (keys changes-map)
+                update-fn
+                (fn [shape]
+                  (let [[new-width new-height] (get changes-map (:id shape))
+                        {:keys [selrect grow-type overflow-text]} (gsh/transform-shape shape)
+                        {shape-width :width shape-height :height} selrect
 
-                          shape (cond-> shape
-                                  (and overflow-text (not= :fixed grow-type))
-                                  (assoc :overflow-text false)
+                        modifier-width (gsh/resize-modifiers shape :width new-width)
+                        modifier-height (gsh/resize-modifiers shape :height new-height)]
 
-                                  (and (= :fixed grow-type) (not overflow-text) (> new-height shape-height))
-                                  (assoc :overflow-text true)
+                    (cond-> shape
+                      (and overflow-text (not= :fixed grow-type))
+                      (assoc :overflow-text false)
 
-                                  (and (= :fixed grow-type) overflow-text (<= new-height shape-height))
-                                  (assoc :overflow-text false)
+                      (and (= :fixed grow-type) (not overflow-text) (> new-height shape-height))
+                      (assoc :overflow-text true)
 
-                                  (and (not-changed? shape-width new-width) (= grow-type :auto-width))
-                                  (-> (assoc :modifiers modifier-width)
-                                      (gsh/transform-shape))
+                      (and (= :fixed grow-type) overflow-text (<= new-height shape-height))
+                      (assoc :overflow-text false)
 
-                                  (and (not-changed? shape-height new-height)
-                                       (or (= grow-type :auto-height) (= grow-type :auto-width)))
-                                  (-> (assoc :modifiers modifier-height)
-                                      (gsh/transform-shape)))]
-                      (assoc objects id shape))))
+                      (and (not-changed? shape-width new-width) (= grow-type :auto-width))
+                      (-> (assoc :modifiers modifier-width)
+                          (gsh/transform-shape))
 
-                undo-transaction (get-in state [:workspace-undo :transaction])
-                objects2 (->> changes (reduce change-text-shape objects1))
+                      (and (not-changed? shape-height new-height)
+                           (or (= grow-type :auto-height) (= grow-type :auto-width)))
+                      (-> (assoc :modifiers modifier-height)
+                          (gsh/transform-shape)))))]
 
-                regchg   {:type :reg-objects
-                          :page-id page-id
-                          :shapes (vec (keys changes))}
-
-                rchanges (dwc/generate-changes page-id objects1 objects2)
-                uchanges (dwc/generate-changes page-id objects2 objects0)]
-
-            (if (seq rchanges)
-              (rx/concat
-               (when-not undo-transaction
-                 (rx/of (dwc/start-undo-transaction)))
-               (rx/of (dwc/commit-changes (conj rchanges regchg) (conj uchanges regchg) {:commit-local? true}))
-               (when-not undo-transaction
-                 (rx/of (dwc/discard-undo-transaction)))))))))))
+            (rx/of (dch/update-shapes ids update-fn {:reg-objects? true}))))))))
 
 ;; When a resize-event arrives we start "buffering" for a time
 ;; after that time we invoke `resize-text-batch` with all the changes

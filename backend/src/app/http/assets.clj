@@ -9,13 +9,13 @@
   (:require
    [app.common.exceptions :as ex]
    [app.common.spec :as us]
+   [app.common.uri :as u]
    [app.db :as db]
    [app.metrics :as mtx]
    [app.storage :as sto]
    [app.util.time :as dt]
    [clojure.spec.alpha :as s]
-   [integrant.core :as ig]
-   [lambdaisland.uri :as u]))
+   [integrant.core :as ig]))
 
 (def ^:private cache-max-age
   (dt/duration {:hours 24}))
@@ -49,7 +49,7 @@
       {:status 200
        :headers {"content-type" (:content-type mdata)
                  "cache-control" (str "max-age=" (inst-ms cache-max-age))}
-       :body (sto/get-object-data storage obj)}
+       :body (sto/get-object-bytes storage obj)}
 
       :s3
       (let [url (sto/get-object-url storage obj {:max-age signature-max-age})]

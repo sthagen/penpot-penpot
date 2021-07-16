@@ -1,10 +1,15 @@
 msgid ""
 msgstr ""
+"PO-Revision-Date: 2021-05-13 08:47+0000\n"
+"Last-Translator: Andrey Antukh <niwi@niwi.nz>\n"
+"Language-Team: French "
+"<https://hosted.weblate.org/projects/penpot/frontend/fr/>\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Plural-Forms: nplurals=2; plural=(n!=1);\n"
+"X-Generator: Weblate 4.7-dev\n"
 
 #: src/app/main/ui/auth/register.cljs
 msgid "auth.already-have-account"
@@ -45,10 +50,6 @@ msgstr "Mot de passe oublié ?"
 #: src/app/main/ui/auth/register.cljs
 msgid "auth.fullname"
 msgstr "Nom complet"
-
-#: src/app/main/ui/auth/recovery_request.cljs
-msgid "auth.go-back-to-login"
-msgstr "Retour !"
 
 #: src/app/main/ui/auth/register.cljs
 msgid "auth.login-here"
@@ -732,6 +733,9 @@ msgstr "Adresse e‑mail"
 msgid "labels.give-feedback"
 msgstr "Donnez votre avis"
 
+msgid "labels.go-back"
+msgstr "Retour"
+
 #: src/app/main/ui/workspace/comments.cljs, src/app/main/ui/viewer/header.cljs
 msgid "labels.hide-resolved-comments"
 msgstr "Masquer les commentaires résolus"
@@ -1198,6 +1202,10 @@ msgid "viewer.header.fullscreen"
 msgstr "Plein écran"
 
 #: src/app/main/ui/viewer/header.cljs
+msgid "viewer.header.interactions"
+msgstr "Interactions"
+
+#: src/app/main/ui/viewer/header.cljs
 msgid "viewer.header.share.copy-link"
 msgstr "Copier le lien"
 
@@ -1219,7 +1227,7 @@ msgstr "Toute personne disposant du lien aura accès"
 
 #: src/app/main/ui/viewer/header.cljs, src/app/main/ui/viewer/header.cljs, src/app/main/ui/viewer/header.cljs
 msgid "viewer.header.share.title"
-msgstr "Lien de partage"
+msgstr "Partager le prototype"
 
 #: src/app/main/ui/viewer/header.cljs
 msgid "viewer.header.show-interactions"
@@ -2036,15 +2044,15 @@ msgstr "Courbe (%s)"
 
 #: src/app/main/ui/workspace/left_toolbar.cljs
 msgid "workspace.toolbar.ellipse"
-msgstr "Ellipse (E)"
+msgstr "Ellipse (%s)"
 
 #: src/app/main/ui/workspace/left_toolbar.cljs
 msgid "workspace.toolbar.frame"
-msgstr "Plan de travail (A)"
+msgstr "Plan de travail (%s)"
 
 #: src/app/main/ui/workspace/left_toolbar.cljs
 msgid "workspace.toolbar.image"
-msgstr "Image (K)"
+msgstr "Image (%s)"
 
 #: src/app/main/ui/workspace/left_toolbar.cljs
 msgid "workspace.toolbar.move"
@@ -2052,15 +2060,15 @@ msgstr "Déplacer"
 
 #: src/app/main/ui/workspace/left_toolbar.cljs
 msgid "workspace.toolbar.path"
-msgstr "Chemin (P)"
+msgstr "Chemin (%s)"
 
 #: src/app/main/ui/workspace/left_toolbar.cljs
 msgid "workspace.toolbar.rect"
-msgstr "Rectangle (R)"
+msgstr "Rectangle (%s)"
 
 #: src/app/main/ui/workspace/left_toolbar.cljs
 msgid "workspace.toolbar.text"
-msgstr "Texte (T)"
+msgstr "Texte (%s)"
 
 #: src/app/main/ui/workspace/sidebar/history.cljs
 msgid "workspace.undo.empty"

@@ -7,7 +7,6 @@
 (ns app.main.ui.viewer
   (:require
    [app.common.data :as d]
-   [app.common.exceptions :as ex]
    [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as geom]
@@ -19,9 +18,8 @@
    [app.main.store :as st]
    [app.main.ui.comments :as cmt]
    [app.main.ui.hooks :as hooks]
-   [app.main.ui.icons :as i]
    [app.main.ui.viewer.header :refer [header]]
-   [app.main.ui.viewer.shapes :as shapes :refer [frame-svg]]
+   [app.main.ui.viewer.shapes :as shapes]
    [app.main.ui.viewer.thumbnails :refer [thumbnails-panel]]
    [app.util.dom :as dom]
    [app.util.i18n :as i18n :refer [t tr]]
@@ -44,7 +42,7 @@
   (l/derived :comments-local st/state))
 
 (mf/defc comments-layer
-  [{:keys [width height zoom frame data] :as props}]
+  [{:keys [zoom frame data] :as props}]
   (let [profile     (mf/deref refs/profile)
 
         modifier1   (-> (gpt/point (:x frame) (:y frame))
@@ -62,7 +60,7 @@
         mframe      (geom/transform-shape frame)
         threads     (->> (vals threads-map)
                          (dcm/apply-filters cstate profile)
-                         (filter (fn [{:keys [seqn position]}]
+                         (filter (fn [{:keys [position]}]
                                    (frame-contains? mframe position))))
 
         on-bubble-click
@@ -127,7 +125,7 @@
 
 (mf/defc viewport
   {::mf/wrap [mf/memo]}
-  [{:keys [state data index section] :or {zoom 1} :as props}]
+  [{:keys [state data index section] :as props}]
   (let [zoom          (:zoom state)
         objects       (:objects data)
 
@@ -138,7 +136,7 @@
                           (gpt/negate)
                           (gmt/translate-matrix))
 
-        update-fn     #(assoc-in %1 [%2 :modifiers :displacement] modifier)
+        update-fn     #(d/update-when %1 %2 assoc-in [:modifiers :displacement] modifier)
 
         objects       (->> (d/concat [frame-id] (cp/get-children frame-id objects))
                            (reduce update-fn objects))
@@ -237,7 +235,7 @@
               (events/unlistenByKey key3))))]
 
     (mf/use-effect on-mount)
-    (hooks/use-shortcuts sc/shortcuts)
+    (hooks/use-shortcuts ::viewer sc/shortcuts)
 
     [:div.viewer-layout {:class (dom/classnames :force-visible
                                                 (:show-thumbnails state))}
@@ -273,7 +271,7 @@
     (mf/use-effect
       (mf/deps (:file data))
       #(when-let [name (get-in data [:file :name])]
-         (dom/set-html-title (tr "title.viewer" name))))
+         (dom/set-html-title (str "\u25b6 " (tr "title.viewer" name)))))
 
     (when (and data state)
       [:& viewer-content

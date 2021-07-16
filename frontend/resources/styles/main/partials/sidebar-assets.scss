@@ -121,13 +121,21 @@
   .listing-options {
     background-color: $color-gray-60;
     display: flex;
-    justify-content: flex-end;
     align-items: center;
     padding: $medium $small 0 $small;
+
+    .selected-count {
+      color: $color-primary;
+      font-size: $fs11;
+    }
 
     .listing-option-btn {
       cursor: pointer;
       margin-left: $small;
+
+      &.first {
+        margin-left: auto;
+      }
 
       svg {
         fill: $color-gray-20;
@@ -156,6 +164,8 @@
     .asset-title {
       display: flex;
       cursor: pointer;
+      font-size: $fs11;
+      text-transform: uppercase;
 
       & .num-assets {
         color: $color-gray-30;
@@ -363,14 +373,13 @@
     //   overflow-y: scroll;
     // }
 
-    .asset-list {
-      margin-top: $medium;
-    }
-
     .asset-list-item {
       display: flex;
       align-items: center;
-      margin-top: $small;
+      border: 1px solid transparent;
+      border-radius: $br-small;
+      margin-top: $x-small;
+      padding: 2px;
       font-size: $fs12;
       color: $color-white;
       cursor: pointer;
@@ -380,12 +389,25 @@
         color: $color-gray-30;
         text-transform: uppercase;
       }
+
+      &.selected {
+        border: 1px solid $color-primary;
+      }
     }
 
     .context-menu {
       position: fixed;
       top: 10px;
       left: 10px;
+    }
+
+    .advanced-options {
+      border-color: $color-black;
+      background-color: $color-gray-60;
+
+      .input-text, .input-select, .adv-typography-name {
+        background-color: $color-gray-60;
+      }
     }
   }
 }

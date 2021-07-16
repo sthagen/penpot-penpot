@@ -6,22 +6,22 @@
 
 (ns app.main.data.workspace.drawing.box
   (:require
-   [beicon.core :as rx]
-   [potok.core :as ptk]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
-   [app.common.uuid :as uuid]
+   [app.common.math :as mth]
    [app.common.pages :as cp]
-   [app.main.data.workspace.common :as dwc]
+   [app.common.uuid :as uuid]
+   [app.main.data.workspace.drawing.common :as common]
+   [app.main.data.workspace.state-helpers :as wsh]
    [app.main.snap :as snap]
    [app.main.streams :as ms]
-   [app.main.data.workspace.drawing.common :as common]
-   [app.common.math :as mth]))
+   [beicon.core :as rx]
+   [potok.core :as ptk]))
 
 (defn truncate-zero [num default]
   (if (mth/almost-zero? num) default num))
 
-(defn resize-shape [{:keys [x y width height transform transform-inverse] :as shape} point lock?]
+(defn resize-shape [{:keys [x y width height] :as shape} point lock?]
   (let [;; The new shape behaves like a resize on the bottom-right corner
         initial (gpt/point (+ x width) (+ y height))
         shapev  (gpt/point width height)
@@ -53,14 +53,12 @@
   (ptk/reify ::handle-drawing-box
     ptk/WatchEvent
     (watch [_ state stream]
-      (let [{:keys [flags]} (:workspace-local state)
-
-            stoper? #(or (ms/mouse-up? %) (= % :interrupt))
+      (let [stoper? #(or (ms/mouse-up? %) (= % :interrupt))
             stoper  (rx/filter stoper? stream)
             initial @ms/mouse-position
 
             page-id (:current-page-id state)
-            objects (dwc/lookup-page-objects state page-id)
+            objects (wsh/lookup-page-objects state page-id)
             layout  (get state :workspace-layout)
             zoom    (get-in state [:workspace-local :zoom] 1)
 
@@ -87,14 +85,14 @@
 
          (->> ms/mouse-position
               (rx/filter #(> (gpt/distance % initial) 2))
-              (rx/with-latest vector ms/mouse-position-ctrl)
+              (rx/with-latest vector ms/mouse-position-shift)
               (rx/switch-map
                (fn [[point :as current]]
                  (->> (snap/closest-snap-point page-id [shape] layout zoom point)
                       (rx/map #(conj current %)))))
               (rx/map
-               (fn [[_ ctrl? point]]
-                 #(update-drawing % point ctrl?)))
+               (fn [[_ shift? point]]
+                 #(update-drawing % point shift?)))
 
               (rx/take-until stoper))
          (rx/of common/handle-finish-drawing))))))

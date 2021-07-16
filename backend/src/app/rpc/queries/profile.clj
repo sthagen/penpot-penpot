@@ -11,7 +11,8 @@
    [app.common.uuid :as uuid]
    [app.db :as db]
    [app.util.services :as sv]
-   [clojure.spec.alpha :as s]))
+   [clojure.spec.alpha :as s]
+   [cuerdas.core :as str]))
 
 ;; --- Helpers & Specs
 
@@ -41,29 +42,27 @@
     {:id uuid/zero
      :fullname "Anonymous User"}))
 
-;; NOTE: this query make the assumption that union all preserves the
-;; order so the first id will always be the team id and the second the
-;; project_id; this is a postgresql behavior because UNION ALL works
-;; like APPEND operation.
-
-(def ^:private sql:default-team-and-project
-  "select t.id
+(def ^:private sql:default-profile-team
+  "select t.id, name
      from team as t
     inner join team_profile_rel as tp on (tp.team_id = t.id)
     where tp.profile_id = ?
       and tp.is_owner is true
-      and t.is_default is true
-    union all
-   select p.id
+      and t.is_default is true")
+
+(def ^:private sql:default-profile-project
+  "select p.id, name
      from project as p
     inner join project_profile_rel as tp on (tp.project_id = p.id)
     where tp.profile_id = ?
       and tp.is_owner is true
-      and p.is_default is true")
+      and p.is_default is true
+      and p.team_id = ?")
 
 (defn retrieve-additional-data
   [conn id]
-  (let [[team project] (db/exec! conn [sql:default-team-and-project id id])]
+  (let [team    (db/exec-one! conn [sql:default-profile-team id])
+        project (db/exec-one! conn [sql:default-profile-project id (:id team)])]
     {:default-team-id (:id team)
      :default-project-id (:id project)}))
 
@@ -74,7 +73,8 @@
 (defn decode-profile-row
   [{:keys [props] :as row}]
   (cond-> row
-    (db/pgobject? props) (assoc :props (db/decode-transit-pgobject props))))
+    (db/pgobject? props "jsonb")
+    (assoc :props (db/decode-transit-pgobject props))))
 
 (defn retrieve-profile-data
   [conn id]
@@ -92,16 +92,11 @@
 
     profile))
 
-(def sql:retrieve-profile-by-email
-  "select p.* from profile as p
-    where p.email = lower(?)
-      and p.deleted_at is null")
-
 (defn retrieve-profile-data-by-email
   [conn email]
-  (let [sql  [sql:retrieve-profile-by-email email]]
-    (some-> (db/exec-one! conn sql)
-            (decode-profile-row))))
+  (try
+    (db/get-by-params conn :profile {:email (str/lower email)})
+    (catch Exception _e)))
 
 ;; --- Attrs Helpers
 

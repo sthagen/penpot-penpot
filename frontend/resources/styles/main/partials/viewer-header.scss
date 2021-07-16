@@ -3,7 +3,7 @@
   background-color: $color-gray-50;
   border-bottom: 1px solid  $color-gray-60;
   display: flex;
-  height: 40px;
+  height: 48px;
   padding: 0 $medium 0 55px;
   position: relative;
   z-index: 12;
@@ -23,7 +23,7 @@
     left: 0;
     position: absolute;
     top: 0;
-    width: 40px;
+    width: 48px;
 
     a {
       height: 30px;
@@ -49,6 +49,12 @@
       display: flex;
       justify-content: center;
 
+      svg {
+        fill: $color-gray-30;
+        height: 30px;
+        width: 28px;
+      }
+
       &:hover {
         > svg {
           fill: $color-primary;
@@ -56,16 +62,36 @@
       }
     }
 
-    svg {
-      fill: $color-gray-30;
-      height: 16px;
-      width: 16px;
+    .dropdown {
+      min-width: 260px;
+      left: 0px;
+      top: 40px;
     }
 
+    .view-options-dropdown {
+      align-items: center;
+      cursor: pointer;
+      display: flex;
+
+      span {
+        color: $color-gray-10;
+        font-size: $fs13;
+        margin-right: $x-small;
+      }
+
+      svg {
+        fill: $color-gray-10;
+        height: 12px;
+        width: 12px;
+      }
+    }
+  }
+
+  .file-menu {
     .dropdown {
+      min-width: 100px;
+      right: 0px;
       top: 40px;
-      left: 0px;
-      width: 260px;
     }
   }
 
@@ -123,7 +149,7 @@
       align-items: center;
 
       height: 100%;
-      width: 40px;
+      width: 48px;
 
       svg {
         fill: $color-gray-20;
@@ -164,6 +190,10 @@
         width: 20px;
         height: 20px;
       }
+    }
+
+    .btn-primary {
+      flex-shrink: 0;
     }
   }
 

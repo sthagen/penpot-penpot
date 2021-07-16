@@ -6,25 +6,22 @@
 
 (ns app.main.ui.static
   (:require
-   [cljs.spec.alpha :as s]
-   [rumext.alpha :as mf]
-   [app.main.ui.context :as ctx]
-   [app.main.data.auth :as da]
    [app.main.data.messages :as dm]
-   [app.main.store :as st]
+   [app.main.data.users :as du]
    [app.main.refs :as refs]
-   [cuerdas.core :as str]
+   [app.main.store :as st]
+   [app.main.ui.icons :as i]
    [app.util.i18n :refer [tr]]
    [app.util.router :as rt]
-   [app.main.ui.icons :as i]))
+   [rumext.alpha :as mf]))
 
 (defn- go-to-dashboard
   [profile]
-  (let [team-id (da/current-team-id profile)]
+  (let [team-id (du/get-current-team-id profile)]
     (st/emit! (rt/nav :dashboard-projects {:team-id team-id}))))
 
 (mf/defc not-found
-  [{:keys [error] :as props}]
+  []
   (let [profile (mf/deref refs/profile)]
     [:section.exception-layout
      [:div.exception-header
@@ -38,11 +35,11 @@
        [:div.sign-info
         [:span (tr "labels.not-found.auth-info") " " [:b (:email profile)]]
         [:a.btn-primary.btn-small
-         {:on-click (st/emitf (da/logout))}
+         {:on-click (st/emitf (du/logout))}
          (tr "labels.sign-out")]]]]]))
 
 (mf/defc bad-gateway
-  [{:keys [error] :as props}]
+  []
   (let [profile (mf/deref refs/profile)]
     [:section.exception-layout
      [:div.exception-header
@@ -59,7 +56,7 @@
          (tr "labels.retry")]]]]]))
 
 (mf/defc service-unavailable
-  [{:keys [error] :as props}]
+  []
   (let [profile (mf/deref refs/profile)]
     [:section.exception-layout
      [:div.exception-header
@@ -76,7 +73,7 @@
          (tr "labels.retry")]]]]]))
 
 (mf/defc internal-error
-  [props]
+  []
   (let [profile (mf/deref refs/profile)]
     [:section.exception-layout
      [:div.exception-header

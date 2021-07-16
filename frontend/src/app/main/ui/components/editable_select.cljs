@@ -6,13 +6,13 @@
 
 (ns app.main.ui.components.editable-select
   (:require
-   [rumext.alpha :as mf]
-   [app.common.uuid :as uuid]
    [app.common.data :as d]
+   [app.common.uuid :as uuid]
+   [app.main.ui.components.dropdown :refer [dropdown]]
+   [app.main.ui.icons :as i]
    [app.util.dom :as dom]
    [app.util.timers :as timers]
-   [app.main.ui.icons :as i]
-   [app.main.ui.components.dropdown :refer [dropdown]]))
+   [rumext.alpha :as mf]))
 
 (mf/defc editable-select [{:keys [value type options class on-change placeholder]}]
   (let [state (mf/use-state {:id (uuid/next)
@@ -24,7 +24,7 @@
         open-dropdown #(swap! state assoc :is-open? true)
         close-dropdown #(swap! state assoc :is-open? false)
         select-item (fn [value]
-                      (fn [event]
+                      (fn [_]
                         (swap! state assoc :current-value value)
                         (when on-change (on-change value))))
 
@@ -44,17 +44,18 @@
         (fn [node]
           ;; There is a problem when changing the state in this callback that
           ;; produces the dropdown to close in the same event
-          (timers/schedule
-           #(when-let [bounds (when node (dom/get-bounding-rect node))]
-              (let [{window-height :height} (dom/get-window-size)
-                    {:keys [left top height]} bounds
-                    bottom (when (< (- window-height top) 300) (- window-height top))
-                    top (when (>= (- window-height top) 300) (+ top height))]
-                (swap! state
-                       assoc
-                       :left left
-                       :top top
-                       :bottom bottom)))))]
+          (when node
+            (timers/schedule
+             #(when-let [bounds (when node (dom/get-bounding-rect node))]
+                (let [{window-height :height} (dom/get-window-size)
+                      {:keys [left top height]} bounds
+                      bottom (when (< (- window-height top) 300) (- window-height top))
+                      top (when (>= (- window-height top) 300) (+ top height))]
+                  (swap! state
+                         assoc
+                         :left left
+                         :top top
+                         :bottom bottom))))))]
 
     (mf/use-effect
      (mf/deps value)

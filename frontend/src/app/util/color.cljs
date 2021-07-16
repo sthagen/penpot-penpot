@@ -7,8 +7,8 @@
 (ns app.util.color
   "Color conversion utils."
   (:require
+   [app.util.object :as obj]
    [cuerdas.core :as str]
-   [app.common.math :as math]
    [goog.color :as gcolor]))
 
 (defn rgb->str
@@ -30,7 +30,7 @@
   [v]
   (try
     (into [] (gcolor/hexToRgb v))
-    (catch :default e [0 0 0])))
+    (catch :default _e [0 0 0])))
 
 (defn rgb->hex
   [[r g b]]
@@ -48,7 +48,7 @@
 (defn hex->hsl [hex]
   (try
     (into [] (gcolor/hexToHsl hex))
-    (catch :default e [0 0 0])))
+    (catch :default _e [0 0 0])))
 
 (defn hex->hsla
   [^string data ^number opacity]
@@ -79,6 +79,34 @@
 (defn hsv->hsl
   [hsv]
   (hex->hsl (hsv->hex hsv)))
+
+(defn expand-hex
+  [v]
+  (cond
+    (re-matches #"^[0-9A-Fa-f]$" v)
+    (str v v v v v v)
+
+    (re-matches #"^[0-9A-Fa-f]{2}$" v)
+    (str v v v)
+
+    (re-matches #"^[0-9A-Fa-f]{3}$" v)
+    (let [a (nth v 0)
+          b (nth v 1)
+          c (nth v 2)]
+      (str a a b b c c))
+
+    :else
+    v))
+
+(defn prepend-hash
+  [color]
+  (gcolor/prependHashIfNecessaryHelper color))
+
+(defn remove-hash
+  [color]
+  (if (str/starts-with? color "#")
+    (subs color 1)
+    color))
 
 (defn gradient->css [{:keys [type stops]}]
   (let [parse-stop
@@ -115,12 +143,15 @@
 
 (defn color? [^string color-str]
   (and (not (nil? color-str))
-       (not (empty? color-str))
+       (seq color-str)
        (gcolor/isValidColor color-str)))
 
 (defn parse-color [^string color-str]
   (let [result (gcolor/parse color-str)]
     (str (.-hex ^js result))))
+
+(def color-names
+  (obj/get-keys ^js gcolor/names))
 
 (def empty-color
   (into {} (map #(vector % nil)) [:color :id :file-id :gradient :opacity]))

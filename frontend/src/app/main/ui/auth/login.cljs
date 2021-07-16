@@ -6,22 +6,27 @@
 
 (ns app.main.ui.auth.login
   (:require
-   [cljs.spec.alpha :as s]
-   [beicon.core :as rx]
-   [rumext.alpha :as mf]
-   [app.config :as cfg]
    [app.common.spec :as us]
-   [app.main.ui.icons :as i]
-   [app.main.data.auth :as da]
+   [app.config :as cfg]
+   [app.main.data.messages :as dm]
+   [app.main.data.users :as du]
    [app.main.repo :as rp]
    [app.main.store :as st]
-   [app.main.ui.messages :as msgs]
-   [app.main.data.messages :as dm]
    [app.main.ui.components.forms :as fm]
-   [app.util.object :as obj]
+   [app.main.ui.icons :as i]
+   [app.main.ui.messages :as msgs]
    [app.util.dom :as dom]
-   [app.util.i18n :refer [tr t]]
-   [app.util.router :as rt]))
+   [app.util.i18n :refer [tr]]
+   [app.util.router :as rt]
+   [beicon.core :as rx]
+   [cljs.spec.alpha :as s]
+   [rumext.alpha :as mf]))
+
+(def show-alt-login-buttons?
+  (or cfg/google-client-id
+      cfg/gitlab-client-id
+      cfg/github-client-id
+      cfg/oidc-client-id))
 
 (s/def ::email ::us/email)
 (s/def ::password ::us/not-empty-string)
@@ -29,26 +34,10 @@
 (s/def ::login-form
   (s/keys :req-un [::email ::password]))
 
-(defn- login-with-google
-  [event params]
+(defn- login-with-oauth
+  [event provider params]
   (dom/prevent-default event)
-  (->> (rp/mutation! :login-with-google params)
-       (rx/subs (fn [{:keys [redirect-uri] :as rsp}]
-                  (.replace js/location redirect-uri))
-                (fn [{:keys [type] :as error}]
-                  (st/emit! (dm/error (tr "errors.google-auth-not-enabled")))))))
-
-(defn- login-with-gitlab
-  [event params]
-  (dom/prevent-default event)
-  (->> (rp/mutation! :login-with-gitlab params)
-       (rx/subs (fn [{:keys [redirect-uri] :as rsp}]
-                  (.replace js/location redirect-uri)))))
-
-(defn- login-with-github
-  [event params]
-  (dom/prevent-default event)
-  (->> (rp/mutation! :login-with-github params)
+  (->> (rp/mutation! :login-with-oauth (assoc params :provider provider))
        (rx/subs (fn [{:keys [redirect-uri] :as rsp}]
                   (.replace js/location redirect-uri)))))
 
@@ -61,7 +50,7 @@
          (rx/subs (fn [profile]
                     (if-let [token (:invitation-token profile)]
                       (st/emit! (rt/nav :auth-verify-token {} {:token token}))
-                      (st/emit! (da/logged-in profile))))
+                      (st/emit! (du/login-from-token {:profile profile}))))
                   (fn [{:keys [type code] :as error}]
                     (cond
                       (and (= type :restriction)
@@ -84,11 +73,11 @@
         on-submit
         (mf/use-callback
          (mf/deps form)
-         (fn [event]
+         (fn [_]
            (reset! error nil)
            (let [params (with-meta (:clean-data @form)
                           {:on-error on-error})]
-             (st/emit! (da/login params)))))
+             (st/emit! (du/login params)))))
 
         on-submit-ldap
         (mf/use-callback
@@ -119,13 +108,42 @@
          :tab-index "3"
          :help-icon i/eye
          :label (tr "auth.password")}]]
-      [:& fm/submit-button
-       {:label (tr "auth.login-submit")}]
 
-      (when cfg/login-with-ldap
-        [:& fm/submit-button
-         {:label (tr "auth.login-with-ldap-submit")
-          :on-click on-submit-ldap}])]]))
+      [:div.buttons-stack
+       [:& fm/submit-button
+        {:label (tr "auth.login-submit")}]
+
+       (when cfg/login-with-ldap
+         [:& fm/submit-button
+          {:label (tr "auth.login-with-ldap-submit")
+           :on-click on-submit-ldap}])]]]))
+
+(mf/defc login-buttons
+  [{:keys [params] :as props}]
+  [:div.auth-buttons
+   (when cfg/google-client-id
+     [:a.btn-ocean.btn-large.btn-google-auth
+      {:on-click #(login-with-oauth % :google params)}
+      (tr "auth.login-with-google-submit")])
+
+   (when cfg/gitlab-client-id
+     [:a.btn-ocean.btn-large.btn-gitlab-auth
+      {:on-click #(login-with-oauth % :gitlab params)}
+      [:img.logo
+       {:src "/images/icons/brand-gitlab.svg"}]
+      (tr "auth.login-with-gitlab-submit")])
+
+   (when cfg/github-client-id
+     [:a.btn-ocean.btn-large.btn-github-auth
+      {:on-click #(login-with-oauth % :github params)}
+      [:img.logo
+       {:src "/images/icons/brand-github.svg"}]
+      (tr "auth.login-with-github-submit")])
+
+   (when cfg/oidc-client-id
+     [:a.btn-ocean.btn-large.btn-github-auth
+      {:on-click #(login-with-oauth % :oidc params)}
+      (tr "auth.login-with-oidc-submit")])])
 
 (mf/defc login-page
   [{:keys [params] :as props}]
@@ -136,42 +154,28 @@
 
     [:& login-form {:params params}]
 
+    (when show-alt-login-buttons?
+      [:*
+       [:span.separator (tr "labels.or")]
+
+       [:div.buttons
+        [:& login-buttons {:params params}]]])
+
     [:div.links
      [:div.link-entry
-      [:a {:on-click #(st/emit! (rt/nav :auth-recovery-request))
-           :tab-index "5"}
+      [:a {:on-click #(st/emit! (rt/nav :auth-recovery-request))}
        (tr "auth.forgot-password")]]
 
      (when cfg/registration-enabled
        [:div.link-entry
         [:span (tr "auth.register") " "]
-        [:a {:on-click #(st/emit! (rt/nav :auth-register {} params))
-             :tab-index "6"}
+        [:a {:on-click #(st/emit! (rt/nav :auth-register {} params))}
          (tr "auth.register-submit")]])]
 
-    (when cfg/google-client-id
-      [:a.btn-ocean.btn-large.btn-google-auth
-       {:on-click #(login-with-google % params)}
-       "Login with Google"])
-
-    (when cfg/gitlab-client-id
-      [:a.btn-ocean.btn-large.btn-gitlab-auth
-       {:on-click #(login-with-gitlab % params)}
-       [:img.logo
-        {:src "/images/icons/brand-gitlab.svg"}]
-       (tr "auth.login-with-gitlab-submit")])
-
-    (when cfg/github-client-id
-      [:a.btn-ocean.btn-large.btn-github-auth
-       {:on-click #(login-with-github % params)}
-       [:img.logo
-        {:src "/images/icons/brand-github.svg"}]
-       (tr "auth.login-with-github-submit")])
 
     (when cfg/allow-demo-users
       [:div.links.demo
        [:div.link-entry
         [:span (tr "auth.create-demo-profile") " "]
-        [:a {:on-click (st/emitf da/create-demo-profile)
-             :tab-index "6"}
+        [:a {:on-click (st/emitf (du/create-demo-profile))}
          (tr "auth.create-demo-account")]]])]])

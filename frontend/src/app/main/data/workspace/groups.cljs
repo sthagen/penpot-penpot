@@ -1,10 +1,17 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
+;;
+;; Copyright (c) UXBOX Labs SL
+
 (ns app.main.data.workspace.groups
   (:require
    [app.common.data :as d]
    [app.common.geom.shapes :as gsh]
    [app.common.pages :as cp]
+   [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.common :as dwc]
-   [app.main.data.workspace.selection :as dws]
+   [app.main.data.workspace.state-helpers :as wsh]
    [beicon.core :as rx]
    [potok.core :as ptk]))
 
@@ -20,7 +27,6 @@
   [shapes prefix keep-name]
   (let [selrect   (gsh/selection-rect shapes)
         frame-id  (-> shapes first :frame-id)
-        parent-id (-> shapes first :parent-id)
         group-name (if (and keep-name
                             (= (count shapes) 1)
                             (= (:type (first shapes)) :group))
@@ -30,31 +36,97 @@
         (gsh/setup selrect)
         (assoc :shapes (mapv :id shapes)))))
 
+(defn get-empty-groups
+  "Retrieve emtpy groups after group creation"
+  [objects parent-id shapes]
+  (let [ids (cp/clean-loops objects (into #{} (map :id) shapes))
+        parents (->> ids
+                     (reduce #(conj %1 (cp/get-parent %2 objects))
+                             #{}))]
+    (loop [current-id (first parents)
+           to-check (rest parents)
+           removed-id? ids
+           result #{}]
+
+      (if-not current-id
+        ;; Base case, no next element
+        result
+
+        (let [group (get objects current-id)]
+          (if (and (not= :frame (:type group))
+                   (not= current-id parent-id)
+                   (empty? (remove removed-id? (:shapes group))))
+
+            ;; Adds group to the remove and check its parent
+            (let [to-check (d/concat [] to-check [(cp/get-parent current-id objects)]) ]
+              (recur (first to-check)
+                     (rest to-check)
+                     (conj removed-id? current-id)
+                     (conj result current-id)))
+
+            ;; otherwise recur
+            (recur (first to-check)
+                   (rest to-check)
+                   removed-id?
+                   result)))))))
+
 (defn prepare-create-group
-  [page-id shapes prefix keep-name]
+  [objects page-id shapes prefix keep-name]
   (let [group (make-group shapes prefix keep-name)
+        frame-id (:frame-id (first shapes))
+        parent-id (:parent-id (first shapes))
         rchanges [{:type :add-obj
                    :id (:id group)
                    :page-id page-id
-                   :frame-id (:frame-id (first shapes))
-                   :parent-id (:parent-id (first shapes))
+                   :frame-id frame-id
+                   :parent-id parent-id
                    :obj group
                    :index (::index (first shapes))}
+
                   {:type :mov-objects
                    :page-id page-id
                    :parent-id (:id group)
                    :shapes (mapv :id shapes)}]
 
-        uchanges (conj
-                   (mapv (fn [obj] {:type :mov-objects
-                                    :page-id page-id
-                                    :parent-id (:parent-id obj)
-                                    :index (::index obj)
-                                    :shapes [(:id obj)]})
-                         shapes)
-                   {:type :del-obj
-                    :id (:id group)
-                    :page-id page-id})]
+        uchanges  (-> (mapv
+                       (fn [obj]
+                         {:type :mov-objects
+                          :page-id page-id
+                          :parent-id (:parent-id obj)
+                          :index (::index obj)
+                          :shapes [(:id obj)]}) shapes)
+                      (conj
+                       {:type :del-obj
+                        :id (:id group)
+                        :page-id page-id}))
+
+        ids-to-delete (get-empty-groups objects parent-id shapes)
+
+        delete-group
+        (fn [changes id]
+          (-> changes
+              (conj {:type :del-obj
+                     :id id
+                     :page-id page-id})))
+
+        add-deleted-group
+        (fn [changes id]
+          (let [obj (-> (get objects id)
+                        (d/without-keys [:shapes]))]
+
+            (d/concat [{:type :add-obj
+                        :id id
+                        :page-id page-id
+                        :frame-id (:frame-id obj)
+                        :parent-id (:parent-id obj)
+                        :obj obj
+                        :index (::index obj)}] changes)))
+
+        rchanges (->> ids-to-delete
+                      (reduce delete-group rchanges))
+
+        uchanges (->> ids-to-delete
+                      (reduce add-deleted-group uchanges))]
     [group rchanges uchanges]))
 
 (defn prepare-remove-group
@@ -98,39 +170,44 @@
 (def group-selected
   (ptk/reify ::group-selected
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [it state _]
       (let [page-id  (:current-page-id state)
-            objects  (dwc/lookup-page-objects state page-id)
-            selected (get-in state [:workspace-local :selected])
+            objects  (wsh/lookup-page-objects state page-id)
+            selected (wsh/lookup-selected state)
             selected (cp/clean-loops objects selected)
             shapes   (shapes-for-grouping objects selected)]
         (when-not (empty? shapes)
-          (let [[group rchanges uchanges] (prepare-create-group page-id shapes "Group-" false)]
-            (rx/of (dwc/commit-changes rchanges uchanges {:commit-local? true})
+          (let [[group rchanges uchanges]
+                (prepare-create-group objects page-id shapes "Group-" false)]
+            (rx/of (dch/commit-changes {:redo-changes rchanges
+                                        :undo-changes uchanges
+                                        :origin it})
                    (dwc/select-shapes (d/ordered-set (:id group))))))))))
 
 (def ungroup-selected
   (ptk/reify ::ungroup-selected
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [it state _]
       (let [page-id  (:current-page-id state)
-            objects  (dwc/lookup-page-objects state page-id)
-            selected (get-in state [:workspace-local :selected])
+            objects  (wsh/lookup-page-objects state page-id)
+            selected (wsh/lookup-selected state)
             group-id (first selected)
             group    (get objects group-id)]
         (when (and (= 1 (count selected))
                    (= (:type group) :group))
           (let [[rchanges uchanges]
                 (prepare-remove-group page-id group objects)]
-            (rx/of (dwc/commit-changes rchanges uchanges {:commit-local? true}))))))))
+            (rx/of (dch/commit-changes {:redo-changes rchanges
+                                        :undo-changes uchanges
+                                        :origin it}))))))))
 
 (def mask-group
   (ptk/reify ::mask-group
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [it state _]
       (let [page-id  (:current-page-id state)
-            objects  (dwc/lookup-page-objects state page-id)
-            selected (get-in state [:workspace-local :selected])
+            objects  (wsh/lookup-page-objects state page-id)
+            selected (wsh/lookup-selected state)
             selected (cp/clean-loops objects selected)
             shapes   (shapes-for-grouping objects selected)]
         (when-not (empty? shapes)
@@ -140,7 +217,7 @@
                 (if (and (= (count shapes) 1)
                          (= (:type (first shapes)) :group))
                   [(first shapes) [] []]
-                  (prepare-create-group page-id shapes "Group-" true))
+                  (prepare-create-group objects page-id shapes "Group-" true))
 
                 rchanges (d/concat rchanges
                                    [{:type :mod-obj
@@ -176,16 +253,18 @@
                                 :page-id page-id
                                 :shapes [(:id group)]})]
 
-            (rx/of (dwc/commit-changes rchanges uchanges {:commit-local? true})
+            (rx/of (dch/commit-changes {:redo-changes rchanges
+                                        :undo-changes uchanges
+                                        :origin it})
                    (dwc/select-shapes (d/ordered-set (:id group))))))))))
 
 (def unmask-group
   (ptk/reify ::unmask-group
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [it state _]
       (let [page-id  (:current-page-id state)
-            objects  (dwc/lookup-page-objects state page-id)
-            selected (get-in state [:workspace-local :selected])]
+            objects  (wsh/lookup-page-objects state page-id)
+            selected (wsh/lookup-selected state)]
         (when (= (count selected) 1)
           (let [group (get objects (first selected))
 
@@ -209,7 +288,9 @@
                            :page-id page-id
                            :shapes [(:id group)]}]]
 
-            (rx/of (dwc/commit-changes rchanges uchanges {:commit-local? true})
+            (rx/of (dch/commit-changes {:redo-changes rchanges
+                                        :undo-changes uchanges
+                                        :origin it})
                    (dwc/select-shapes (d/ordered-set (:id group))))))))))
 
 

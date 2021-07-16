@@ -9,8 +9,8 @@
    [app.common.geom.shapes :as gsh]
    [app.common.pages :as cp]
    [app.main.refs :as refs]
-   [app.util.geom.path :as ugp]
    [app.util.object :as obj]
+   [app.util.path.format :as upf]
    [clojure.set :as set]
    [rumext.alpha :as mf]
    [rumext.util :refer [map->obj]]))
@@ -27,16 +27,16 @@
         path-data
         (mf/use-memo
          (mf/deps shape)
-         #(when path? (ugp/content->path (:content shape))))
+         #(when path? (upf/format-path (:content shape))))
 
-        {:keys [id x y width height]} shape
+        {:keys [x y width height selrect]} shape
 
         outline-type (case (:type shape)
                        :circle "ellipse"
                        :path "path"
                        "rect")
 
-        common {:fill "transparent"
+        common {:fill "none"
                 :stroke color
                 :strokeWidth (/ 1 zoom)
                 :pointerEvents "none"
@@ -53,10 +53,10 @@
                 {:d path-data
                  :transform nil}
 
-                {:x x
-                 :y y
-                 :width width
-                 :height height})]
+                {:x (:x selrect)
+                 :y (:y selrect)
+                 :width (:width selrect)
+                 :height (:height selrect)})]
 
     [:> outline-type (map->obj (merge common props))]))
 

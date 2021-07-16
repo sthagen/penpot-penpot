@@ -8,13 +8,9 @@
   (:require
    [app.common.data :as d]
    [app.common.geom.shapes :as geom]
-   [app.main.ui.context :as muc]
    [app.main.ui.shapes.attrs :as attrs]
-   [app.main.ui.shapes.text.embed :as ste]
    [app.main.ui.shapes.text.styles :as sts]
-   [app.util.color :as uc]
    [app.util.object :as obj]
-   [cuerdas.core :as str]
    [rumext.alpha :as mf]))
 
 (mf/defc render-text
@@ -23,29 +19,25 @@
   (let [node  (obj/get props "node")
         text  (:text node)
         style (sts/generate-text-styles node)]
-    [:span {:style style}
+    [:span.text-node {:style style}
      (if (= text "") "\u00A0" text)]))
 
 (mf/defc render-root
   {::mf/wrap-props false}
   [props]
   (let [node     (obj/get props "node")
-        embed?   (obj/get props "embed-fonts?")
         children (obj/get props "children")
         shape    (obj/get props "shape")
         style    (sts/generate-root-styles shape node)]
     [:div.root.rich-text
      {:style style
       :xmlns "http://www.w3.org/1999/xhtml"}
-     (when embed?
-       [ste/embed-fontfaces-style {:node node}])
      children]))
 
 (mf/defc render-paragraph-set
   {::mf/wrap-props false}
   [props]
-  (let [node     (obj/get props "node")
-        children (obj/get props "children")
+  (let [children (obj/get props "children")
         shape    (obj/get props "shape")
         style    (sts/generate-paragraph-set-styles shape)]
     [:div.paragraph-set {:style style} children]))
@@ -94,7 +86,6 @@
   [props ref]
   (let [{:keys [id x y width height content] :as shape} (obj/get props "shape")
         grow-type (obj/get props "grow-type") ;; This is only needed in workspace
-        embed-fonts? (mf/use-ctx muc/embed-ctx)
         ;; We add 8px to add a padding for the exporter
         ;; width (+ width 8)
         ]
@@ -107,7 +98,10 @@
                      :height (if (#{:auto-height :auto-width} grow-type) 100000 height)
                      :style (-> (obj/new) (attrs/add-layer-props shape))
                      :ref ref}
+     ;; We use a class here because react has a bug that won't use the appropiate selector for
+     ;; `background-clip`
+     [:style ".text-node { background-clip: text;
+                           -webkit-background-clip: text;" ]
      [:& render-node {:index 0
                       :shape shape
-                      :node content
-                      :embed-fonts? embed-fonts?}]]))
+                      :node content}]]))

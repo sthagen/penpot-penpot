@@ -10,6 +10,7 @@
    [app.common.exceptions :as ex]
    [app.common.spec :as us]
    [app.db :as db]
+   [app.loggers.audit :as audit]
    [app.metrics :as mtx]
    [app.rlimits :as rlm]
    [app.util.logging :as l]
@@ -31,9 +32,10 @@
   [methods {:keys [profile-id] :as request}]
   (let [type   (keyword (get-in request [:path-params :type]))
 
-        data   (d/merge (:params request)
-                        (:body-params request)
-                        (:uploads request))
+        data   (merge (:params request)
+                      (:body-params request)
+                      (:uploads request)
+                      {::request request})
 
         data   (if profile-id
                  (assoc data :profile-id profile-id)
@@ -49,12 +51,15 @@
 (defn- rpc-mutation-handler
   [methods {:keys [profile-id] :as request}]
   (let [type   (keyword (get-in request [:path-params :type]))
-        data   (d/merge (:params request)
-                        (:body-params request)
-                        (:uploads request))
+        data   (merge (:params request)
+                      (:body-params request)
+                      (:uploads request)
+                      {::request request})
+
         data   (if profile-id
                  (assoc data :profile-id profile-id)
                  (dissoc data :profile-id))
+
         result ((get methods type default-handler) data)
         mdata  (meta result)]
     (cond->> {:status 200 :body result}
@@ -85,18 +90,43 @@
     f))
 
 (defn- wrap-impl
-  [cfg f mdata]
-  (let [f     (wrap-with-rlimits cfg f mdata)
-        f     (wrap-with-metrics cfg f mdata)
-        spec  (or (::sv/spec mdata) (s/spec any?))]
-    (l/trace :action "register"
-             :name (::sv/name mdata))
+  [{:keys [audit] :as cfg} f mdata]
+  (let [f      (wrap-with-rlimits cfg f mdata)
+        f      (wrap-with-metrics cfg f mdata)
+        spec   (or (::sv/spec mdata) (s/spec any?))
+        auth?  (:auth mdata true)]
+
+    (l/trace :action "register" :name (::sv/name mdata))
     (fn [params]
-      (when (and (:auth mdata true) (not (uuid? (:profile-id params))))
+
+      ;; Raise authentication error when rpc method requires auth but
+      ;; no profile-id is found in the request.
+      (when (and auth? (not (uuid? (:profile-id params))))
         (ex/raise :type :authentication
                   :code :authentication-required
                   :hint "authentication required for this endpoint"))
-      (f cfg (us/conform spec params)))))
+
+      (let [params' (dissoc params ::request)
+            params' (us/conform spec params')
+            result  (f cfg params')]
+
+        ;; When audit log is enabled (default false).
+        (when (fn? audit)
+          (let [resultm    (meta result)
+                request    (::request params)
+                profile-id (or (:profile-id params')
+                               (:profile-id result)
+                               (::audit/profile-id resultm))
+                props      (d/merge params (::audit/props resultm))]
+            (audit :cmd :submit
+                   :type (::type cfg)
+                   :name (or (::audit/name resultm)
+                             (::sv/name mdata))
+                   :profile-id profile-id
+                   :ip-addr (audit/parse-client-ip request)
+                   :props (audit/profile->props props))))
+
+        result))))
 
 (defn- process-method
   [cfg vfn]
@@ -112,7 +142,7 @@
                :registry (get-in cfg [:metrics :registry])
                :type :histogram
                :help "Timing of query services."})
-        cfg  (assoc cfg ::mobj mobj)]
+        cfg  (assoc cfg ::mobj mobj ::type "query")]
     (->> (sv/scan-ns 'app.rpc.queries.projects
                      'app.rpc.queries.files
                      'app.rpc.queries.teams
@@ -120,6 +150,7 @@
                      'app.rpc.queries.profile
                      'app.rpc.queries.recent-files
                      'app.rpc.queries.viewer
+                     'app.rpc.queries.fonts
                      'app.rpc.queries.svg)
          (map (partial process-method cfg))
          (into {}))))
@@ -132,7 +163,7 @@
                :registry (get-in cfg [:metrics :registry])
                :type :histogram
                :help "Timing of mutation services."})
-        cfg  (assoc cfg ::mobj mobj)]
+        cfg  (assoc cfg ::mobj mobj ::type "mutation")]
     (->> (sv/scan-ns 'app.rpc.mutations.demo
                      'app.rpc.mutations.media
                      'app.rpc.mutations.profile
@@ -143,6 +174,7 @@
                      'app.rpc.mutations.teams
                      'app.rpc.mutations.management
                      'app.rpc.mutations.ldap
+                     'app.rpc.mutations.fonts
                      'app.rpc.mutations.verify-token)
          (map (partial process-method cfg))
          (into {}))))
@@ -150,9 +182,11 @@
 (s/def ::storage some?)
 (s/def ::session map?)
 (s/def ::tokens fn?)
+(s/def ::audit (s/nilable fn?))
 
 (defmethod ig/pre-init-spec ::rpc [_]
-  (s/keys :req-un [::db/pool ::storage ::session ::tokens ::mtx/metrics ::rlm/rlimits]))
+  (s/keys :req-un [::storage ::session ::tokens ::audit
+                   ::mtx/metrics ::rlm/rlimits ::db/pool]))
 
 (defmethod ig/init-key ::rpc
   [_ cfg]

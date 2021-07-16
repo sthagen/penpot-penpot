@@ -10,18 +10,15 @@
    [app.common.geom.point :as gpt]
    [app.common.pages :as cp]
    [app.common.spec :as us]
-   [app.config :as cfg]
-   [app.main.data.workspace.common :as dwc]
-   [app.main.data.workspace.persistence :as dwp]
+   [app.common.transit :as t]
+   [app.common.uri :as u]
+   [app.config :as cf]
+   [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.libraries :as dwl]
-   [app.main.repo :as rp]
-   [app.main.store :as st]
+   [app.main.data.workspace.persistence :as dwp]
    [app.main.streams :as ms]
-   [app.util.avatars :as avatars]
    [app.util.time :as dt]
-   [app.util.transit :as t]
    [app.util.websockets :as ws]
-   [app.util.i18n :as i18n :refer [tr]]
    [beicon.core :as rx]
    [cljs.spec.alpha :as s]
    [clojure.set :as set]
@@ -39,14 +36,24 @@
 (s/def ::message
   (s/keys :req-un [::type]))
 
+(defn prepare-uri
+  [params]
+  (let [base (-> (u/join cf/public-uri "ws/notifications")
+                 (assoc :query (u/map->query-string params)))]
+    (cond-> base
+      (= "https" (:scheme base))
+      (assoc :scheme "wss")
+
+      (= "http" (:scheme base))
+      (assoc :scheme "ws"))))
+
 (defn initialize
   [file-id]
   (ptk/reify ::initialize
     ptk/UpdateEvent
     (update [_ state]
       (let [sid (:session-id state)
-            uri (ws/uri "/ws/notifications" {:file-id file-id
-                                             :session-id sid})]
+            uri (prepare-uri {:file-id file-id :session-id sid})]
         (assoc-in state [:ws file-id] (ws/open uri))))
 
     ptk/WatchEvent
@@ -63,7 +70,7 @@
               ;; Process all incoming messages.
               (->> (ws/-stream wsession)
                    (rx/filter ws/message?)
-                   (rx/map (comp t/decode :payload))
+                   (rx/map (comp t/decode-str :payload))
                    (rx/filter #(s/valid? ::message %))
                    (rx/map process-message))
 
@@ -93,7 +100,7 @@
   [file-id]
   (ptk/reify ::send-keepalive
     ptk/EffectEvent
-    (effect [_ state stream]
+    (effect [_ state _]
       (when-let [ws (get-in state [:ws file-id])]
         (ws/send! ws {:type :keepalive})))))
 
@@ -101,9 +108,8 @@
   [file-id point]
   (ptk/reify ::handle-pointer-update
     ptk/EffectEvent
-    (effect [_ state stream]
+    (effect [_ state _]
       (let [ws (get-in state [:ws file-id])
-            sid (:session-id state)
             pid (:current-page-id state)
             msg {:type :pointer-update
                  :page-id pid
@@ -117,7 +123,7 @@
   [file-id]
   (ptk/reify ::finalize
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ state _]
       (when-let [ws (get-in state [:ws file-id])]
         (ws/-close ws))
       (rx/of ::finalize))))
@@ -176,7 +182,7 @@
           (update state :workspace-presence update-presence))))))
 
 (defn handle-pointer-update
-  [{:keys [page-id profile-id session-id x y] :as msg}]
+  [{:keys [page-id session-id x y] :as msg}]
   (ptk/reify ::handle-pointer-update
     ptk/UpdateEvent
     (update [_ state]
@@ -202,11 +208,11 @@
   (us/assert ::file-change-event msg)
   (ptk/reify ::handle-file-change
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ _ _]
       (let [changes-by-pages (group-by :page-id changes)
             process-page-changes
             (fn [[page-id changes]]
-              (dwc/update-indices page-id changes))]
+              (dch/update-indices page-id changes))]
 
         (rx/merge
          (rx/of (dwp/shapes-changes-persisted file-id msg))
@@ -228,7 +234,7 @@
   (us/assert ::library-change-event msg)
   (ptk/reify ::handle-library-change
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ state _]
       (when (contains? (:workspace-libraries state) file-id)
         (rx/of (dwl/ext-library-changed file-id modified-at revn changes)
                (dwl/notify-sync-file file-id))))))

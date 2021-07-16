@@ -14,9 +14,8 @@
    [app.main.store :as st]
    [app.main.streams :as ms]
    [app.main.ui.hooks :as hooks]
-   [app.main.ui.workspace.shapes.path.actions :refer [path-actions]]
+   [app.main.ui.workspace.viewport.path-actions :refer [path-actions]]
    [app.util.dom :as dom]
-   [app.util.object :as obj]
    [rumext.alpha :as mf]))
 
 (mf/defc pixel-grid
@@ -48,7 +47,7 @@
         shape (-> selected first)]
     (when (and (= (count selected) 1)
                (= (:id shape) edition)
-               (= :path (:type shape)))
+               (not= :text (:type shape)))
       [:div.viewport-actions
        [:& path-actions {:shape shape}]])))
 
@@ -64,13 +63,19 @@
 
 (mf/defc selection-rect
   {:wrap [mf/memo]}
-  [{:keys [data] :as props}]
+  [{:keys [data zoom] :as props}]
   (when data
     [:rect.selection-rect
      {:x (:x data)
       :y (:y data)
       :width (:width data)
-      :height (:height data)}]))
+      :height (:height data)
+      :style {;; Primary with 0.1 opacity
+              :fill "rgb(49, 239, 184, 0.1)"
+
+              ;; Primary color
+              :stroke "rgb(49, 239, 184)"
+              :stroke-width (/ 1 zoom)}}]))
 
 ;; Ensure that the label has always the same font
 ;; size, regardless of zoom
@@ -104,13 +109,13 @@
         on-pointer-enter
         (mf/use-callback
          (mf/deps (:id frame) on-frame-enter)
-         (fn [event]
+         (fn [_]
            (on-frame-enter (:id frame))))
 
         on-pointer-leave
         (mf/use-callback
          (mf/deps (:id frame) on-frame-leave)
-         (fn [event]
+         (fn [_]
            (on-frame-leave (:id frame))))]
 
     [:text {:x 0

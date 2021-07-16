@@ -6,11 +6,10 @@
 
 (ns app.main.ui.workspace.viewport.snap-points
   (:require
-   [app.common.math :as mth]
    [app.common.data :as d]
-   [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
-   [app.main.refs :as refs]
+   [app.common.math :as mth]
+   [app.common.pages :as cp]
    [app.main.snap :as snap]
    [app.util.geom.snap-points :as sp]
    [beicon.core :as rx]
@@ -105,7 +104,7 @@
                                         (hash-map coord fixedv (flip coord) maxv)]))))
 
 (mf/defc snap-feedback
-  [{:keys [shapes page-id filter-shapes zoom modifiers] :as props}]
+  [{:keys [shapes filter-shapes zoom modifiers] :as props}]
   (let [state (mf/use-state [])
         subject (mf/use-memo #(rx/subject))
 
@@ -116,14 +115,13 @@
         snap-lines (->> (into (process-snap-lines @state :x)
                               (process-snap-lines @state :y))
                         (into #{}))]
-
     (mf/use-effect
      (fn []
        (let [sub (->> subject
-                      (rx/switch-map #(rx/combine-latest
-                                       d/concat
-                                       (get-snap :y %)
-                                       (get-snap :x %)))
+                      (rx/switch-map #(rx/combine-latest (get-snap :x %)
+                                                         (get-snap :y %)))
+                      (rx/map (fn [result]
+                                (apply d/concat (seq result))))
                       (rx/subs #(let [rs (filter (fn [[_ snaps _]] (> (count snaps) 0)) %)]
                                   (reset! state rs))))]
 
@@ -131,7 +129,7 @@
          #(rx/dispose! sub))))
 
     (mf/use-effect
-     (mf/deps shapes modifiers)
+     (mf/deps shapes filter-shapes modifiers)
      (fn []
        (rx/push! subject props)))
 
@@ -152,15 +150,26 @@
 
 (mf/defc snap-points
   {::mf/wrap [mf/memo]}
-  [{:keys [layout zoom selected page-id drawing transform modifiers] :as props}]
-  (let [shapes        (mf/deref (refs/objects-by-id selected))
-        filter-shapes (mf/deref refs/selected-shapes-with-children)
+  [{:keys [layout zoom objects selected page-id drawing transform modifiers] :as props}]
+
+  (let [;; shapes        (mf/deref (refs/objects-by-id selected))
+        ;; filter-shapes (mf/deref refs/selected-shapes-with-children)
+
+        shapes (->> selected
+                    (map #(get objects %))
+                    (filterv (comp not nil?)))
+        filter-shapes (into #{}
+                            (comp (mapcat #(cp/get-object-with-children % objects))
+                                  (map :id))
+                            selected)
+
         filter-shapes (fn [id]
                         (if (= id :layout)
                           (or (not (contains? layout :display-grid))
                               (not (contains? layout :snap-grid)))
                           (or (filter-shapes id)
                               (not (contains? layout :dynamic-alignment)))))
+
         shapes    (if drawing [drawing] shapes)]
     (when (or drawing transform)
       [:& snap-feedback {:shapes shapes

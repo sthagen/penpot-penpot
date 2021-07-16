@@ -16,12 +16,9 @@
    [app.main.ui.hooks :as hooks]
    [app.main.ui.icons :as i]
    [app.util.dom :as dom]
-   [app.util.i18n :as i18n :refer [t]]
    [app.util.keyboard :as kbd]
    [app.util.object :as obj]
-   [app.util.perf :as perf]
    [app.util.timers :as ts]
-   [beicon.core :as rx]
    [okulary.core :as l]
    [rumext.alpha :as mf]))
 
@@ -150,10 +147,6 @@
           (dom/prevent-default event)
           (let [id (:id item)]
             (cond
-              (or (:blocked item)
-                  (:hidden item))
-              nil
-
               (kbd/shift? event)
               (st/emit! (dw/shift-select-shapes id))
 
@@ -179,7 +172,7 @@
             (st/emit! (dw/select-shape id))))
 
         on-drop
-        (fn [side {:keys [id] :as data}]
+        (fn [side _data]
           (if (= side :center)
             (st/emit! (dw/relocate-selected-shapes (:id item) 0))
             (let [to-index  (if (= side :top) (inc index) index)
@@ -233,7 +226,7 @@
         (if (:hidden item) i/eye-closed i/eye)]
        [:div.block-element {:class (when (:blocked item) "selected")
                             :on-click toggle-blocking}
-        (if (:blocked item) i/lock i/lock-open)]]
+        (if (:blocked item) i/lock i/unlock)]]
 
       (when (:shapes item)
         [:span.toggle-content
@@ -285,27 +278,30 @@
                :objects objects
                :key id}])))]]))
 
+(defn- strip-obj-data [obj]
+  (select-keys obj [:id
+                    :name
+                    :blocked
+                    :hidden
+                    :shapes
+                    :type
+                    :content
+                    :parent-id
+                    :component-id
+                    :component-file
+                    :shape-ref
+                    :touched
+                    :metadata
+                    :masked-group?]))
+
 (defn- strip-objects
   [objects]
-  (let [strip-data #(select-keys % [:id
-                                    :name
-                                    :blocked
-                                    :hidden
-                                    :shapes
-                                    :type
-                                    :content
-                                    :parent-id
-                                    :component-id
-                                    :component-file
-                                    :shape-ref
-                                    :touched
-                                    :metadata
-                                    :masked-group?])]
-    (persistent!
-     (reduce-kv (fn [res id obj]
-                  (assoc! res id (strip-data obj)))
-                (transient {})
-                objects))))
+  (persistent!
+   (->> objects
+        (reduce-kv
+         (fn [res id obj]
+           (assoc! res id (strip-obj-data obj)))
+         (transient {})))))
 
 (mf/defc layers-tree-wrapper
   {::mf/wrap-props false

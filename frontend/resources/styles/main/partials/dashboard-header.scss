@@ -77,6 +77,7 @@
       display: flex;
       flex-shrink: 0;
       font-size: $fs18;
+      font-weight: 600;
       z-index: 10;
     }
 
@@ -103,7 +104,12 @@
     }
   }
 
+  .dashboard-header-actions {
+    display: flex;
+  }
+
   .pin-icon {
+    margin: 0 $small 0 $big;
     svg {
       fill: $color-gray-20;
     }

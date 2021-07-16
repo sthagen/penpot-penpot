@@ -8,12 +8,15 @@
   "A http client with rx streams interface."
   (:require
    [app.common.data :as d]
+   [app.common.transit :as t]
+   [app.common.uri :as u]
    [app.config :as cfg]
-   [app.util.object :as obj]
-   [app.util.transit :as t]
+   [app.util.cache :as c]
+   [app.util.globals :as globals]
+   [app.util.time :as dt]
+   [app.util.webapi :as wapi]
    [beicon.core :as rx]
    [cuerdas.core :as str]
-   [lambdaisland.uri :as u]
    [promesa.core :as p]))
 
 (defprotocol IBodyData
@@ -22,7 +25,7 @@
   (-get-body-data [_]))
 
 (extend-protocol IBodyData
-  js/FormData
+  globals/FormData
   (-get-body-data [it] it)
   (-update-headers [it headers]
     (dissoc headers "content-type" "Content-Type"))
@@ -51,8 +54,8 @@
   {"x-frontend-version" (:full @cfg/version)})
 
 (defn fetch
-  [{:keys [method uri query headers body timeout mode]
-    :or {timeout 10000 mode :cors headers {}}}]
+  [{:keys [method uri query headers body mode omit-default-headers]
+    :or {mode :cors headers {}}}]
   (rx/Observable.create
    (fn [subscriber]
      (let [controller    (js/AbortController.)
@@ -66,9 +69,15 @@
            uri           (cond-> uri
                            (string? uri) (u/uri)
                            (some? query) (assoc :query query))
-           headers       (->> (d/merge headers default-headers)
-                              (-update-headers body))
+
+           headers       (cond-> headers
+                           (not omit-default-headers)
+                           (d/merge default-headers))
+
+           headers       (-update-headers body headers)
+
            body          (-get-body-data body)
+
            params        #js {:method (translate-method method)
                               :headers (clj->js headers)
                               :body body
@@ -119,16 +128,16 @@
 (defn transit-data
   [data]
   (reify IBodyData
-    (-get-body-data [_] (t/encode data))
+    (-get-body-data [_] (t/encode-str data))
     (-update-headers [_ headers]
       (assoc headers "content-type" "application/transit+json"))))
 
 (defn conditional-decode-transit
-  [{:keys [body headers status] :as response}]
+  [{:keys [body headers] :as response}]
   (let [contentype (get headers "content-type")]
     (if (and (str/starts-with? contentype "application/transit+json")
              (pos? (count body)))
-      (assoc response :body (t/decode body))
+      (assoc response :body (t/decode-str body))
       response)))
 
 (defn success?
@@ -145,6 +154,29 @@
 
 (defn as-promise
   [observable]
-  (p/create (fn [resolve reject]
-              (->> (rx/take 1 observable)
-                   (rx/subs resolve reject)))))
+  (p/create
+   (fn [resolve reject]
+     (->> (rx/take 1 observable)
+          (rx/subs resolve reject)))))
+
+(defn fetch-data-uri [uri]
+  (c/with-cache {:key uri :max-age (dt/duration {:hours 4})}
+    (->> (send! {:method :get
+                 :uri uri
+                 :response-type :blob
+                 :omit-default-headers true})
+
+         (rx/filter #(= 200 (:status %)))
+         (rx/map :body)
+         (rx/mapcat wapi/read-file-as-data-url)
+         (rx/map #(hash-map uri %)))))
+
+(defn fetch-text [url]
+  (c/with-cache {:key url :max-age (dt/duration {:hours 4})}
+    (->> (send!
+          {:method :get
+           :mode :cors
+           :omit-default-headers true
+           :uri url
+           :response-type :text})
+         (rx/map :body))))

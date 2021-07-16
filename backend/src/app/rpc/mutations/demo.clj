@@ -11,10 +11,11 @@
    [app.common.uuid :as uuid]
    [app.config :as cfg]
    [app.db :as db]
+   [app.loggers.audit :as audit]
    [app.rpc.mutations.profile :as profile]
    [app.setup.initial-data :as sid]
    [app.util.services :as sv]
-   [app.worker :as wrk]
+   [app.util.time :as dt]
    [buddy.core.codecs :as bc]
    [buddy.core.nonce :as bn]
    [clojure.spec.alpha :as s]))
@@ -34,6 +35,7 @@
                   :email email
                   :fullname fullname
                   :is-demo true
+                  :deleted-at (dt/in-future cfg/deletion-delay)
                   :password password
                   :props {:onboarding-viewed true}}]
 
@@ -47,11 +49,6 @@
            (#'profile/create-profile-relations conn)
            (sid/load-initial-project! conn))
 
-      ;; Schedule deletion of the demo profile
-      (wrk/submit! {::wrk/task :delete-profile
-                    ::wrk/delay cfg/deletion-delay
-                    ::wrk/conn conn
-                    :profile-id id})
-
-      {:email email
-       :password password})))
+      (with-meta {:email email
+                  :password password}
+        {::audit/profile-id id}))))

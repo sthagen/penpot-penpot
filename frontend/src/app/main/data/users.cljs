@@ -6,25 +6,23 @@
 
 (ns app.main.data.users
   (:require
-   [app.config :as cf]
    [app.common.data :as d]
    [app.common.spec :as us]
    [app.common.uuid :as uuid]
+   [app.config :as cf]
+   [app.main.data.events :as ev]
    [app.main.data.media :as di]
-   [app.main.data.messages :as dm]
+   [app.main.data.modal :as modal]
    [app.main.repo :as rp]
-   [app.main.store :as st]
-   [app.util.avatars :as avatars]
-   [app.util.i18n :as i18n :refer [tr]]
+   [app.util.i18n :as i18n]
    [app.util.router :as rt]
    [app.util.storage :refer [storage]]
    [app.util.theme :as theme]
    [beicon.core :as rx]
    [cljs.spec.alpha :as s]
-   [cuerdas.core :as str]
    [potok.core :as ptk]))
 
-;; --- Common Specs
+;; --- COMMON SPECS
 
 (s/def ::id ::us/uuid)
 (s/def ::fullname ::us/string)
@@ -45,56 +43,80 @@
                    ::lang
                    ::theme]))
 
+;; --- HELPERS
+
+(defn get-current-team-id
+  [profile]
+  (let [team-id (::current-team-id @storage)]
+    (or team-id (:default-team-id profile))))
+
+(defn set-current-team!
+  [team-id]
+  (swap! storage assoc ::current-team-id team-id))
+
+;; --- EVENT: fetch-teams
+
+(defn teams-fetched
+  [teams]
+  (let [teams (d/index-by :id teams)]
+    (ptk/reify ::teams-fetched
+      IDeref
+      (-deref [_] teams)
+
+      ptk/UpdateEvent
+      (update [_ state]
+        (assoc state :teams teams)))))
+
 (defn fetch-teams
   []
-  (letfn [(on-fetched [state data]
-            (let [teams (d/index-by :id data)]
-              (assoc state :teams teams)))]
-    (ptk/reify ::fetch-teams
-      ptk/WatchEvent
-      (watch [_ state s]
-        (->> (rp/query! :teams)
-             (rx/map (fn [data] #(on-fetched % data))))))))
+  (ptk/reify ::fetch-teams
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (->> (rp/query! :teams)
+           (rx/map teams-fetched)))))
+
+;; --- EVENT: fetch-profile
 
 (defn profile-fetched
-  [{:keys [fullname id] :as data}]
-  (us/verify ::profile data)
+  [{:keys [id] :as profile}]
+  (us/verify ::profile profile)
   (ptk/reify ::profile-fetched
     IDeref
-    (-deref [_] data)
+    (-deref [_] profile)
 
     ptk/UpdateEvent
     (update [_ state]
       (-> state
           (assoc :profile-id id)
-          (assoc :profile data)))
+          (assoc :profile profile)))
 
     ptk/EffectEvent
-    (effect [_ state stream]
+    (effect [_ state _]
       (let [profile (:profile state)]
-        (swap! storage assoc :profile profile)
-        (i18n/set-locale! (:lang profile))
-        (some-> (:theme profile)
-                (theme/set-current-theme!))))))
-
-;; --- Fetch Profile
+        (when (not= uuid/zero (:id profile))
+          (swap! storage assoc :profile profile)
+          (i18n/set-locale! (:lang profile))
+          (some-> (:theme profile)
+                  (theme/set-current-theme!)))))))
 
 (defn fetch-profile
   []
   (ptk/reify ::fetch-profile
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ _ _]
       (->> (rp/query! :profile)
            (rx/map profile-fetched)))))
 
-(defn fetch-profile-and-teams
+;; --- EVENT: INITIALIZE PROFILE
+
+(defn initialize-profile
   "Event used mainly on application bootstrap; it fetches the profile
   and if and only if the fetched profile corresponds to an
   authenticated user; proceed to fetch teams."
   []
-  (ptk/reify ::fetch-profile-and-teams
+  (ptk/reify ::initialize-profile
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ _ stream]
       (rx/merge
        (rx/of (fetch-profile))
        (->> stream
@@ -106,6 +128,133 @@
                            (rx/empty)
                            (rx/of (fetch-teams))))))))))
 
+;; --- EVENT: login
+
+(defn- logged-in
+  [profile]
+  (ptk/reify ::logged-in
+    IDeref
+    (-deref [_] profile)
+
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (let [team-id (get-current-team-id profile)]
+        (->> (rx/concat
+              (rx/of (profile-fetched profile)
+                     (fetch-teams))
+
+              (->> (rx/of (rt/nav' :dashboard-projects {:team-id team-id}))
+                   (rx/delay 1000))
+
+              (when-not (get-in profile [:props :onboarding-viewed])
+                (->> (rx/of (modal/show {:type :onboarding}))
+                     (rx/delay 1000))))
+
+             (rx/observe-on :async))))))
+
+(s/def ::login-params
+  (s/keys :req-un [::email ::password]))
+
+(defn login
+  [{:keys [email password] :as data}]
+  (us/verify ::login-params data)
+  (ptk/reify ::login
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (let [{:keys [on-error on-success]
+             :or {on-error rx/throw
+                  on-success identity}} (meta data)
+            params {:email email
+                    :password password
+                    :scope "webapp"}]
+        (->> (rx/timer 100)
+             (rx/mapcat #(rp/mutation :login params))
+             (rx/tap on-success)
+             (rx/catch on-error)
+             (rx/map (fn [profile]
+                       (with-meta profile
+                         {::ev/source "login"})))
+             (rx/map logged-in))))))
+
+(defn login-from-token
+  [{:keys [profile] :as tdata}]
+  (ptk/reify ::login-from-token
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (rx/of (logged-in
+              (with-meta profile
+                {::ev/source "login-with-token"}))))))
+
+(defn login-from-register
+  "Event used mainly for mark current session as logged-in in after the
+  user sucessfully registred using third party auth provider (in this
+  case we dont need to verify the email)."
+  []
+  (ptk/reify ::login-from-register
+    ptk/WatchEvent
+    (watch [_ _ stream]
+      (rx/merge
+       (rx/of (fetch-profile))
+       (->> stream
+            (rx/filter (ptk/type? ::profile-fetched))
+            (rx/take 1)
+            (rx/map deref)
+            (rx/map (fn [profile]
+                      (with-meta profile
+                        {::ev/source "register"})))
+            (rx/map logged-in))))))
+
+;; --- EVENT: logout
+
+(defn logged-out
+  []
+  (ptk/reify ::logged-out
+    ptk/UpdateEvent
+    (update [_ state]
+      (select-keys state [:route :router :session-id :history]))
+
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (rx/of (rt/nav :auth-login)))
+
+    ptk/EffectEvent
+    (effect [_ _ _]
+      (reset! storage {})
+      (i18n/reset-locale))))
+
+(defn logout
+  []
+  (ptk/reify ::logout
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (->> (rp/mutation :logout)
+           (rx/delay-at-least 300)
+           (rx/catch (constantly (rx/of 1)))
+           (rx/map logged-out)))))
+
+;; --- EVENT: register
+
+;; TODO: remove
+(s/def ::invitation-token ::us/not-empty-string)
+
+(s/def ::register
+  (s/keys :req-un [::fullname ::password ::email]
+          :opt-un [::invitation-token]))
+
+(defn register
+  "Create a register event instance."
+  [data]
+  (s/assert ::register data)
+  (ptk/reify ::register
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (let [{:keys [on-error on-success]
+             :or {on-error identity
+                  on-success identity}} (meta data)]
+        (->> (rp/mutation :register-profile data)
+             (rx/tap on-success)
+             (rx/catch on-error))))))
+
 ;; --- Update Profile
 
 (defn update-profile
@@ -113,7 +262,7 @@
   (us/assert ::profile data)
   (ptk/reify ::update-profile
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ _ stream]
       (let [mdata      (meta data)
             on-success (:on-success mdata identity)
             on-error   (:on-error mdata #(rx/throw %))]
@@ -137,7 +286,7 @@
   (us/assert ::us/email email)
   (ptk/reify ::request-email-change
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ _ _]
       (let [{:keys [on-error on-success]
              :or {on-error identity
                   on-success identity}} (meta data)]
@@ -150,7 +299,7 @@
 (def cancel-email-change
   (ptk/reify ::cancel-email-change
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ _ _]
       (->> (rp/mutation :cancel-email-change {})
            (rx/map (constantly (fetch-profile)))))))
 
@@ -166,7 +315,7 @@
   (us/verify ::update-password data)
   (ptk/reify ::update-password
     ptk/WatchEvent
-    (watch [_ state s]
+    (watch [_ _ _]
       (let [{:keys [on-error on-success]
              :or {on-error identity
                   on-success identity}} (meta data)
@@ -185,7 +334,7 @@
   ([{:keys [version]}]
    (ptk/reify ::mark-oboarding-as-viewed
      ptk/WatchEvent
-     (watch [_ state stream]
+     (watch [_ state _]
        (let [version (or version (:main @cf/version))
              props   (-> (get-in state [:profile :props])
                          (assoc :onboarding-viewed true)
@@ -200,7 +349,7 @@
   (us/verify ::di/blob file)
   (ptk/reify ::update-photo
     ptk/WatchEvent
-    (watch [_ state stream]
+    (watch [_ _ _]
       (let [on-success di/notify-finished-loading
             on-error #(do (di/notify-finished-loading)
                           (di/process-error %))
@@ -228,6 +377,73 @@
                  (assoc state :users)))]
     (ptk/reify ::fetch-team-users
       ptk/WatchEvent
-      (watch [_ state stream]
+      (watch [_ _ _]
         (->> (rp/query :team-users {:team-id team-id})
              (rx/map #(partial fetched %)))))))
+
+;; --- EVENT: request-account-deletion
+
+(defn request-account-deletion
+  [params]
+  (ptk/reify ::request-account-deletion
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (let [{:keys [on-error on-success]
+             :or {on-error rx/throw
+                  on-success identity}} (meta params)]
+        (->> (rp/mutation :delete-profile {})
+             (rx/tap on-success)
+             (rx/delay-at-least 300)
+             (rx/catch (constantly (rx/of 1)))
+             (rx/map logged-out)
+             (rx/catch on-error))))))
+
+;; --- EVENT: request-profile-recovery
+
+(s/def ::request-profile-recovery
+  (s/keys :req-un [::email]))
+
+(defn request-profile-recovery
+  [data]
+  (us/verify ::request-profile-recovery data)
+  (ptk/reify ::request-profile-recovery
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (let [{:keys [on-error on-success]
+             :or {on-error rx/throw
+                  on-success identity}} (meta data)]
+
+        (->> (rp/mutation :request-profile-recovery data)
+             (rx/tap on-success)
+             (rx/catch on-error))))))
+
+;; --- EVENT: recover-profile (Password)
+
+(s/def ::token string?)
+(s/def ::recover-profile
+  (s/keys :req-un [::password ::token]))
+
+(defn recover-profile
+  [data]
+  (us/verify ::recover-profile data)
+  (ptk/reify ::recover-profile
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (let [{:keys [on-error on-success]
+             :or {on-error rx/throw
+                  on-success identity}} (meta data)]
+        (->> (rp/mutation :recover-profile data)
+             (rx/tap on-success)
+             (rx/catch on-error))))))
+
+;; --- EVENT: crete-demo-profile
+
+(defn create-demo-profile
+  []
+  (ptk/reify ::create-demo-profile
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (->> (rp/mutation :create-demo-profile {})
+           (rx/map login)))))
+
+

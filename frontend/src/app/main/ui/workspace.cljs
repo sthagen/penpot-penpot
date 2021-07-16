@@ -6,34 +6,25 @@
 
 (ns app.main.ui.workspace
   (:require
-   [app.common.geom.point :as gpt]
-   [app.main.constants :as c]
-   [app.main.data.history :as udh]
    [app.main.data.messages :as dm]
    [app.main.data.workspace :as dw]
-   [app.main.data.workspace.shortcuts :as sc]
    [app.main.refs :as refs]
    [app.main.store :as st]
-   [app.main.streams :as ms]
    [app.main.ui.context :as ctx]
-   [app.main.ui.hooks :as hooks]
    [app.main.ui.icons :as i]
    [app.main.ui.workspace.colorpalette :refer [colorpalette]]
    [app.main.ui.workspace.colorpicker]
    [app.main.ui.workspace.context-menu :refer [context-menu]]
+   [app.main.ui.workspace.coordinates :as coordinates]
    [app.main.ui.workspace.header :refer [header]]
    [app.main.ui.workspace.left-toolbar :refer [left-toolbar]]
    [app.main.ui.workspace.libraries]
    [app.main.ui.workspace.rules :refer [horizontal-rule vertical-rule]]
    [app.main.ui.workspace.sidebar :refer [left-sidebar right-sidebar]]
    [app.main.ui.workspace.viewport :refer [viewport]]
-   [app.main.ui.workspace.coordinates :as coordinates]
    [app.util.dom :as dom]
    [app.util.i18n :as i18n :refer [tr]]
-   [app.util.keyboard :as kbd]
    [app.util.object :as obj]
-   [beicon.core :as rx]
-   [cuerdas.core :as str]
    [okulary.core :as l]
    [rumext.alpha :as mf]))
 
@@ -61,15 +52,15 @@
 (mf/defc workspace-content
   {::mf/wrap-props false}
   [props]
-  (let [local  (mf/deref refs/viewport-data)
-        {:keys [zoom vbox vport options-mode selected]} local
+  (let [selected (mf/deref refs/selected-shapes)
+        local    (mf/deref refs/viewport-data)
+
+        {:keys [zoom vbox vport options-mode]} local
         file   (obj/get props "file")
         layout (obj/get props "layout")]
     [:*
-     ;; TODO: left-sidebar option is obsolete because left-sidebar now
-     ;; is always visible.
      (when (:colorpalette layout)
-       [:& colorpalette {:left-sidebar? true}])
+       [:& colorpalette])
 
      [:section.workspace-content
       [:section.workspace-viewport
@@ -81,6 +72,7 @@
 
        [:& viewport {:file file
                      :local local
+                     :selected selected
                      :layout layout}]]]
 
      [:& left-toolbar {:layout layout}]
@@ -94,17 +86,21 @@
 
 (mf/defc workspace-page
   [{:keys [file layout page-id] :as props}]
-  (let [page (mf/deref trimmed-page-ref)]
-    (mf/use-layout-effect
-     (mf/deps page-id)
-     (fn []
-       (st/emit! (dw/initialize-page page-id))
-       (st/emitf (dw/finalize-page page-id))))
+  (mf/use-layout-effect
+   (mf/deps page-id)
+   (fn []
+     (if (nil? page-id)
+       (st/emit! (dw/go-to-page))
+       (st/emit! (dw/initialize-page page-id)))
 
-    (when page
-      [:& workspace-content {:key page-id
-                             :file file
-                             :layout layout}])))
+     (fn []
+       (when page-id
+         (st/emit! (dw/finalize-page page-id))))))
+
+  (when (mf/deref trimmed-page-ref)
+    [:& workspace-content {:key page-id
+                           :file file
+                           :layout layout}]))
 
 (mf/defc workspace-loader
   []
@@ -114,30 +110,28 @@
 (mf/defc workspace
   {::mf/wrap [mf/memo]}
   [{:keys [project-id file-id page-id layout-name] :as props}]
-  (mf/use-effect
-    (mf/deps layout-name)
-    #(st/emit! (dw/initialize-layout layout-name)))
-
-  (mf/use-effect
-   (mf/deps project-id file-id)
-   (fn []
-     (st/emit! (dw/initialize-file project-id file-id))
-     (st/emitf (dw/finalize-file project-id file-id))))
-
-  (mf/use-effect
-    (fn []
-      ;; Close any non-modal dialog that may be still open
-      (st/emitf dm/hide)))
-
-  (hooks/use-shortcuts sc/shortcuts)
-
   (let [file    (mf/deref refs/workspace-file)
         project (mf/deref refs/workspace-project)
         layout  (mf/deref refs/workspace-layout)]
 
     (mf/use-effect
-      (mf/deps file)
-      #(dom/set-html-title (tr "title.workspace" (:name file))))
+     (mf/deps layout-name)
+     #(st/emit! (dw/initialize-layout layout-name)))
+
+    (mf/use-effect
+     (mf/deps project-id file-id)
+     (fn []
+       (st/emit! (dw/initialize-file project-id file-id))
+       (st/emitf (dw/finalize-file project-id file-id))))
+
+    (mf/use-effect
+     (fn []
+       ;; Close any non-modal dialog that may be still open
+       (st/emit! dm/hide)))
+
+    (mf/use-effect
+     (mf/deps file)
+     #(dom/set-html-title (tr "title.workspace" (:name file))))
 
     [:& (mf/provider ctx/current-file-id) {:value (:id file)}
      [:& (mf/provider ctx/current-team-id) {:value (:team-id project)}
@@ -153,6 +147,9 @@
 
          (if (and (and file project)
                   (:initialized file))
-           [:& workspace-page {:page-id page-id :file file :layout layout}]
+           [:& workspace-page {:key (str "page-" page-id)
+                               :page-id page-id
+                               :file file
+                               :layout layout}]
            [:& workspace-loader])]]]]]))
 

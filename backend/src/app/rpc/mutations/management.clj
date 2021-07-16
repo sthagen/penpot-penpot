@@ -91,21 +91,21 @@
 (def sql:retrieve-used-media-objects
   "select fmo.*
      from file_media_object as fmo
-    inner join storage_object as o on (fmo.media_id = o.id)
+    inner join storage_object as so on (fmo.media_id = so.id)
     where fmo.file_id = ?
-      and o.deleted_at is null")
+      and so.deleted_at is null")
 
 (defn duplicate-file
-  [conn {:keys [profile-id file index project-id name]} {:keys [reset-shared-flag] :as opts}]
-  (let [flibs    (db/exec! conn [sql:retrieve-used-libraries (:id file)])
-        fmeds    (db/exec! conn [sql:retrieve-used-media-objects (:id file)])
+  [conn {:keys [profile-id file index project-id name flibs fmeds]} {:keys [reset-shared-flag] :as opts}]
+  (let [flibs    (or flibs (db/exec! conn [sql:retrieve-used-libraries (:id file)]))
+        fmeds    (or fmeds (db/exec! conn [sql:retrieve-used-media-objects (:id file)]))
 
         ;; memo uniform creation/modification date
         now      (dt/now)
         ignore   (dt/plus now (dt/duration {:seconds 5}))
 
         ;; add to the index all file media objects.
-        index  (reduce #(assoc %1 (:id %2) (uuid/next)) index fmeds)
+        index    (reduce #(assoc %1 (:id %2) (uuid/next)) index fmeds)
 
         flibs-xf (comp
                   (map #(remap-id % index :file-id))
@@ -167,13 +167,13 @@
           :opt-un [::name]))
 
 (sv/defmethod ::duplicate-file
-  [{:keys [pool] :as cfg} {:keys [profile-id file-id name] :as params}]
+  [{:keys [pool] :as cfg} {:keys [profile-id file-id] :as params}]
   (db/with-atomic [conn pool]
     (let [file   (db/get-by-id conn :file file-id)
           index  {file-id (uuid/next)}
           params (assoc params :index index :file file)]
       (proj/check-edition-permissions! conn profile-id (:project-id file))
-
+      (db/exec-one! conn ["SET CONSTRAINTS ALL DEFERRED"])
       (-> (duplicate-file conn params {:reset-shared-flag true})
           (update :data blob/decode)))))
 
@@ -187,10 +187,11 @@
           :opt-un [::name]))
 
 (sv/defmethod ::duplicate-project
-  [{:keys [pool] :as cfg} {:keys [profile-id project-id name] :as params}]
+  [{:keys [pool] :as cfg} {:keys [profile-id project-id] :as params}]
   (db/with-atomic [conn pool]
     (let [project (db/get-by-id conn :project project-id)]
       (teams/check-edition-permissions! conn profile-id (:team-id project))
+      (db/exec-one! conn ["SET CONSTRAINTS ALL DEFERRED"])
       (duplicate-project conn (assoc params :project project)))))
 
 (defn duplicate-project

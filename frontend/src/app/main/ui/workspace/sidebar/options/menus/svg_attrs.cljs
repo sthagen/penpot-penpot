@@ -6,15 +6,14 @@
 
 (ns app.main.ui.workspace.sidebar.options.menus.svg-attrs
   (:require
-   [cuerdas.core :as str]
    [app.common.data :as d]
-   [app.main.data.workspace.common :as dwc]
+   [app.main.data.workspace.changes :as dch]
    [app.main.store :as st]
+   [app.main.ui.icons :as i]
    [app.main.ui.workspace.sidebar.options.rows.input-row :refer [input-row]]
    [app.util.dom :as dom]
    [app.util.i18n :refer [tr]]
-   [rumext.alpha :as mf]
-   [app.main.ui.icons :as i]))
+   [rumext.alpha :as mf]))
 
 (mf/defc attribute-value [{:keys [attr value on-change on-delete] :as props}]
   (let [handle-change
@@ -54,14 +53,14 @@
                                :on-change on-change
                                :on-delete on-delete}])])]))
 
-(mf/defc svg-attrs-menu [{:keys [ids type values]}]
+(mf/defc svg-attrs-menu [{:keys [ids values]}]
   (let [handle-change
         (mf/use-callback
          (mf/deps ids)
          (fn [attr value]
            (let [update-fn
                  (fn [shape] (assoc-in shape (concat [:svg-attrs] attr) value))]
-             (st/emit! (dwc/update-shapes ids update-fn)))))
+             (st/emit! (dch/update-shapes ids update-fn)))))
 
         handle-delete
         (mf/use-callback
@@ -76,7 +75,7 @@
                                  (empty? (get-in shape [:svg-attrs :style]))
                                  (update :svg-attrs dissoc :style))]
                      shape))]
-             (st/emit! (dwc/update-shapes ids update-fn)))))
+             (st/emit! (dch/update-shapes ids update-fn)))))
 
         ]
 
@@ -85,7 +84,7 @@
        [:div.element-set-title
         [:span (tr "workspace.sidebar.options.svg-attrs.title")]]
 
-       (for [[index [attr-key attr-value]] (d/enumerate (:svg-attrs values))]
+       (for [[attr-key attr-value] (:svg-attrs values)]
          [:& attribute-value {:key attr-key
                               :attr [attr-key]
                               :value attr-value

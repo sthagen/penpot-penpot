@@ -1,8 +1,15 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
+;;
+;; Copyright (c) UXBOX Labs SL
+
 (ns app.util.logging)
 
-(defn- log-expr [form level keyvals]
+(defn- log-expr [_form level keyvals]
   (let [keyvals-map (apply array-map keyvals)
-        formatter (::formatter keyvals-map 'identity)]
+        ;;formatter (::formatter keyvals-map 'identity)
+        ]
     `(log ~(::logger keyvals-map (str *ns*))
           ~level
           ~(-> keyvals-map

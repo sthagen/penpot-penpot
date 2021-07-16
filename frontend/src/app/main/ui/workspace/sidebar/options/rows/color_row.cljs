@@ -6,27 +6,38 @@
 
 (ns app.main.ui.workspace.sidebar.options.rows.color-row
   (:require
-   [rumext.alpha :as mf]
-   [cuerdas.core :as str]
+   [app.common.data :as d]
    [app.common.math :as math]
    [app.common.pages :as cp]
-   [app.common.data :as d]
-   [app.util.dom :as dom]
-   [app.util.data :refer [classnames]]
-   [app.util.i18n :as i18n :refer [tr]]
-   [app.util.color :as uc]
-   [app.main.refs :as refs]
    [app.main.data.modal :as modal]
+   [app.main.refs :as refs]
+   [app.main.ui.components.color-bullet :as cb]
+   [app.main.ui.components.color-input :refer [color-input]]
+   [app.main.ui.components.numeric-input :refer [numeric-input]]
+   [app.main.ui.context :as ctx]
    [app.main.ui.hooks :as h]
    [app.main.ui.icons :as i]
-   [app.main.ui.context :as ctx]
-   [app.main.ui.components.color-bullet :as cb]
-   [app.main.ui.components.numeric-input :refer [numeric-input]]))
+   [app.util.color :as uc]
+   [app.util.dom :as dom]
+   [app.util.i18n :as i18n :refer [tr]]
+   [rumext.alpha :as mf]))
 
 (defn color-picker-callback
   [color disable-gradient disable-opacity handle-change-color handle-open handle-close]
   (fn [event]
-    (let [x (.-clientX event)
+    (let [color
+          (cond
+            (uc/multiple? color)
+            {:color cp/default-color
+             :opacity 1}
+
+            (= :multiple (:opacity color))
+            (assoc color :opacity 1)
+
+            :else
+            color)
+
+          x (.-clientX event)
           y (.-clientY event)
           props {:x x
                  :y y
@@ -37,13 +48,6 @@
                  :data color}]
       (handle-open)
       (modal/show! :colorpicker props))))
-
-
-(defn remove-hash [value]
-  (if (or (nil? value) (= value :multiple)) "" (subs value 1)))
-
-(defn append-hash [value]
-  (str "#" value))
 
 (defn opacity->string [opacity]
   (if (= opacity :multiple)
@@ -92,13 +96,9 @@
         handle-close (fn [value opacity id file-id]
                        (when on-close (on-close value opacity id file-id)))
 
-        handle-value-change (fn [event]
-                              (let [target (dom/get-target event)]
-                                (when (dom/valid? target)
-                                  (-> target
-                                      dom/get-value
-                                      append-hash
-                                      change-value))))
+        handle-value-change (fn [new-value]
+                              (-> new-value
+                                  change-value))
 
         handle-opacity-change (fn [value]
                                 (change-opacity (/ value 100)))
@@ -108,16 +108,12 @@
 
         handle-click-color (mf/use-callback
                             (mf/deps color)
-                            (let [;; If multiple, we change to default color
-                                  color (if (uc/multiple? color)
-                                          {:color cp/default-color :opacity 1}
-                                          color)]
-                              (color-picker-callback color
-                                                     disable-gradient
-                                                     disable-opacity
-                                                     handle-pick-color
-                                                     handle-open
-                                                     handle-close)))
+                            (color-picker-callback color
+                                                   disable-gradient
+                                                   disable-opacity
+                                                   handle-pick-color
+                                                   handle-open
+                                                   handle-close))
 
         prev-color (h/use-previous color)]
 
@@ -155,18 +151,17 @@
        :else
        [:*
         [:div.color-info
-         [:input {:value (if (uc/multiple? color)
-                           ""
-                           (-> color :color remove-hash))
-                  :pattern "^[0-9a-fA-F]{0,6}$"
-                  :placeholder (tr "settings.multiple")
-                  :on-click select-all
-                  :on-change handle-value-change}]]
+         [:> color-input {:value (if (uc/multiple? color)
+                                   ""
+                                   (-> color :color uc/remove-hash))
+                          :placeholder (tr "settings.multiple")
+                          :on-click select-all
+                          :on-change handle-value-change}]]
 
         (when (and (not disable-opacity)
                    (not (:gradient color)))
           [:div.input-element
-           {:class (classnames :percentail (not= (:opacity color) :multiple))}
+           {:class (dom/classnames :percentail (not= (:opacity color) :multiple))}
            [:> numeric-input {:value (-> color :opacity opacity->string)
                               :placeholder (tr "settings.multiple")
                               :on-click select-all
