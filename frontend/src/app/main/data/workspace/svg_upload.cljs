@@ -7,10 +7,13 @@
 (ns app.main.data.workspace.svg-upload
   (:require
    [app.common.data :as d]
+   [app.common.exceptions :as ex]
    [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
+   [app.common.math :as mth]
    [app.common.pages :as cp]
+   [app.common.spec :refer [max-safe-int min-safe-int]]
    [app.common.uuid :as uuid]
    [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.common :as dwc]
@@ -28,13 +31,36 @@
 (defonce default-circle {:r 0 :cx 0 :cy 0})
 (defonce default-image {:x 0 :y 0 :width 1 :height 1})
 
+(defn- assert-valid-num [attr num]
+  (when (or (nil? num)
+            (mth/nan? num)
+            (not (mth/finite? num))
+            (>= num max-safe-int )
+            (<= num  min-safe-int))
+    (ex/raise (str (d/name attr) " attribute invalid: " num)))
+
+  ;; If the number is between 0-1 we round to 1 (same in negative form
+  (cond
+    (and (> num 0) (< num 1))  1
+    (and (< num 0) (> num -1)) -1
+    :else                      num))
+
+(defn- assert-valid-pos-num [attr num]
+  (let [num (assert-valid-num attr num)]
+    (when (< num 0)
+      (ex/raise (str (d/name attr) " attribute invalid: " num)))
+    num))
+
 (defn- svg-dimensions [data]
   (let [width (get-in data [:attrs :width] 100)
         height (get-in data [:attrs :height] 100)
         viewbox (get-in data [:attrs :viewBox] (str "0 0 " width " " height))
-        [x y width height] (->> (str/split viewbox " ")
+        [x y width height] (->> (str/split viewbox #"\s+")
                                 (map d/parse-double))]
-    [x y width height]))
+    [(assert-valid-num :x x)
+     (assert-valid-num :y y)
+     (assert-valid-pos-num :width width)
+     (assert-valid-pos-num :height height)]))
 
 (defn tag->name
   "Given a tag returns its layer name"
@@ -69,7 +95,11 @@
                                  (d/parse-double))))))
 
 (defn setup-stroke [shape]
-  (let [shape
+  (let [stroke-linecap (-> (or (get-in shape [:svg-attrs :stroke-linecap])
+                               (get-in shape [:svg-attrs :style :stroke-linecap]))
+                           ((d/nilf str/trim))
+                           ((d/nilf keyword)))
+        shape
         (cond-> shape
           (uc/color? (get-in shape [:svg-attrs :stroke]))
           (-> (update :svg-attrs dissoc :stroke)
@@ -87,8 +117,16 @@
           (get-in shape [:svg-attrs :style :stroke-width])
           (-> (update-in [:svg-attrs :style] dissoc :stroke-width)
               (assoc :stroke-width (-> (get-in shape [:svg-attrs :style :stroke-width])
-                                       (d/parse-double)))))]
-    (if (d/any-key? shape :stroke-color :stroke-opacity :stroke-width)
+                                       (d/parse-double))))
+
+          (and stroke-linecap (= (:type shape) :path))
+          (-> (update-in [:svg-attrs :style] dissoc :stroke-linecap)
+              (cond->
+                (#{:round :square} stroke-linecap)
+                (assoc :stroke-cap-start stroke-linecap
+                       :stroke-cap-end   stroke-linecap))))]
+
+    (if (d/any-key? shape :stroke-color :stroke-opacity :stroke-width :stroke-cap-start :stroke-cap-end)
       (merge {:stroke-style :svg} shape)
       shape)))
 
@@ -305,7 +343,7 @@
   (let [{:keys [tag attrs]} element-data
         attrs (usvg/format-styles attrs)
         element-data (cond-> element-data (map? element-data) (assoc :attrs attrs))
-        name (dwc/generate-unique-name unames (or (:id attrs) (tag->name tag)) true)
+        name (dwc/generate-unique-name unames (or (:id attrs) (tag->name tag)))
         att-refs (usvg/find-attr-references attrs)
         references (usvg/find-def-references (:defs svg-data) att-refs)
 
@@ -467,4 +505,6 @@
                  (dwc/select-shapes (d/ordered-set root-id))))
 
         (catch :default e
-          (.error js/console "Error upload" e))))))
+          (.error js/console "Error SVG" e)
+          (rx/throw {:type :svg-parser
+                     :data e}))))))

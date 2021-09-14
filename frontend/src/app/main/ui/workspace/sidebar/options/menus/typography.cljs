@@ -230,7 +230,7 @@
                     :current? (= (:id font) (:id selected))}])))
 
 (mf/defc font-options
-  [{:keys [values on-change] :as props}]
+  [{:keys [values on-change on-blur] :as props}]
   (let [{:keys [font-id font-size font-variant-id]} values
 
         font-id         (or font-id (:font-id txt/default-text-attrs))
@@ -271,18 +271,26 @@
                          :font-family (:family font)
                          :font-variant-id new-variant-id
                          :font-weight (:weight variant)
-                         :font-style (:style variant)}))))
+                         :font-style (:style variant)})
+             (dom/blur! (dom/get-target event)))))
 
         on-font-select
         (mf/use-callback
          (mf/deps change-font)
          (fn [font*]
            (when (not= font font*)
-             (change-font (:id font*)))))
+             (change-font (:id font*)))
+
+           (when (some? on-blur)
+             (on-blur))))
 
         on-font-selector-close
         (mf/use-callback
-         #(reset! open-selector? false))]
+         (fn []
+           (reset! open-selector? false)
+           (when (some? on-blur)
+             (on-blur))
+           ))]
 
     [:*
      (when @open-selector?
@@ -314,12 +322,16 @@
           :options size-options
           :type "number"
           :placeholder "--"
-          :on-change on-font-size-change}])
+          :min 3
+          :max 1000
+          :on-change on-font-size-change
+          :on-blur on-blur}])
 
       [:select.input-select.variant-option
        {:disabled (= font-id :multiple)
         :value (attr->string font-variant-id)
-        :on-change on-font-variant-change}
+        :on-change on-font-variant-change
+        :on-blur on-blur}
        (when (or (= font-id :multiple) (= font-variant-id :multiple))
          [:option {:value ""} "--"])
        (for [variant (:variants font)]
@@ -329,7 +341,7 @@
 
 
 (mf/defc spacing-options
-  [{:keys [values on-change] :as props}]
+  [{:keys [values on-change on-blur] :as props}]
   (let [{:keys [line-height
                 letter-spacing]} values
 
@@ -353,7 +365,8 @@
         :max "200"
         :value (attr->string line-height)
         :placeholder (tr "settings.multiple")
-        :on-change #(handle-change % :line-height)}]]
+        :on-change #(handle-change % :line-height)
+        :on-blur on-blur}]]
 
      [:div.input-icon
       [:span.icon-before.tooltip.tooltip-bottom
@@ -366,18 +379,21 @@
         :max "200"
         :value (attr->string letter-spacing)
         :placeholder (tr "settings.multiple")
-        :on-change #(handle-change % :letter-spacing)}]]]))
+        :on-change #(handle-change % :letter-spacing)
+        :on-blur on-blur}]]]))
 
 (mf/defc text-transform-options
-  [{:keys [values on-change] :as props}]
+  [{:keys [values on-change on-blur] :as props}]
   (let [text-transform (or (:text-transform values) "none")
         handle-change
         (fn [_ type]
-          (on-change {:text-transform type}))]
+          (on-change {:text-transform type})
+          (when (some? on-blur) (on-blur)))]
     [:div.align-icons
      [:span.tooltip.tooltip-bottom
       {:alt (tr "workspace.options.text-options.none")
        :class (dom/classnames :current (= "none" text-transform))
+       :on-focus #(dom/prevent-default %)
        :on-click #(handle-change % "none")}
       i/minus]
      [:span.tooltip.tooltip-bottom
@@ -397,11 +413,12 @@
       i/titlecase]]))
 
 (mf/defc typography-options
-  [{:keys [ids editor values on-change]}]
+  [{:keys [ids editor values on-change on-blur]}]
   (let [opts #js {:editor editor
                   :ids ids
                   :values values
-                  :on-change on-change}]
+                  :on-change on-change
+                  :on-blur on-blur}]
     [:div.element-set-content
      [:> font-options opts]
      [:div.row-flex
@@ -420,6 +437,8 @@
         hover-detach   (mf/use-state false)
         name-input-ref (mf/use-ref)
 
+        name-ref (mf/use-ref (:name typography))
+
         on-name-blur
         (fn [event]
           (let [content (dom/get-target-val event)]
@@ -430,7 +449,12 @@
         (fn []
           (let [pparams {:project-id (:project-id file)
                          :file-id (:id file)}]
-            (st/emit! (rt/nav :workspace pparams))))]
+            (st/emit! (rt/nav :workspace pparams))))
+
+        on-name-change
+        (mf/use-callback
+         (fn [event]
+           (mf/set-ref-val! name-ref (dom/get-target-val event))))]
 
     (mf/use-effect
      (mf/deps editting?)
@@ -446,6 +470,14 @@
           #(when-let [node (mf/ref-val name-input-ref)]
              (dom/focus! node)
              (dom/select-text! node))))))
+
+    (mf/use-effect
+     (fn []
+       (fn []
+         (let [content (mf/ref-val name-ref)]
+           ;; On destroy we check if it changed
+           (when (and (some? content) (not= content (:name typography)))
+             (on-change {:name content}))))))
 
     [:*
      [:div.element-set-options-group.typography-entry
@@ -519,7 +551,8 @@
             {:type "text"
              :ref name-input-ref
              :default-value (cp/merge-path-item (:path typography) (:name typography))
-             :on-blur on-name-blur}]
+             :on-blur on-name-blur
+             :on-change on-name-change}]
 
              [:div.element-set-actions-button
               {:on-click #(reset! open? false)}

@@ -68,19 +68,17 @@
 
 (defn generate-unique-name
   "A unique name generator"
-  ([used basename]
-   (generate-unique-name used basename false))
-  ([used basename prefix-first?]
-   (s/assert ::set-of-string used)
-   (s/assert ::us/string basename)
-   (let [[prefix initial] (extract-numeric-suffix basename)]
-     (loop [counter initial]
-       (let [candidate (if (and (= 1 counter) prefix-first?)
-                         (str prefix)
-                         (str prefix "-" counter))]
-         (if (contains? used candidate)
-           (recur (inc counter))
-           candidate))))))
+  [used basename]
+  (s/assert ::set-of-string used)
+  (s/assert ::us/string basename)
+  (if-not (contains? used basename)
+    basename
+    (let [[prefix initial] (extract-numeric-suffix basename)]
+      (loop [counter initial]
+        (let [candidate (str prefix "-" counter)]
+          (if (contains? used candidate)
+            (recur (inc counter))
+            candidate))))))
 
 ;; --- Shape attrs (Layers Sidebar)
 
@@ -143,6 +141,38 @@
                                             :undo-changes []
                                             :origin it
                                             :save-undo? false}))))))))))
+
+(defn undo-to-index
+  "Repeat undoing or redoing until dest-index is reached."
+  [dest-index]
+  (ptk/reify ::undo-to-index
+    ptk/WatchEvent
+    (watch [it state _]
+      (let [edition (get-in state [:workspace-local :edition])
+            drawing (get state :workspace-drawing)]
+        (when-not (or (some? edition) (not-empty drawing))
+          (let [undo  (:workspace-undo state)
+                items (:items undo)
+                index (or (:index undo) (dec (count items)))]
+            (when (and (some? items)
+                       (<= 0 dest-index (dec (count items))))
+              (let [changes (vec (apply concat
+                                        (cond
+                                          (< dest-index index)
+                                          (->> (subvec items (inc dest-index) (inc index))
+                                               (reverse)
+                                               (map :undo-changes))
+                                          (> dest-index index)
+                                          (->> (subvec items (inc index) (inc dest-index))
+                                               (map :redo-changes))
+                                          :else [])))]
+                (when (seq changes)
+                  (rx/of (dwu/materialize-undo changes dest-index)
+                         (dch/commit-changes {:redo-changes changes
+                                              :undo-changes []
+                                              :origin it
+                                              :save-undo? false})))))))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Shapes
@@ -400,67 +430,74 @@
             (into (d/ordered-set) empty-parents-xform all-parents)
 
             mk-del-obj-xf
-            (map (fn [id]
-                   {:type :del-obj
-                    :page-id page-id
-                    :id id}))
+            (comp (filter (partial contains? objects))
+                  (map (fn [id]
+                         {:type :del-obj
+                          :page-id page-id
+                          :id id})))
 
             mk-add-obj-xf
-            (map (fn [id]
-                   (let [item (get objects id)]
-                     {:type :add-obj
-                      :id (:id item)
-                      :page-id page-id
-                      :index (cp/position-on-parent id objects)
-                      :frame-id (:frame-id item)
-                      :parent-id (:parent-id item)
-                      :obj item})))
+            (comp (filter (partial contains? objects))
+                  (map (fn [id]
+                         (let [item (get objects id)]
+                           {:type :add-obj
+                            :id (:id item)
+                            :page-id page-id
+                            :index (cp/position-on-parent id objects)
+                            :frame-id (:frame-id item)
+                            :parent-id (:parent-id item)
+                            :obj item}))))
 
             mk-mod-touched-xf
-            (map (fn [id]
-                   (let [parent (get objects id)]
-                     {:type :mod-obj
-                      :page-id page-id
-                      :id (:id parent)
-                      :operations [{:type :set-touched
-                                    :touched (:touched parent)}]})))
+            (comp (filter (partial contains? objects))
+                  (map (fn [id]
+                         (let [parent (get objects id)]
+                           {:type :mod-obj
+                            :page-id page-id
+                            :id (:id parent)
+                            :operations [{:type :set-touched
+                                          :touched (:touched parent)}]}))))
 
             mk-mod-int-del-xf
-            (map (fn [obj]
-                   {:type :mod-obj
-                    :page-id page-id
-                    :id (:id obj)
-                    :operations [{:type :set
-                                  :attr :interactions
-                                  :val (vec (remove (fn [interaction]
-                                                      (contains? ids (:destination interaction)))
-                                                    (:interactions obj)))}]}))
+            (comp (filter some?)
+                  (map (fn [obj]
+                         {:type :mod-obj
+                          :page-id page-id
+                          :id (:id obj)
+                          :operations [{:type :set
+                                        :attr :interactions
+                                        :val (vec (remove (fn [interaction]
+                                                            (contains? ids (:destination interaction)))
+                                                          (:interactions obj)))}]})))
             mk-mod-int-add-xf
-            (map (fn [obj]
-                   {:type :mod-obj
-                    :page-id page-id
-                    :id (:id obj)
-                    :operations [{:type :set
-                                  :attr :interactions
-                                  :val (:interactions obj)}]}))
+            (comp (filter some?)
+                  (map (fn [obj]
+                         {:type :mod-obj
+                          :page-id page-id
+                          :id (:id obj)
+                          :operations [{:type :set
+                                        :attr :interactions
+                                        :val (:interactions obj)}]})))
 
             mk-mod-unmask-xf
-            (map (fn [id]
-                   {:type :mod-obj
-                    :page-id page-id
-                    :id id
-                    :operations [{:type :set
-                                  :attr :masked-group?
-                                  :val false}]}))
+            (comp (filter (partial contains? objects))
+                  (map (fn [id]
+                         {:type :mod-obj
+                          :page-id page-id
+                          :id id
+                          :operations [{:type :set
+                                        :attr :masked-group?
+                                        :val false}]})))
 
             mk-mod-mask-xf
-            (map (fn [id]
-                   {:type :mod-obj
-                    :page-id page-id
-                    :id id
-                    :operations [{:type :set
-                                  :attr :masked-group?
-                                  :val true}]}))
+            (comp (filter (partial contains? objects))
+                  (map (fn [id]
+                         {:type :mod-obj
+                          :page-id page-id
+                          :id id
+                          :operations [{:type :set
+                                        :attr :masked-group?
+                                        :val true}]})))
 
             rchanges
             (-> []

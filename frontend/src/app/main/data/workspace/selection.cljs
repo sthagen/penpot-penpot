@@ -114,7 +114,7 @@
 (defn deselect-shape
   [id]
   (us/verify ::us/uuid id)
-  (ptk/reify ::select-shape
+  (ptk/reify ::deselect-shape
     ptk/UpdateEvent
     (update [_ state]
       (update-in state [:workspace-local :selected] disj id))))
@@ -219,17 +219,15 @@
                           lks/empty-linked-set)
             selrect (get-in state [:workspace-local :selrect])
             blocked? (fn [id] (get-in objects [id :blocked] false))]
-        (rx/merge
-
-          (when selrect
-            (->> (uw/ask! {:cmd :selection/query
-                           :page-id page-id
-                           :rect selrect
-                           :include-frames? true
-                           :full-frame? true})
-                 (rx/map #(cp/clean-loops objects %))
-                 (rx/map #(into initial-set (filter (comp not blocked?)) %))
-                 (rx/map select-shapes))))))))
+        (when selrect
+          (->> (uw/ask! {:cmd :selection/query
+                         :page-id page-id
+                         :rect selrect
+                         :include-frames? true
+                         :full-frame? true})
+               (rx/map #(cp/clean-loops objects %))
+               (rx/map #(into initial-set (filter (comp not blocked?)) %))
+               (rx/map select-shapes)))))))
 
 (defn select-inside-group
   [group-id position]
@@ -256,8 +254,6 @@
 (declare prepare-duplicate-change)
 (declare prepare-duplicate-frame-change)
 (declare prepare-duplicate-shape-change)
-
-(def ^:private change->name #(get-in % [:obj :name]))
 
 (defn update-indices
   "Fixes the indices for a set of changes after a duplication. We need to
@@ -290,19 +286,19 @@
   "Prepare objects to paste: generate new id, give them unique names,
   move to the position of mouse pointer, and find in what frame they
   fit."
-  [objects page-id names ids delta]
-  (loop [names names
-         ids   (seq ids)
-         chgs  []]
-    (if ids
-      (let [id     (first ids)
-            result (prepare-duplicate-change objects page-id names id delta)
-            result (if (vector? result) result [result])]
-        (recur
-         (into names (map change->name) result)
-         (next ids)
-         (into chgs result)))
-      chgs)))
+  [objects page-id unames ids delta]
+  (let [unames         (volatile! unames)
+        update-unames! (fn [new-name] (vswap! unames conj new-name))]
+    (loop [ids   (seq ids)
+           chgs  []]
+      (if ids
+        (let [id     (first ids)
+              result (prepare-duplicate-change objects page-id unames update-unames! id delta)
+              result (if (vector? result) result [result])]
+          (recur
+            (next ids)
+            (into chgs result)))
+        chgs))))
 
 (defn duplicate-changes-update-indices
   "Parses the change set when duplicating to set-up the appropiate indices"
@@ -317,32 +313,32 @@
     (-> changes (update-indices index-map))))
 
 (defn- prepare-duplicate-change
-  [objects page-id names id delta]
+  [objects page-id unames update-unames! id delta]
   (let [obj (get objects id)]
     (if (= :frame (:type obj))
-      (prepare-duplicate-frame-change objects page-id names obj delta)
-      (prepare-duplicate-shape-change objects page-id names obj delta (:frame-id obj) (:parent-id obj)))))
+      (prepare-duplicate-frame-change objects page-id unames update-unames! obj delta)
+      (prepare-duplicate-shape-change objects page-id unames update-unames! obj delta (:frame-id obj) (:parent-id obj)))))
 
 (defn- prepare-duplicate-shape-change
-  [objects page-id names obj delta frame-id parent-id]
+  [objects page-id unames update-unames! obj delta frame-id parent-id]
   (when (some? obj)
     (let [id          (uuid/next)
-          name        (dwc/generate-unique-name names (:name obj))
+          name        (dwc/generate-unique-name @unames (:name obj))
+          _           (update-unames! name)
+
           renamed-obj (assoc obj :id id :name name)
           moved-obj   (geom/move renamed-obj delta)
           parent-id   (or parent-id frame-id)
 
           children-changes
-          (loop [names names
-                 result []
+          (loop [result []
                  cid  (first (:shapes obj))
                  cids (rest (:shapes obj))]
             (if (nil? cid)
               result
               (let [obj (get objects cid)
-                    changes (prepare-duplicate-shape-change objects page-id names obj delta frame-id id)]
+                    changes (prepare-duplicate-shape-change objects page-id unames update-unames! obj delta frame-id id)]
                 (recur
-                 (into names (map change->name changes))
                  (into result changes)
                  (first cids)
                  (rest cids)))))
@@ -361,11 +357,13 @@
             children-changes))))
 
 (defn- prepare-duplicate-frame-change
-  [objects page-id names obj delta]
+  [objects page-id unames update-unames! obj delta]
   (let [frame-id   (uuid/next)
-        frame-name (dwc/generate-unique-name names (:name obj))
+        frame-name (dwc/generate-unique-name @unames (:name obj))
+        _          (update-unames! frame-name)
+
         sch        (->> (map #(get objects %) (:shapes obj))
-                        (mapcat #(prepare-duplicate-shape-change objects page-id names % delta frame-id frame-id)))
+                        (mapcat #(prepare-duplicate-shape-change objects page-id unames update-unames! % delta frame-id frame-id)))
 
         frame     (-> obj
                       (assoc :id frame-id)
@@ -383,6 +381,53 @@
 
     (into [fch] sch)))
 
+(defn clear-memorize-duplicated
+  []
+  (ptk/reify ::clear-memorize-duplicated
+    ptk/UpdateEvent
+    (update [_ state]
+      (d/dissoc-in state [:workspace-local :duplicated]))))
+
+(defn memorize-duplicated
+  "When duplicate an object, remember the operation during the following seconds.
+  If the user moves the duplicated object, and then duplicates it again, check
+  the displacement and apply it to the third copy. This is useful for doing
+  grids or cascades of cloned objects."
+  [id-original id-duplicated]
+  (ptk/reify ::memorize-duplicated
+    ptk/UpdateEvent
+    (update [_ state]
+      (assoc-in state [:workspace-local :duplicated] {:id-original id-original
+                                                      :id-duplicated id-duplicated}))
+
+    ptk/WatchEvent
+    (watch [_ _ stream]
+      (let [stoper (rx/filter (ptk/type? ::memorize-duplicated) stream)]
+        (->> (rx/timer 10000) ;; This time may be adjusted after some user testing.
+             (rx/take-until stoper)
+             (rx/map clear-memorize-duplicated))))))
+
+(defn calc-duplicate-delta
+  [obj state objects]
+  (let [{:keys [id-original id-duplicated]}
+        (get-in state [:workspace-local :duplicated])]
+    (if (and (not= id-original (:id obj))
+             (not= id-duplicated (:id obj)))
+
+      ;; The default is leave normal shapes in place, but put
+      ;; new frames to the right of the original.
+      (if (= (:type obj) :frame)
+        (gpt/point (+ (:width obj) 50) 0)
+        (gpt/point 0 0))
+
+      (let [obj-original   (get objects id-original)
+            obj-duplicated (get objects id-duplicated)
+            distance       (gpt/subtract (gpt/point obj-duplicated)
+                                         (gpt/point obj-original))
+            new-pos        (gpt/add (gpt/point obj-duplicated) distance)
+            delta          (gpt/subtract new-pos (gpt/point obj))]
+        delta))))
+
 (def duplicate-selected
   (ptk/reify ::duplicate-selected
     ptk/WatchEvent
@@ -390,7 +435,10 @@
       (let [page-id  (:current-page-id state)
             objects  (wsh/lookup-page-objects state page-id)
             selected (wsh/lookup-selected state)
-            delta    (gpt/point 0 0)
+            delta    (if (= (count selected) 1)
+                       (let [obj (get objects (first selected))]
+                         (calc-duplicate-delta obj state objects))
+                       (gpt/point 0 0))
 
             unames   (dwc/retrieve-used-names objects)
 
@@ -400,15 +448,20 @@
             uchanges (mapv #(array-map :type :del-obj :page-id page-id :id (:id %))
                            (reverse rchanges))
 
+            id-original (when (= (count selected) 1) (first selected))
+
             selected (->> rchanges
                           (filter #(selected (:old-id %)))
                           (map #(get-in % [:obj :id]))
-                          (into (d/ordered-set)))]
+                          (into (d/ordered-set)))
+
+            id-duplicated (when (= (count selected) 1) (first selected))]
 
         (rx/of (dch/commit-changes {:redo-changes rchanges
                                     :undo-changes uchanges
                                     :origin it})
-               (select-shapes selected))))))
+               (select-shapes selected)
+               (memorize-duplicated id-original id-duplicated))))))
 
 (defn change-hover-state
   [id value]

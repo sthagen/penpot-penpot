@@ -11,8 +11,8 @@
    [app.common.pages.migrations :as pmg]
    [app.common.spec :as us]
    [app.common.uuid :as uuid]
-   [app.config :as cf]
    [app.db :as db]
+   [app.metrics :as mtx]
    [app.rpc.permissions :as perms]
    [app.rpc.queries.files :as files]
    [app.rpc.queries.projects :as proj]
@@ -288,11 +288,11 @@
 
 (defn- delete-from-storage
   [{:keys [storage] :as cfg} file]
-  (when-let [backend (simpl/resolve-backend storage (cf/get :fdata-storage-backend))]
+  (when-let [backend (simpl/resolve-backend storage (:data-backend file))]
     (simpl/del-object backend file)))
 
 (defn- update-file
-  [{:keys [conn] :as cfg} {:keys [file changes changes-with-metadata session-id profile-id] :as params}]
+  [{:keys [conn metrics] :as cfg} {:keys [file changes changes-with-metadata session-id profile-id] :as params}]
   (when (> (:revn params)
            (:revn file))
 
@@ -302,14 +302,22 @@
               :context {:incoming-revn (:revn params)
                         :stored-revn (:revn file)}))
 
-  (let [changes (if changes-with-metadata
+  (let [mtx1    (get-in metrics [:definitions :update-file-changes])
+        mtx2    (get-in metrics [:definitions :update-file-bytes-processed])
+
+        changes (if changes-with-metadata
                   (mapcat :changes changes-with-metadata)
                   changes)
+
+        ;; Trace the number of changes processed
+        _       ((::mtx/fn mtx1) {:by (count changes)})
 
         ts      (dt/now)
         file    (-> (files/retrieve-data cfg file)
                     (update :revn inc)
                     (update :data (fn [data]
+                                    ;; Trace the length of bytes of processed data
+                                    ((::mtx/fn mtx2) {:by (alength data)})
                                     (-> data
                                         (blob/decode)
                                         (assoc :id (:id file))

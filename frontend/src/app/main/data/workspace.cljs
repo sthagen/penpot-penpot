@@ -20,6 +20,7 @@
    [app.common.transit :as t]
    [app.common.uuid :as uuid]
    [app.config :as cfg]
+   [app.main.data.events :as ev]
    [app.main.data.messages :as dm]
    [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.common :as dwc]
@@ -37,6 +38,7 @@
    [app.main.repo :as rp]
    [app.main.streams :as ms]
    [app.main.worker :as uw]
+   [app.util.globals :as ug]
    [app.util.http :as http]
    [app.util.i18n :as i18n]
    [app.util.router :as rt]
@@ -48,7 +50,6 @@
    [potok.core :as ptk]))
 
 ;; (log/set-level! :trace)
-;; --- Specs
 
 (s/def ::shape-attrs ::cp/shape-attrs)
 (s/def ::set-of-string
@@ -87,7 +88,7 @@
     :snap-grid
     :dynamic-alignment})
 
-(def layout-names
+(def layout-presets
   {:assets
    {:del #{:sitemap :layers :document-history }
     :add #{:assets}}
@@ -121,22 +122,31 @@
    :picked-color nil
    :picked-color-select false})
 
-(declare ensure-layout)
-
-(defn initialize-layout
-  [layout-name]
-  (us/verify (s/nilable ::us/keyword) layout-name)
-  (ptk/reify ::initialize-layout
+(defn ensure-layout
+  [lname]
+  (ptk/reify ::ensure-layout
     ptk/UpdateEvent
     (update [_ state]
       (update state :workspace-layout
-              (fn [layout]
-                (or layout default-layout))))
+              (fn [stored]
+                (let [todel (get-in layout-presets [lname :del] #{})
+                      toadd (get-in layout-presets [lname :add] #{})]
+                  (-> stored
+                      (set/difference todel)
+                      (set/union toadd))))))))
+
+(defn setup-layout
+  [lname]
+  (us/verify (s/nilable ::us/keyword) lname)
+  (ptk/reify ::setup-layout
+    ptk/UpdateEvent
+    (update [_ state]
+      (update state :workspace-layout #(or % default-layout)))
 
     ptk/WatchEvent
     (watch [_ _ _]
-      (if (and layout-name (contains? layout-names layout-name))
-        (rx/of (ensure-layout layout-name))
+      (if (and lname (contains? layout-presets lname))
+        (rx/of (ensure-layout lname))
         (rx/of (ensure-layout :layers))))))
 
 (defn initialize-file
@@ -171,7 +181,12 @@
                           (->> stream
                                (rx/filter #(= ::dwc/index-initialized %))
                                (rx/first)
-                               (rx/map #(file-initialized bundle)))))))))))
+                               (rx/map #(file-initialized bundle)))))))))
+
+    ptk/EffectEvent
+    (effect [_ _ _]
+      (let [name (str "workspace-" file-id)]
+        (unchecked-set ug/global "name" name)))))
 
 (defn- file-initialized
   [{:keys [file users project libraries] :as bundle}]
@@ -204,15 +219,25 @@
     ptk/UpdateEvent
     (update [_ state]
       (dissoc state
+              :current-file-id
+              :current-project-id
+              :workspace-data
+              :workspace-editor-state
               :workspace-file
-              :workspace-project
+              :workspace-libraries
               :workspace-media-objects
-              :workspace-persistence))
+              :workspace-persistence
+              :workspace-presence
+              :workspace-project
+              :workspace-project
+              :workspace-undo))
 
     ptk/WatchEvent
     (watch [_ _ _]
-      (rx/of (dwn/finalize file-id)
-             ::dwp/finalize))))
+      (rx/merge
+       (rx/of (dwn/finalize file-id))
+       (->> (rx/of ::dwp/finalize)
+            (rx/observe-on :async))))))
 
 (defn initialize-page
   [page-id]
@@ -242,9 +267,10 @@
     (update [_ state]
       (let [page-id (or page-id (get-in state [:workspace-data :pages 0]))
             local   (-> (:workspace-local state)
-                        (dissoc :edition)
-                        (dissoc :edit-path)
-                        (dissoc :selected))]
+                        (dissoc
+                         :edition
+                         :edit-path
+                         :selected))]
         (-> state
             (assoc-in [:workspace-cache page-id] local)
             (dissoc :current-page-id :workspace-local :trimmed-page :workspace-drawing))))))
@@ -265,7 +291,7 @@
       (watch [it state _]
         (let [pages   (get-in state [:workspace-data :pages-index])
               unames  (dwc/retrieve-used-names pages)
-              name    (dwc/generate-unique-name unames "Page")
+              name    (dwc/generate-unique-name unames "Page-1")
 
               rchange {:type :add-page
                        :id id
@@ -339,7 +365,6 @@
                (when (= id (:current-page-id state))
                  go-to-file))))))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WORKSPACE File Actions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -348,6 +373,10 @@
   [id name]
   {:pre [(uuid? id) (string? name)]}
   (ptk/reify ::rename-file
+    IDeref
+    (-deref [_]
+      {::ev/origin "workspace" :id id :name name})
+
     ptk/UpdateEvent
     (update [_ state]
       (assoc-in state [:workspace-file :name] name))
@@ -364,6 +393,9 @@
 
 ;; --- Viewport Sizing
 
+(declare increase-zoom)
+(declare decrease-zoom)
+(declare set-zoom)
 (declare zoom-to-fit-all)
 
 (defn initialize-viewport
@@ -448,7 +480,6 @@
                                             (update :height #(/ % hprop))
                                             (assoc :left-offset left-offset))))))))))))
 
-
 (defn start-panning []
   (ptk/reify ::start-panning
     ptk/WatchEvent
@@ -475,23 +506,32 @@
       (-> state
           (update :workspace-local dissoc :panning)))))
 
+(defn start-zooming [pt]
+  (ptk/reify ::start-zooming
+    ptk/WatchEvent
+    (watch [_ state stream]
+      (let [stopper (->> stream (rx/filter (ptk/type? ::finish-zooming)))]
+        (when-not (get-in state [:workspace-local :zooming])
+          (rx/concat
+           (rx/of #(-> % (assoc-in [:workspace-local :zooming] true)))
+           (->> stream
+                (rx/filter ms/pointer-event?)
+                (rx/filter #(= :delta (:source %)))
+                (rx/map :pt)
+                (rx/take-until stopper)
+                (rx/map (fn [delta]
+                          (let [scale (+ 1 (/ (:y delta) 100))] ;; this number may be adjusted after user testing
+                            (set-zoom pt scale)))))))))))
 
-;; --- Toggle layout flag
-
-(defn ensure-layout
-  [layout-name]
-  (assert (contains? layout-names layout-name)
-          (str "unexpected layout name: " layout-name))
-  (ptk/reify ::ensure-layout
+(defn finish-zooming []
+  (ptk/reify ::finish-zooming
     ptk/UpdateEvent
     (update [_ state]
-      (update state :workspace-layout
-              (fn [stored]
-                (let [todel (get-in layout-names [layout-name :del] #{})
-                      toadd (get-in layout-names [layout-name :add] #{})]
-                  (-> stored
-                      (set/difference todel)
-                      (set/union toadd))))))))
+      (-> state
+          (update :workspace-local dissoc :zooming)))))
+
+
+;; --- Toggle layout flag
 
 (defn toggle-layout-flags
   [& flags]
@@ -559,6 +599,16 @@
     (update [_ state]
       (update state :workspace-local
               #(impl-update-zoom % center (fn [z] (max (/ z 1.3) 0.01)))))))
+
+(defn set-zoom
+  [center scale]
+  (ptk/reify ::set-zoom
+    ptk/UpdateEvent
+    (update [_ state]
+      (update state :workspace-local
+              #(impl-update-zoom % center (fn [z] (-> (* z scale)
+                                                      (max 0.01)
+                                                      (min 200))))))))
 
 (def reset-zoom
   (ptk/reify ::reset-zoom
@@ -1049,6 +1099,9 @@
               :group
               (rx/of (dwc/select-shapes (into (d/ordered-set) [(last shapes)])))
 
+              :svg-raw
+              nil
+
               (rx/of (dwc/start-edition-mode id)
                      (dwdp/start-path-edit id)))))))))
 
@@ -1080,7 +1133,7 @@
 (defn align-objects
   [axis]
   (us/verify ::gal/align-axis axis)
-  (ptk/reify :align-objects
+  (ptk/reify ::align-objects
     ptk/WatchEvent
     (watch [_ state _]
       (let [page-id  (:current-page-id state)
@@ -1111,7 +1164,7 @@
 (defn distribute-objects
   [axis]
   (us/verify ::gal/dist-axis axis)
-  (ptk/reify :align-objects
+  (ptk/reify ::distribute-objects
     ptk/WatchEvent
     (watch [_ state _]
       (let [page-id  (:current-page-id state)
@@ -1186,7 +1239,7 @@
          (rx/of (rt/nav' :workspace pparams qparams))))))
   ([page-id]
    (us/verify ::us/uuid page-id)
-   (ptk/reify ::go-to-page
+   (ptk/reify ::go-to-page-2
      ptk/WatchEvent
      (watch [_ state _]
        (let [project-id (:current-project-id state)
@@ -1198,7 +1251,10 @@
 (defn go-to-layout
   [layout]
   (us/verify ::layout-flag layout)
-  (ptk/reify ::go-to-layout
+  (ptk/reify ::set-workspace-layout
+    IDeref
+    (-deref [_] {:layout layout})
+
     ptk/WatchEvent
     (watch [_ state _]
       (let [project-id (get-in state [:workspace-project :id])
@@ -1225,10 +1281,14 @@
      ptk/WatchEvent
      (watch [_ state _]
        (let [{:keys [current-file-id current-page-id]} state
-             params {:file-id (or file-id current-file-id)
-                     :page-id (or page-id current-page-id)}]
+             pparams {:file-id (or file-id current-file-id)}
+             qparams {:page-id (or page-id current-page-id)
+                      :index 0}]
          (rx/of ::dwp/force-persist
-                (rt/nav-new-window :viewer params {:index 0})))))))
+                (rt/nav-new-window* {:rname :viewer
+                                     :path-params pparams
+                                     :query-params qparams
+                                     :name (str "viewer-" (:file-id pparams))})))))))
 
 (defn go-to-dashboard
   ([] (go-to-dashboard nil))
@@ -1242,7 +1302,7 @@
 
 (defn go-to-dashboard-fonts
   []
-   (ptk/reify ::go-to-dashboard
+   (ptk/reify ::go-to-dashboard-fonts
      ptk/WatchEvent
      (watch [_ state _]
        (let [team-id (:current-team-id state)]
@@ -1474,8 +1534,8 @@
          (= :frame (get-in objects [(first selected) :type])))))
 
 (defn- paste-shape
-  [{:keys [selected objects images] :as data} in-viewport?]
-  (letfn [;; Given a file-id and img (part generated by the
+  [{:keys [selected objects images] :as data} in-viewport?] ;; TODO: perhaps rename 'objects' to 'shapes', because it contains only
+  (letfn [;; Given a file-id and img (part generated by the ;;       the shapes to paste, not the whole page tree of shapes
           ;; copy-selected event), uploads the new media.
           (upload-media [file-id imgpart]
             (->> (http/send! {:uri (:file-data imgpart)
@@ -1583,7 +1643,7 @@
 
                   page-id   (:current-page-id state)
                   unames    (-> (wsh/lookup-page-objects state page-id)
-                                (dwc/retrieve-used-names))
+                                (dwc/retrieve-used-names)) ;; TODO: move this calculation inside prepare-duplcate-changes?
 
                   rchanges  (->> (dws/prepare-duplicate-changes objects page-id unames selected delta)
                                  (mapv (partial process-rchange media-idx))

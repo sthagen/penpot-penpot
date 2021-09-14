@@ -9,7 +9,6 @@
    [app.common.pages.migrations :as pmg]
    [app.common.spec :as us]
    [app.common.uuid :as uuid]
-   [app.config :as cf]
    [app.db :as db]
    [app.rpc.permissions :as perms]
    [app.rpc.queries.projects :as projects]
@@ -62,16 +61,23 @@
 
 (defn- retrieve-file-permissions
   [conn profile-id file-id]
-  (db/exec! conn [sql:file-permissions
-                  file-id profile-id
-                  file-id profile-id
-                  file-id profile-id]))
+  (when (and profile-id file-id)
+    (db/exec! conn [sql:file-permissions
+                    file-id profile-id
+                    file-id profile-id
+                    file-id profile-id])))
+
+(def has-edit-permissions?
+  (perms/make-edition-predicate-fn retrieve-file-permissions))
+
+(def has-read-permissions?
+  (perms/make-read-predicate-fn retrieve-file-permissions))
 
 (def check-edition-permissions!
-  (perms/make-edition-check-fn retrieve-file-permissions))
+  (perms/make-check-fn has-edit-permissions?))
 
 (def check-read-permissions!
-  (perms/make-read-check-fn retrieve-file-permissions))
+  (perms/make-check-fn has-read-permissions?))
 
 
 ;; --- Query: Files search
@@ -175,7 +181,7 @@
 
 (defn- retrieve-data*
   [{:keys [storage] :as cfg} file]
-  (when-let [backend (simpl/resolve-backend storage (cf/get :fdata-storage-backend))]
+  (when-let [backend (simpl/resolve-backend storage (:data-backend file))]
     (simpl/get-object-bytes backend file)))
 
 (defn retrieve-data
