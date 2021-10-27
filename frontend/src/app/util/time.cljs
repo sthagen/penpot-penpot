@@ -7,12 +7,14 @@
 (ns app.util.time
   (:require
    ["date-fns/formatDistanceToNowStrict" :default dateFnsFormatDistanceToNowStrict]
+   ["date-fns/locale/ar-SA" :default dateFnsLocalesAr]
    ["date-fns/locale/ca" :default dateFnsLocalesCa]
    ["date-fns/locale/de" :default dateFnsLocalesDe]
    ["date-fns/locale/el" :default dateFnsLocalesEl]
    ["date-fns/locale/en-US" :default dateFnsLocalesEnUs]
    ["date-fns/locale/es" :default dateFnsLocalesEs]
    ["date-fns/locale/fr" :default dateFnsLocalesFr]
+   ["date-fns/locale/he" :default dateFnsLocalesHe]
    ["date-fns/locale/pt-BR" :default dateFnsLocalesPtBr]
    ["date-fns/locale/ro" :default dateFnsLocalesRo]
    ["date-fns/locale/ru" :default dateFnsLocalesRu]
@@ -202,6 +204,8 @@
 
 (def ^:private locales
   #js {:en dateFnsLocalesEnUs
+       :ar dateFnsLocalesAr
+       :he dateFnsLocalesHe
        :fr dateFnsLocalesFr
        :tr dateFnsLocalesTr
        :es dateFnsLocalesEs

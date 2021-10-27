@@ -6,7 +6,8 @@
 
 (ns app.main.ui.shapes.group
   (:require
-   [app.main.ui.shapes.mask :refer [mask-str clip-str mask-factory]]
+   [app.main.ui.context :as muc]
+   [app.main.ui.shapes.mask :refer [mask-url clip-url mask-factory]]
    [app.util.object :as obj]
    [rumext.alpha :as mf]))
 
@@ -19,28 +20,38 @@
       (let [frame          (unchecked-get props "frame")
             shape          (unchecked-get props "shape")
             childs         (unchecked-get props "childs")
-
+            render-id      (mf/use-ctx muc/render-ctx)
             masked-group?  (:masked-group? shape)
 
             [mask childs]  (if masked-group?
                              [(first childs) (rest childs)]
                              [nil childs])
 
+            ;; We need to separate mask and clip into two because a bug in Firefox
+            ;; breaks when the group has clip+mask+foreignObject
+            ;; Clip and mask separated will work in every platform
+            ;  Firefox bug: https://bugzilla.mozilla.org/show_bug.cgi?id=1734805
+            [clip-wrapper clip-props]
+            (if masked-group?
+              ["g" (-> (obj/new)
+                       (obj/set! "clipPath" (clip-url render-id mask)))]
+              [mf/Fragment nil])
+
             [mask-wrapper mask-props]
             (if masked-group?
               ["g" (-> (obj/new)
-                       (obj/set! "clipPath" (clip-str mask))
-                       (obj/set! "mask"     (mask-str mask)))]
+                       (obj/set! "mask"     (mask-url render-id mask)))]
               [mf/Fragment nil])]
 
-        [:> mask-wrapper mask-props
-         (when masked-group?
-           [:> render-mask #js {:frame frame :mask mask}])
+        [:> clip-wrapper clip-props
+         [:> mask-wrapper mask-props
+          (when masked-group?
+            [:> render-mask #js {:frame frame :mask mask}])
 
-         (for [item childs]
-           [:& shape-wrapper {:frame frame
-                              :shape item
-                              :key (:id item)}])]))))
+          (for [item childs]
+            [:& shape-wrapper {:frame frame
+                               :shape item
+                               :key (:id item)}])]]))))
 
 
 

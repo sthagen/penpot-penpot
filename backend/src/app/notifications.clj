@@ -7,12 +7,12 @@
 (ns app.notifications
   "A websocket based notifications mechanism."
   (:require
+   [app.common.logging :as l]
    [app.common.spec :as us]
    [app.common.transit :as t]
    [app.db :as db]
    [app.metrics :as mtx]
    [app.util.async :as aa]
-   [app.util.logging :as l]
    [app.util.time :as dt]
    [app.worker :as wrk]
    [clojure.core.async :as a]
@@ -69,6 +69,7 @@
                    :mtx-messages mtx-messages
                    :mtx-sessions mtx-sessions
                    )]
+
     (-> #(handler cfg %)
         (wrap-session)
         (wrap-keyword-params)
@@ -135,7 +136,7 @@
         ws-send      (mtx/wrap-counter ws-send mtx-messages ["send"])]
 
     (letfn [(on-connect [conn]
-              (mtx-aconn :inc)
+              ((::mtx/fn mtx-aconn) {:cmd :inc :by 1})
               ;; A subscription channel should use a lossy buffer
               ;; because we can't penalize normal clients when one
               ;; slow client is connected to the room.
@@ -162,8 +163,8 @@
                   (a/<! (handle-connect cfg))
 
                   ;; when connection is closed
-                  (mtx-aconn :dec)
-                  (mtx-sessions :observe (/ (inst-ms (dt/diff created-at (dt/now))) 1000.0))
+                  ((::mtx/fn mtx-aconn) {:cmd :dec :by 1})
+                  ((::mtx/fn mtx-sessions) {:val (/ (inst-ms (dt/diff created-at (dt/now))) 1000.0)})
 
                   ;; close subscription
                   (a/close! sub-ch))))
