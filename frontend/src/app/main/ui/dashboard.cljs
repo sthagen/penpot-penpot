@@ -7,9 +7,7 @@
 (ns app.main.ui.dashboard
   (:require
    [app.common.spec :as us]
-   [app.config :as cf]
    [app.main.data.dashboard :as dd]
-   [app.main.data.modal :as modal]
    [app.main.refs :as refs]
    [app.main.store :as st]
    [app.main.ui.context :as ctx]
@@ -22,7 +20,6 @@
    [app.main.ui.dashboard.search :refer [search-page]]
    [app.main.ui.dashboard.sidebar :refer [sidebar]]
    [app.main.ui.dashboard.team :refer [team-settings-page team-members-page]]
-   [app.util.timers :as tm]
    [rumext.alpha :as mf]))
 
 (defn ^boolean uuid-str?
@@ -94,27 +91,17 @@
 
     (mf/use-effect
      (mf/deps team-id)
-     (st/emitf (dd/initialize {:id team-id})))
-
-    (mf/use-effect
-     (mf/deps)
      (fn []
-       (let [props   (:props profile)
-             version (:release-notes-viewed props)]
-         (when (and (:onboarding-viewed props)
-                    (not= version (:main @cf/version))
-                    (not= "0.0" (:main @cf/version)))
-           (tm/schedule 1000 #(st/emit! (modal/show {:type :release-notes :version (:main @cf/version)})))))))
+       (st/emit! (dd/initialize {:id team-id}))))
 
     [:& (mf/provider ctx/current-team-id) {:value team-id}
      [:& (mf/provider ctx/current-project-id) {:value project-id}
-
       ;; NOTE: dashboard events and other related functions assumes
       ;; that the team is a implicit context variable that is
       ;; available using react context or accessing
       ;; the :current-team-id on the state. We set the key to the
-      ;; team-id becase we want to completly refresh all the
-      ;; components on team change. Many components assumess that the
+      ;; team-id because we want to completely refresh all the
+      ;; components on team change. Many components assumes that the
       ;; team is already set so don't put the team into mf/deps.
       (when team
         [:section.dashboard-layout {:key (:id team)}

@@ -12,7 +12,6 @@
    [app.config :as cf]
    [app.main.data.events :as ev]
    [app.main.data.media :as di]
-   [app.main.data.modal :as modal]
    [app.main.repo :as rp]
    [app.util.i18n :as i18n]
    [app.util.router :as rt]
@@ -80,8 +79,6 @@
         (when-let [ctid (::current-team-id @storage)]
           (when-not (contains? ids ctid)
             (swap! storage dissoc ::current-team-id)))))))
-
-
 
 (defn fetch-teams
   []
@@ -157,18 +154,12 @@
 
     ptk/WatchEvent
     (watch [_ _ _]
-      (let [team-id (get-current-team-id profile)]
+      (let [team-id (:default-team-id profile)]
         (->> (rx/concat
               (rx/of (profile-fetched profile)
                      (fetch-teams))
-
               (->> (rx/of (rt/nav' :dashboard-projects {:team-id team-id}))
-                   (rx/delay 1000))
-
-              (when-not (get-in profile [:props :onboarding-viewed])
-                (->> (rx/of (modal/show {:type :onboarding}))
-                     (rx/delay 1000))))
-
+                   (rx/delay 1000)))
              (rx/observe-on :async))))))
 
 (s/def ::login-params
@@ -193,7 +184,12 @@
              (rx/map (fn [profile]
                        (with-meta profile
                          {::ev/source "login"})))
-             (rx/map logged-in))))))
+             (rx/map logged-in)
+             (rx/observe-on :async))))
+
+    ptk/EffectEvent
+    (effect [_ _ _]
+      (reset! storage {}))))
 
 (defn login-from-token
   [{:keys [profile] :as tdata}]
@@ -206,7 +202,7 @@
 
 (defn login-from-register
   "Event used mainly for mark current session as logged-in in after the
-  user sucessfully registred using third party auth provider (in this
+  user successfully registered using third party auth provider (in this
   case we dont need to verify the email)."
   []
   (ptk/reify ::login-from-register
@@ -351,15 +347,29 @@
 (defn mark-onboarding-as-viewed
   ([] (mark-onboarding-as-viewed nil))
   ([{:keys [version]}]
-   (ptk/reify ::mark-oboarding-as-viewed
+   (ptk/reify ::mark-onboarding-as-viewed
      ptk/WatchEvent
-     (watch [_ state _]
+     (watch [_ _ _]
        (let [version (or version (:main @cf/version))
-             props   (-> (get-in state [:profile :props])
-                         (assoc :onboarding-viewed true)
-                         (assoc :release-notes-viewed version))]
+             props   {:onboarding-viewed true
+                      :release-notes-viewed version}]
          (->> (rp/mutation :update-profile-props {:props props})
               (rx/map (constantly (fetch-profile)))))))))
+
+
+(defn mark-questions-as-answered
+  []
+  (ptk/reify ::mark-questions-as-answered
+    ptk/UpdateEvent
+    (update [_ state]
+      (update-in state [:profile :props] assoc :onboarding-questions-answered true))
+
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (let [props {:onboarding-questions-answered true}]
+        (->> (rp/mutation :update-profile-props {:props props})
+             (rx/map (constantly (fetch-profile))))))))
+
 
 ;; --- Update Photo
 

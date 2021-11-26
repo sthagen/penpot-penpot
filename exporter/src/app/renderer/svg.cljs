@@ -11,19 +11,19 @@
    [app.browser :as bw]
    [app.common.data :as d]
    [app.common.exceptions :as ex :include-macros true]
+   [app.common.logging :as l]
    [app.common.pages :as cp]
    [app.common.spec :as us]
    [app.config :as cf]
+   [app.renderer.bitmap :refer [create-cookie]]
    [app.util.shell :as sh]
    [cljs.spec.alpha :as s]
    [clojure.walk :as walk]
    [cuerdas.core :as str]
-   [lambdaisland.glogi :as log]
    [lambdaisland.uri :as u]
-   [app.renderer.bitmap :refer [create-cookie]]
    [promesa.core :as p]))
 
-(log/set-level "app.http.export-svg" :trace)
+(l/set-level! :trace)
 
 (defn- xml->clj
   [data]
@@ -116,14 +116,14 @@
 (defn- render-object
   [{:keys [page-id file-id object-id token scale suffix type]}]
   (letfn [(convert-to-ppm [pngpath]
-            (log/trace :fn :convert-to-ppm)
+            (l/trace :fn :convert-to-ppm)
             (let [basepath (path/dirname pngpath)
                   ppmpath  (path/join basepath "origin.ppm")]
               (-> (sh/run-cmd! (str "convert " pngpath " " ppmpath))
                   (p/then (constantly ppmpath)))))
 
           (trace-color-mask [pbmpath]
-            (log/trace :fn :trace-color-mask :pbmpath pbmpath)
+            (l/trace :fn :trace-color-mask :pbmpath pbmpath)
             (let [basepath (path/dirname pbmpath)
                   basename (path/basename pbmpath ".pbm")
                   svgpath  (path/join basepath (str basename ".svg"))]
@@ -131,7 +131,7 @@
                   (p/then (constantly svgpath)))))
 
           (generate-color-layer [ppmpath color]
-            (log/trace :fn :generate-color-layer :ppmpath ppmpath :color color)
+            (l/trace :fn :generate-color-layer :ppmpath ppmpath :color color)
             (let [basepath (path/dirname ppmpath)
                   pbmpath  (path/join basepath (str "mask-" (subs color 1) ".pbm"))]
               (-> (sh/run-cmd! (str/format "ppmcolormask \"%s\" %s" color ppmpath))
@@ -146,50 +146,107 @@
                               {:color   color
                                :svgdata data}))))))
 
-          (join-color-layers [{:keys [x y width height] :as node} layers]
-            (log/trace :fn :join-color-layers)
+          (set-path-color [id color mapping node]
+            (let [color-mapping (get mapping color)]
+              (cond
+                (and (some? color-mapping)
+                     (= "transparent" (get color-mapping "type")))
+                (update node "attributes" assoc
+                        "fill" (get color-mapping "hex")
+                        "fill-opacity" (get color-mapping "opacity"))
+
+                (and (some? color-mapping)
+                     (= "gradient" (get color-mapping "type")))
+                (update node "attributes" assoc
+                        "fill" (str "url(#gradient-" id "-" (subs color 1) ")"))
+
+                :else
+                (update node "attributes" assoc "fill" color))))
+
+          (get-stops [data]
+            (->> (get-in data ["gradient" "stops"])
+                 (mapv (fn [stop-data]
+                         {"type" "element"
+                          "name" "stop"
+                          "attributes" {"offset" (get stop-data "offset")
+                                        "stop-color" (get stop-data "color")
+                                        "stop-opacity" (get stop-data "opacity")}}))))
+
+          (data->gradient-def [id [color data]]
+            (let [id (str "gradient-" id "-" (subs color 1))]
+              (if (= type "linear")
+                {"type" "element"
+                 "name" "linearGradient"
+                 "attributes" {"id" id "x1" "0.5" "y1" "1" "x2" "0.5" "y2" "0"}
+                 "elements" (get-stops data)}
+
+                {"type" "element"
+                 "name" "radialGradient"
+                 "attributes" {"id" id "cx" "0.5" "cy" "0.5" "r" "0.5"}
+                 "elements" (get-stops data)}
+                )))
+
+          (get-gradients [id mapping]
+            (->> mapping
+                 (filter (fn [[color data]]
+                           (= (get data "type") "gradient")))
+                 (mapv (partial data->gradient-def id))))
+
+          (join-color-layers [{:keys [id x y width height mapping] :as node} layers]
+            (l/trace :fn :join-color-layers :mapping mapping)
             (loop [result (-> (:svgdata (first layers))
                               (assoc "elements" []))
                    layers (seq layers)]
               (if-let [{:keys [color svgdata]} (first layers)]
                 (recur (->> (get svgdata "elements")
                             (filter #(= (get % "name") "g"))
-                            (map #(update % "attributes" assoc "fill" color))
+                            (map (partial set-path-color id color mapping))
                             (update result "elements" d/concat))
                        (rest layers))
 
                 ;; Now we have the result containing the svgdata of a
                 ;; SVG with all text layers. Now we need to transform
-                ;; this SVG to G (Group) and remove unnecesary metada
+                ;; this SVG to G (Group) and remove unnecessary metadata
                 ;; objects.
                 (let [vbox      (-> (get-in result ["attributes" "viewBox"])
                                     (parse-viewbox))
                       transform (str/fmt "translate(%s, %s) scale(%s, %s)" x y
                                          (/ width (:width vbox))
-                                         (/ height (:height vbox)))]
+                                         (/ height (:height vbox)))
+
+                      gradient-defs (get-gradients id mapping)
+
+                      elements
+                      (->> (get result "elements")
+                           (mapv (fn [group]
+                                   (let [paths (get group "elements")]
+                                     (if (= 1 (count paths))
+                                       (let [path (first paths)]
+                                         (update path "attributes"
+                                                 (fn [attrs]
+                                                   (-> attrs
+                                                       (d/merge (get group "attributes"))
+                                                       (update "transform" #(str transform " " %))))))
+                                       (update-in group ["attributes" "transform"] #(str transform " " %)))))))
+
+
+                      elements (cond->> elements
+                                 (not (empty? gradient-defs))
+                                 (d/concat [{"type" "element" "name" "defs" "attributes" {}
+                                             "elements" gradient-defs}]))]
+
                   (-> result
                       (assoc "name" "g")
                       (assoc "attributes" {})
-                      (update "elements" (fn [elements]
-                                           (mapv (fn [group]
-                                                   (let [paths (get group "elements")]
-                                                     (if (= 1 (count paths))
-                                                       (let [path (first paths)]
-                                                         (update path "attributes"
-                                                                 (fn [attrs]
-                                                                   (-> attrs
-                                                                       (d/merge (get group "attributes"))
-                                                                       (update "transform" #(str transform " " %))))))
-                                                       (update-in group ["attributes" "transform"] #(str transform " " %)))))
-                                                 elements))))))))
+                      (assoc "elements" elements))))))
 
           (convert-to-svg [ppmpath {:keys [colors] :as node}]
-            (log/trace :fn :convert-to-svg :ppmpath ppmpath :colors colors)
+            (l/trace :fn :convert-to-svg :ppmpath ppmpath :colors colors)
             (-> (p/all (map (partial generate-color-layer ppmpath) colors))
                 (p/then (partial join-color-layers node))))
 
           (trace-node [{:keys [data] :as node}]
-            (log/trace :fn :trace-node)
+            (l/trace :fn :trace-node)
             (p/let [tdpath  (sh/create-tmpdir! "svgexport-")
                     pngpath (path/join tdpath "origin.png")
                     _       (sh/write-file! pngpath data)
@@ -201,25 +258,28 @@
                          :svgdata svgdata))))
 
           (extract-element-attrs [^js element]
-            (let [^js attrs  (.. element -attributes)
-                  ^js colors (.. element -dataset -colors)]
-              #js {:id     (.. attrs -id -value)
-                   :x      (.. attrs -x -value)
-                   :y      (.. attrs -y -value)
-                   :width  (.. attrs -width -value)
-                   :height (.. attrs -height -value)
-                   :colors (.split colors ",")}))
+            (let [^js attrs   (.. element -attributes)
+                  ^js colors  (.. element -dataset -colors)
+                  ^js mapping (.. element -dataset -mapping)]
+              #js {:id      (.. attrs -id -value)
+                   :x       (.. attrs -x -value)
+                   :y       (.. attrs -y -value)
+                   :width   (.. attrs -width -value)
+                   :height  (.. attrs -height -value)
+                   :colors  (.split colors ",")
+                   :mapping (js/JSON.parse mapping)}))
 
           (extract-single-node [[shot node]]
-            (log/trace :fn :extract-single-node)
+            (l/trace :fn :extract-single-node)
 
             (p/let [attrs (bw/eval! node extract-element-attrs)]
-              {:id     (unchecked-get attrs "id")
-               :x      (unchecked-get attrs "x")
-               :y      (unchecked-get attrs "y")
-               :width  (unchecked-get attrs "width")
-               :height (unchecked-get attrs "height")
-               :colors (vec (unchecked-get attrs "colors"))
+              {:id      (unchecked-get attrs "id")
+               :x       (unchecked-get attrs "x")
+               :y       (unchecked-get attrs "y")
+               :width   (unchecked-get attrs "width")
+               :height  (unchecked-get attrs "height")
+               :colors  (vec (unchecked-get attrs "colors"))
+               :mapping (js->clj (unchecked-get attrs "mapping"))
                :data   shot}))
 
           (resolve-text-node [page node]
@@ -242,7 +302,7 @@
                 (p/then clean-temp-data)))
 
           (process-text-nodes [page]
-            (log/trace :fn :process-text-nodes)
+            (l/trace :fn :process-text-nodes)
             (-> (bw/select-all page "#screenshot foreignObject")
                 (p/then (fn [nodes] (p/all (map (partial process-text-node page) nodes))))))
 
@@ -285,7 +345,7 @@
           cookie (create-cookie uri token)
           rctx   {:cookie cookie
                   :uri (str uri)}]
-      (log/info :uri (:uri rctx))
+      (l/info :uri (:uri rctx))
       (bw/exec! (partial handle rctx)))))
 
 (s/def ::name ::us/string)
@@ -313,3 +373,4 @@
                         ".svg"))
      :length (alength content)
      :mime-type "image/svg+xml"}))
+

@@ -15,6 +15,7 @@
    [app.main.ui.dashboard.file-menu :refer [file-menu]]
    [app.main.ui.dashboard.import :refer [use-import-file]]
    [app.main.ui.dashboard.inline-edition :refer [inline-edition]]
+   [app.main.ui.dashboard.placeholder :refer [empty-placeholder loading-placeholder]]
    [app.main.ui.icons :as i]
    [app.main.worker :as wrk]
    [app.util.dom :as dom]
@@ -195,29 +196,16 @@
                         :on-edit on-edit
                         :on-menu-close on-menu-close}])]]]))
 
-(mf/defc empty-placeholder
-  [{:keys [dragging?] :as props}]
-  (if-not dragging?
-    [:div.grid-empty-placeholder
-     [:div.icon i/file-html]
-     [:div.text (tr "dashboard.empty-files")]]
-    [:div.grid-row.no-wrap
-     [:div.grid-item]]))
-
-(mf/defc loading-placeholder
-  []
-  [:div.grid-empty-placeholder
-   [:div.icon i/loader]
-   [:div.text (tr "dashboard.loading-files")]])
-
 (mf/defc grid
-  [{:keys [files project-id] :as props}]
-  (let [dragging? (mf/use-state false)
+  [{:keys [files project] :as props}]
+  (let [dragging?  (mf/use-state false)
+        project-id (:id project)
 
         on-finish-import
         (mf/use-callback
          (fn []
            (st/emit! (dd/fetch-files {:project-id project-id})
+                     (dd/fetch-shared-files)
                      (dd/clear-selected-files))))
 
         import-files (use-import-file project-id on-finish-import)
@@ -272,7 +260,7 @@
             :navigate? true}])]
 
        :else
-       [:& empty-placeholder])]))
+       [:& empty-placeholder {:default? (:is-default project)}])]))
 
 (mf/defc line-grid-row
   [{:keys [files selected-files on-load-more dragging?] :as props}]
@@ -330,15 +318,19 @@
          (tr "dashboard.show-all-files")]])]))
 
 (mf/defc line-grid
-  [{:keys [project-id team-id files on-load-more] :as props}]
+  [{:keys [project team files on-load-more] :as props}]
   (let [dragging?        (mf/use-state false)
+        project-id       (:id project)
+        team-id          (:id team)
+
         selected-files   (mf/deref refs/dashboard-selected-files)
         selected-project (mf/deref refs/dashboard-selected-project)
 
         on-finish-import
         (mf/use-callback
+         (mf/deps (:id team))
          (fn []
-           (st/emit! (dd/fetch-recent-files)
+           (st/emit! (dd/fetch-recent-files (:id team))
                      (dd/clear-selected-files))))
 
         import-files (use-import-file project-id on-finish-import)
@@ -376,7 +368,7 @@
         on-drop-success
         (fn []
           (st/emit! (dm/success (tr "dashboard.success-move-file"))
-                    (dd/fetch-recent-files)
+                    (dd/fetch-recent-files (:id team))
                     (dd/clear-selected-files)))
 
         on-drop
@@ -413,5 +405,6 @@
                           :dragging? @dragging?}]
 
        :else
-       [:& empty-placeholder {:dragging? @dragging?}])]))
+       [:& empty-placeholder {:dragging? @dragging?
+                              :default? (:is-default project)}])]))
 

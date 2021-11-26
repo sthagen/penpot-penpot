@@ -35,7 +35,7 @@ msgstr "Just wanna try it?"
 msgid "auth.demo-warning"
 msgstr ""
 "This is a DEMO service, DO NOT USE for real work, the projects will be "
-"periodicaly wiped."
+"periodically wiped."
 
 #: src/app/main/ui/auth/register.cljs, src/app/main/ui/auth/recovery_request.cljs, src/app/main/ui/auth/login.cljs
 msgid "auth.email"
@@ -67,7 +67,7 @@ msgstr "Great to see you again!"
 
 #: src/app/main/ui/auth/login.cljs
 msgid "auth.login-with-github-submit"
-msgstr "Login with Github"
+msgstr "Login with GitHub"
 
 #: src/app/main/ui/auth/login.cljs
 msgid "auth.login-with-gitlab-submit"
@@ -98,7 +98,7 @@ msgid "auth.notifications.invalid-token-error"
 msgstr "The recovery token is invalid."
 
 #: src/app/main/ui/auth/recovery.cljs
-msgid "auth.notifications.password-changed-succesfully"
+msgid "auth.notifications.password-changed-successfully"
 msgstr "Password successfully changed"
 
 #: src/app/main/ui/auth/recovery_request.cljs
@@ -111,7 +111,7 @@ msgstr "Password recovery link sent to your inbox."
 
 #: src/app/main/ui/auth/verify_token.cljs
 msgid "auth.notifications.team-invitation-accepted"
-msgstr "Joined the team succesfully"
+msgstr "Joined the team successfully"
 
 #: src/app/main/ui/auth/register.cljs, src/app/main/ui/auth/login.cljs
 msgid "auth.password"
@@ -196,6 +196,9 @@ msgstr "Can view"
 msgid "common.share-link.permissions-hint"
 msgstr "Anyone with link will have access"
 
+msgid "common.share-link.placeholder"
+msgstr "Shareable link will appear here"
+
 msgid "common.share-link.remove-link"
 msgstr "Remove link"
 
@@ -249,6 +252,14 @@ msgstr "Duplicate %s files"
 #: src/app/main/ui/dashboard/grid.cljs
 msgid "dashboard.empty-files"
 msgstr "You still have no files here"
+
+#: src/app/main/ui/dashboard/grid.cljs
+#, markdown
+msgid "dashboard.empty-placeholder-drafts"
+msgstr ""
+"There are no files here yet. If you want to try some templates you can go "
+"to the [Libraries & templates "
+"section](https://penpot.app/libraries-templates.html)"
 
 msgid "dashboard.export-frames"
 msgstr "Export artboards to PDF..."
@@ -327,7 +338,7 @@ msgid "dashboard.import.import-error"
 msgstr "There was a problem importing the file. The file wasn't imported."
 
 msgid "dashboard.import.import-message"
-msgstr "%s files have been imported succesfully."
+msgstr "%s files have been imported successfully."
 
 msgid "dashboard.import.progress.process-colors"
 msgstr "Processing colors"
@@ -1104,6 +1115,9 @@ msgstr "Name"
 msgid "labels.new-password"
 msgstr "New password"
 
+msgid "labels.next"
+msgstr "Next"
+
 #: src/app/main/ui/workspace/comments.cljs, src/app/main/ui/dashboard/comments.cljs
 msgid "labels.no-comments-available"
 msgstr "You have no pending comment notifications"
@@ -1454,7 +1468,7 @@ msgid "modals.leave-and-reassign.promote-and-leave"
 msgstr "Promote and leave"
 
 #: src/app/main/ui/dashboard/sidebar.cljs
-msgid "modals.leave-and-reassign.select-memeber-to-promote"
+msgid "modals.leave-and-reassign.select-member-to-promote"
 msgstr "Select a member to promote"
 
 #: src/app/main/ui/dashboard/sidebar.cljs
@@ -1533,6 +1547,26 @@ msgstr "Profile saved successfully!"
 msgid "notifications.validation-email-sent"
 msgstr "Verification email sent to %s. Check your email!"
 
+msgid "onboarding.choice.desc"
+msgstr "How do you want to start?"
+
+msgid "onboarding.choice.fly-solo"
+msgstr "Fly solo"
+
+msgid "onboarding.choice.fly-solo-desc"
+msgstr "Jump away into Penpot and start designing by your own."
+
+msgid "onboarding.choice.team-up"
+msgstr "Team up"
+
+msgid "onboarding.choice.team-up-desc"
+msgstr ""
+"Are you working with someone? Create a team and invite people to work "
+"together on projects and share design assets."
+
+msgid "onboarding.choice.title"
+msgstr "Welcome to Penpot"
+
 msgid "onboarding.contrib.alt"
 msgstr "Open Source"
 
@@ -1606,44 +1640,37 @@ msgstr ""
 msgid "onboarding.slide.3.title"
 msgstr "One shared source of truth"
 
-msgid "onboarding.team.create.button"
-msgstr "Create a team"
-
-msgid "onboarding.team.create.desc1"
-msgstr ""
-"Are you working with someone? Create a team to work together on projects "
-"and share design assets."
-
-msgid "onboarding.team.create.input-placeholder"
+msgid "onboarding.team-input-placeholder"
 msgstr "Enter new team name"
 
-msgid "onboarding.team.create.title"
-msgstr "Create team"
+msgid "onboarding.team.skip-and-invite-later"
+msgstr "Skip and invite later"
 
-msgid "onboarding.team.start.button"
-msgstr "Start right away"
+msgid "onboarding.templates.subtitle"
+msgstr "Here are some templates."
 
-msgid "onboarding.team.start.desc1"
-msgstr ""
-"Jump right away into Penpot and start designing by your own. You will still "
-"have the chance to create teams later."
-
-msgid "onboarding.team.start.title"
+msgid "onboarding.templates.title"
 msgstr "Start designing"
 
 msgid "onboarding.welcome.alt"
 msgstr "Penpot"
 
 msgid "onboarding.welcome.desc1"
-msgstr "We are very happy to introduce you to the very first Alpha release."
+msgstr "Hooray! You are already a Penpot user :)"
 
 msgid "onboarding.welcome.desc2"
 msgstr ""
-"Penpot is still at development stage and there will be constant updates. We "
-"hope you enjoy the first stable version."
+"Penpot is in its first beta version thanks to the combination of core "
+"features, maturity, stability and the amazing validation from the community "
+"as a whole, to which you are more than welcome."
+
+msgid "onboarding.welcome.desc3"
+msgstr ""
+"While you enjoy Penpot for what it is we will keep improving it, releasing "
+"iterations of our hopeful plans."
 
 msgid "onboarding.welcome.title"
-msgstr "Welcome to Penpot!"
+msgstr "Welcome to Penpot"
 
 #: src/app/main/ui/auth/recovery.cljs
 msgid "profile.recovery.go-to-login"
@@ -1961,7 +1988,7 @@ msgstr "Disable snap to grid"
 
 #: src/app/main/ui/workspace/header.cljs
 msgid "workspace.header.menu.enable-dynamic-alignment"
-msgstr "Enable dynamic aligment"
+msgstr "Enable dynamic alignment"
 
 #: src/app/main/ui/workspace/header.cljs
 msgid "workspace.header.menu.enable-scale-text"
@@ -2265,6 +2292,9 @@ msgstr "Auto"
 msgid "workspace.options.grid.column"
 msgstr "Columns"
 
+msgid "workspace.options.grid.params.color"
+msgstr "Color"
+
 #: src/app/main/ui/workspace/sidebar/options/menus/frame_grid.cljs
 msgid "workspace.options.grid.params.columns"
 msgstr "Columns"
@@ -2348,6 +2378,9 @@ msgstr "Group fill"
 #: src/app/main/ui/workspace/sidebar/options/menus/stroke.cljs
 msgid "workspace.options.group-stroke"
 msgstr "Group stroke"
+
+msgid "workspace.options.height"
+msgstr "Height"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
 msgid "workspace.options.interaction-action"
@@ -2456,6 +2489,10 @@ msgstr "Top right"
 #: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
 msgid "workspace.options.interaction-position"
 msgstr "Position"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-preserve-scroll"
+msgstr "Preserve scroll position"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
 msgid "workspace.options.interaction-prev-screen"
@@ -2569,6 +2606,9 @@ msgstr "Group layers"
 msgid "workspace.options.layer-options.title.multiple"
 msgstr "Selected layers"
 
+msgid "workspace.options.opacity"
+msgstr "Opacity"
+
 #: src/app/main/ui/workspace/sidebar/options/shapes/frame.cljs, src/app/main/ui/workspace/sidebar/options/menus/measures.cljs
 msgid "workspace.options.position"
 msgstr "Position"
@@ -2614,6 +2654,9 @@ msgstr "Selection stroke"
 #: src/app/main/ui/workspace/sidebar/options/menus/shadow.cljs
 msgid "workspace.options.shadow-options.blur"
 msgstr "Blur"
+
+msgid "workspace.options.shadow-options.color"
+msgstr "Shadow color"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/shadow.cljs
 msgid "workspace.options.shadow-options.drop-shadow"
@@ -2690,6 +2733,12 @@ msgstr "Square marker"
 #: src/app/main/ui/workspace/sidebar/options/menus/stroke.cljs
 msgid "workspace.options.stroke-cap.triangle-arrow"
 msgstr "Triangle arrow"
+
+msgid "workspace.options.stroke-color"
+msgstr "Stroke color"
+
+msgid "workspace.options.stroke-width"
+msgstr "Stroke width"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/stroke.cljs
 msgid "workspace.options.stroke.center"
@@ -2831,6 +2880,15 @@ msgstr "Vertical align"
 #: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
 msgid "workspace.options.use-play-button"
 msgstr "Use the play button at the header to run the prototype view."
+
+msgid "workspace.options.width"
+msgstr "Width"
+
+msgid "workspace.options.x"
+msgstr "X"
+
+msgid "workspace.options.y"
+msgstr "Y"
 
 msgid "workspace.path.actions.add-node"
 msgstr "Add node (%s)"
@@ -3188,3 +3246,12 @@ msgstr "Update"
 
 msgid "workspace.viewport.click-to-close-path"
 msgstr "Click to close the path"
+
+msgid "errors.team-leave.member-does-not-exists"
+msgstr "The member you try to assign does not exist."
+
+msgid "errors.team-leave.owner-cant-leave"
+msgstr "Owner can't leave team, you must reassign the owner role."
+
+msgid "errors.team-leave.insufficient-members"
+msgstr "Insufficient members to leave team, you probably want to delete it."

@@ -28,6 +28,7 @@
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.object :as obj]
    [app.util.router :as rt]
+   [beicon.core :as rx]
    [cljs.spec.alpha :as s]
    [goog.functions :as f]
    [rumext.alpha :as mf]))
@@ -230,11 +231,14 @@
 (mf/defc leave-and-reassign-modal
   {::mf/register modal/components
    ::mf/register-as ::leave-and-reassign}
-  [{:keys [members profile team accept]}]
+  [{:keys [team accept]}]
   (let [form        (fm/use-form :spec ::leave-modal-form :initial {})
-        members     (some->> members (filterv #(not= (:id %) (:id profile))))
+
+        members-map (mf/deref refs/dashboard-team-members)
+        members     (vals members-map)
+
         options     (into [{:value ""
-                            :label (tr "modals.leave-and-reassign.select-memeber-to-promote")}]
+                            :label (tr "modals.leave-and-reassign.select-member-to-promote")}]
                           (map #(hash-map :label (:name %) :value (str (:id %))) members))
 
         on-cancel   (st/emitf (modal/hide))
@@ -284,21 +288,39 @@
         members-map (mf/deref refs/dashboard-team-members)
         members     (vals members-map)
 
-        on-rename-clicked
-        (st/emitf (modal/show :team-form {:team team}))
-
-        on-leaved-success
+        on-success
         (fn []
-          (st/emit! (modal/hide)
-                    (dd/go-to-projects (:default-team-id profile))))
+          (st/emit! (dd/go-to-projects (:default-team-id profile))
+                    (modal/hide)
+                    (du/fetch-teams)))
+
+        on-error
+        (fn [{:keys [code] :as error}]
+          (condp = code
+            :no-enough-members-for-leave
+            (rx/of (dm/error (tr "errors.team-leave.insufficient-members")))
+
+            :member-does-not-exist
+            (rx/of (dm/error (tr "errors.team-leave.member-does-not-exists")))
+
+            :owner-cant-leave-team
+            (rx/of (dm/error (tr "errors.team-leave.owner-cant-leave")))
+
+            (rx/throw error)))
 
         leave-fn
-        (st/emitf (dd/leave-team (with-meta {} {:on-success on-leaved-success})))
-
-        leave-and-reassign-fn
         (fn [member-id]
-          (let [params {:reassign-to member-id}]
-            (st/emit! (dd/leave-team (with-meta params {:on-success on-leaved-success})))))
+          (let [params (cond-> {} (uuid? member-id) (assoc :reassign-to member-id))]
+            (st/emit! (dd/leave-team (with-meta params
+                                       {:on-success on-success
+                                        :on-error on-error})))))
+        delete-fn
+        (fn []
+          (st/emit! (dd/delete-team (with-meta team {:on-success on-success
+                                                     :on-error on-error}))))
+        on-rename-clicked
+        (fn []
+          (st/emit! (modal/show :team-form {:team team})))
 
         on-leave-clicked
         (st/emitf (modal/show
@@ -309,15 +331,13 @@
                     :on-accept leave-fn}))
 
         on-leave-as-owner-clicked
-        (st/emitf (modal/show
-                   {:type ::leave-and-reassign
-                    :profile profile
-                    :team team
-                    :members members
-                    :accept leave-and-reassign-fn}))
-
-        delete-fn
-        (st/emitf (dd/delete-team (with-meta team {:on-success on-leaved-success})))
+        (fn []
+          (st/emit! (dd/fetch-team-members)
+                    (modal/show
+                     {:type ::leave-and-reassign
+                      :profile profile
+                      :team team
+                      :accept leave-fn})))
 
         on-delete-clicked
         (st/emitf
@@ -335,14 +355,14 @@
      [:li {:on-click on-rename-clicked} (tr "labels.rename")]
 
      (cond
-       (:is-owner team)
+       (get-in team [:permissions :is-owner])
        [:li {:on-click on-leave-as-owner-clicked} (tr "dashboard.leave-team")]
 
        (> (count members) 1)
        [:li {:on-click on-leave-clicked}  (tr "dashboard.leave-team")])
 
 
-     (when (:is-owner team)
+     (when (get-in team [:permissions :is-owner])
        [:li {:on-click on-delete-clicked} (tr "dashboard.delete-team")])]))
 
 

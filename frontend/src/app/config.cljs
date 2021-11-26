@@ -57,8 +57,8 @@
 (defn- parse-flags
   [global]
   (let [flags (obj/get global "penpotFlags" "")
-        flags (into #{} (map keyword) (str/words flags))]
-    (flags/parse flags flags/default)))
+        flags (sequence (map keyword) (str/words flags))]
+    (flags/parse flags/default flags)))
 
 (defn- parse-version
   [global]
@@ -78,6 +78,7 @@
 (def translations         (obj/get global "penpotTranslations"))
 (def themes               (obj/get global "penpotThemes"))
 (def sentry-dsn           (obj/get global "penpotSentryDsn"))
+(def onboarding-form-id   (obj/get global "penpotOnboardingQuestionsFormId"))
 
 (def flags                (atom (parse-flags global)))
 (def version              (atom (parse-version global)))
@@ -85,7 +86,7 @@
 (def browser              (atom (parse-browser)))
 (def platform             (atom (parse-platform)))
 
-;; mantain for backward compatibility
+;; maintain for backward compatibility
 (let [login-with-ldap (obj/get global "penpotLoginWithLDAP" false)
       registration    (obj/get global "penpotRegistrationEnabled" true)]
   (when login-with-ldap

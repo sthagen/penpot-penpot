@@ -33,7 +33,6 @@
                     :role :editor
                     :profile-id (:id profile1)}]
 
-
       ;; invite external user without complaints
       (let [data (assoc data :email "foo@bar.com")
             out  (th/mutation! data)]
@@ -130,15 +129,16 @@
     (let [result (task {:max-age (dt/duration {:minutes 1})})]
       (t/is (nil? result)))
 
-    ;; query the list of projects of a after hard deletion
+    ;; query the list of projects after hard deletion
     (let [data {::th/type :projects
                 :team-id (:id team)
                 :profile-id (:id profile1)}
           out  (th/query! data)]
       ;; (th/print-result! out)
-      (t/is (nil? (:error out)))
-      (let [result (:result out)]
-        (t/is (= 0 (count result)))))
+      (let [error (:error out)
+            error-data (ex-data error)]
+        (t/is (th/ex-info? error))
+        (t/is (= (:type error-data) :not-found))))
 
     ;; run permanent deletion
     (let [result (task {:max-age (dt/duration 0)})]

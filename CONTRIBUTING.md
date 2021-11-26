@@ -19,9 +19,9 @@ If you found a bug, please report it, as far as possible with:
 - a browser and the browser version used
 - a dev tools console exception stack trace (if it is available)
 
-If you found a bug that you consider better discuse in private (for
+If you found a bug that you consider better discuss in private (for
 example: security bugs), consider first send an email to
-`info@penpot.app`.
+`support@penpot.app`.
 
 **We don't have formal bug bounty program for security reports; this
 is an open source application and your contribution will be recognized

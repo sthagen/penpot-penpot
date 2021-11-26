@@ -169,6 +169,7 @@
         overlay-pos-type     (:overlay-pos-type interaction)
         close-click-outside? (:close-click-outside interaction false)
         background-overlay?  (:background-overlay interaction false)
+        preserve-scroll?     (:preserve-scroll interaction false)
 
         extended-open? (mf/use-state false)
 
@@ -197,10 +198,27 @@
                 value (when (not= value "") (uuid/uuid value))]
             (update-interaction index #(cti/set-destination % value))))
 
+        change-preserve-scroll
+        (fn [event]
+          (let [value (-> event dom/get-target dom/checked?)]
+            (update-interaction index #(cti/set-preserve-scroll % value))))
+
         change-url
         (fn [event]
-          (let [value (-> event dom/get-target dom/get-value)]
-            (update-interaction index #(cti/set-url % value))))
+          (let [target      (dom/get-target event)
+                value       (dom/get-value target)
+                has-prefix? (or (str/starts-with? value "http://")
+                                (str/starts-with? value "https://"))
+                value       (if has-prefix?
+                              value
+                              (str "http://" value))]
+            (when-not has-prefix?
+              (dom/set-value! target value))
+            (if (dom/valid? target)
+              (do
+                (dom/remove-class! target "error")
+                (update-interaction index #(cti/set-url % value)))
+              (dom/add-class! target "error"))))
 
         change-overlay-pos-type
         (fn [event]
@@ -231,7 +249,7 @@
       [:div.interactions-summary {:on-click #(swap! extended-open? not)}
        [:div.trigger-name (event-type-name interaction)]
        [:div.action-summary (action-summary interaction destination)]]
-      [:div.elemen-set-actions {:on-click #(remove-interaction index)}
+      [:div.element-set-actions {:on-click #(remove-interaction index)}
        [:div.element-set-actions-button i/minus]]
 
       (when @extended-open?
@@ -252,11 +270,12 @@
          (when (cti/has-delay interaction)
            [:div.interactions-element
             [:span.element-set-subtitle.wide (tr "workspace.options.interaction-delay")]
-            [:div.input-element
+            [:div.input-element {:title (tr "workspace.options.interaction-ms")}
              [:> numeric-input {:ref ext-delay-ref
                                 :on-click (select-text ext-delay-ref)
                                 :on-change change-delay
-                                :value (:delay interaction)}]
+                                :value (:delay interaction)
+                                :title (tr "workspace.options.interaction-ms")}]
              [:span.after (tr "workspace.options.interaction-ms")]]])
 
          ; Action select
@@ -283,11 +302,24 @@
                           (not= (:id frame) (:frame-id shape))) ; nor a shape to its container frame
                  [:option {:value (str (:id frame))} (:name frame)]))]])
 
+         ; Preserve scroll
+         (when (cti/has-preserve-scroll interaction)
+           [:div.interactions-element
+            [:div.input-checkbox
+             [:input {:type "checkbox"
+                      :id (str "preserve-" index)
+                      :checked preserve-scroll?
+                      :on-change change-preserve-scroll}]
+             [:label {:for (str "preserve-" index)}
+              (tr "workspace.options.interaction-preserve-scroll")]]])
+
          ; URL
          (when (cti/has-url interaction)
            [:div.interactions-element
             [:span.element-set-subtitle.wide (tr "workspace.options.interaction-url")]
-            [:input.input-text {:default-value (str (:url interaction))
+            [:input.input-text {:type "url"
+                                :placeholder "http://example.com"
+                                :default-value (str (:url interaction))
                                 :on-blur change-url}]])
 
          (when (cti/has-overlay-opts interaction)

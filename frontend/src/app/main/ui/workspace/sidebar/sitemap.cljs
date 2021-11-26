@@ -82,10 +82,9 @@
 
         on-drop
         (mf/use-callback
-         (mf/deps id)
-         (fn [side {:keys [id] :as data}]
-           (let [index (if (= :bot side) (inc index) index)]
-             (st/emit! (dw/relocate-page id index)))))
+         (mf/deps id index)
+         (fn [_side {:keys [id] :as data}]
+           (st/emit! (dw/relocate-page id index))))
 
         on-duplicate
         (fn [_]

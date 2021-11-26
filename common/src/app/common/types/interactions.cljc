@@ -64,11 +64,12 @@
 (s/def ::url ::us/string)
 (s/def ::close-click-outside ::us/boolean)
 (s/def ::background-overlay ::us/boolean)
+(s/def ::preserve-scroll ::us/boolean)
 
 (defmulti action-opts-spec :action-type)
 
 (defmethod action-opts-spec :navigate [_]
-  (s/keys :req-un [::destination]))
+  (s/keys :opt-un [::destination ::preserve-scroll]))
 
 (defmethod action-opts-spec :open-overlay [_]
   (s/keys :req-un [::destination
@@ -85,7 +86,7 @@
                    ::background-overlay]))
 
 (defmethod action-opts-spec :close-overlay [_]
-  (s/keys :req-un [::destination]))
+  (s/keys :opt-un [::destination]))
 
 (defmethod action-opts-spec :prev-screen [_]
   (s/keys :req-un []))
@@ -113,7 +114,8 @@
 (def default-interaction
   {:event-type :click
    :action-type :navigate
-   :destination nil})
+   :destination nil
+   :preserve-scroll false})
 
 (def default-delay 600)
 
@@ -151,7 +153,8 @@
       :navigate
       (assoc interaction
              :action-type action-type
-             :destination (get interaction :destination))
+             :destination (get interaction :destination)
+             :preserve-scroll (get interaction :preserve-scroll false))
 
       (:open-overlay :toggle-overlay)
       (let [overlay-pos-type (get interaction :overlay-pos-type :center)
@@ -209,6 +212,17 @@
         (= (:action-type interaction) :toggle-overlay))
     (assoc :overlay-pos-type :center
            :overlay-position (gpt/point 0 0))))
+
+(defn has-preserve-scroll
+  [interaction]
+  (= (:action-type interaction) :navigate))
+
+(defn set-preserve-scroll
+  [interaction preserve-scroll]
+  (us/verify ::interaction interaction)
+  (us/verify ::us/boolean preserve-scroll)
+  (assert (has-preserve-scroll interaction))
+  (assoc interaction :preserve-scroll preserve-scroll))
 
 (defn has-url
   [interaction]
@@ -275,7 +289,7 @@
 
 (defn- calc-overlay-pos-initial
   [destination shape objects overlay-pos-type]
-  (if (= overlay-pos-type :manual)
+  (if (and (= overlay-pos-type :manual) (some? destination))
     (let [dest-frame   (get objects destination)
           overlay-size (:selrect dest-frame)
           orig-frame   (if (= (:type shape) :frame)

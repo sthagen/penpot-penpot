@@ -94,8 +94,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def initsql
-  (str "SET statement_timeout = 200000;\n"
-       "SET idle_in_transaction_session_timeout = 200000;"))
+  (str "SET statement_timeout = 300000;\n"
+       "SET idle_in_transaction_session_timeout = 300000;"))
 
 (defn- create-datasource-config
   [{:keys [metrics read-only] :or {read-only false} :as cfg}]
@@ -113,7 +113,7 @@
       (.setIdleTimeout 120000)       ;; 2min
       (.setMaxLifetime 1800000)      ;; 30min
       (.setMinimumIdle (:min-pool-size cfg 0))
-      (.setMaximumPoolSize (:max-pool-size cfg 30))
+      (.setMaximumPoolSize (:max-pool-size cfg 50))
       (.setConnectionInitSql initsql)
       (.setInitializationFailTimeout -1))
 

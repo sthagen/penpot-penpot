@@ -16,6 +16,7 @@
    [app.main.repo :as rp]
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.router :as rt]
+   [app.util.timers :as tm]
    [beicon.core :as rx]
    [cljs.spec.alpha :as s]
    [potok.core :as ptk]))
@@ -187,10 +188,12 @@
     (ptk/reify ::files-fetched
       ptk/UpdateEvent
       (update [_ state]
-        (update state :dashboard-files
-                (fn [state]
-                  (let [state (remove-project-files state)]
-                    (reduce #(assoc %1 (:id %2) %2) state files))))))))
+        (-> state
+            (update :dashboard-files
+                    (fn [state]
+                      (let [state (remove-project-files state)]
+                        (reduce #(assoc %1 (:id %2) %2) state files))))
+            (assoc-in [:dashboard-projects project-id :count] (count files)))))))
 
 (defn fetch-files
   [{:keys [project-id] :as params}]
@@ -235,13 +238,14 @@
             (update :dashboard-files d/merge files))))))
 
 (defn fetch-recent-files
-  []
-  (ptk/reify ::fetch-recent-files
-    ptk/WatchEvent
-    (watch [_ state _]
-      (let [team-id (:current-team-id state)]
-        (->> (rp/query :team-recent-files {:team-id team-id})
-             (rx/map recent-files-fetched))))))
+  ([] (fetch-recent-files nil))
+  ([team-id]
+   (ptk/reify ::fetch-recent-files
+     ptk/WatchEvent
+     (watch [_ state _]
+       (let [team-id (or team-id (:current-team-id state))]
+         (->> (rp/query :team-recent-files {:team-id team-id})
+              (rx/map recent-files-fetched)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Data Selection
@@ -296,6 +300,28 @@
              :or {on-success identity
                   on-error rx/throw}} (meta params)]
         (->> (rp/mutation! :create-team {:name name})
+             (rx/tap on-success)
+             (rx/map team-created)
+             (rx/catch on-error))))))
+
+;; --- EVENT: create-team-with-invitations
+
+;; NOTE: right now, it only handles a single email, in a near future
+;; this will be changed to the ability to specify multiple emails.
+
+(defn create-team-with-invitations
+  [{:keys [name email role] :as params}]
+  (us/assert string? name)
+  (ptk/reify ::create-team-with-invitations
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (let [{:keys [on-success on-error]
+             :or {on-success identity
+                  on-error rx/throw}} (meta params)
+            params {:name name
+                    :emails #{email}
+                    :role role}]
+        (->> (rp/mutation! :create-team-and-invite-members params)
              (rx/tap on-success)
              (rx/map team-created)
              (rx/catch on-error))))))
@@ -372,16 +398,13 @@
       (let [{:keys [on-success on-error]
              :or {on-success identity
                   on-error rx/throw}} (meta params)
-            team-id (:current-team-id state)]
-        (rx/concat
-         (when (uuid? reassign-to)
-           (->> (rp/mutation! :update-team-member-role {:team-id team-id
-                                                        :role :owner
-                                                        :member-id reassign-to})
-                (rx/ignore)))
-         (->> (rp/mutation! :leave-team {:id team-id})
-              (rx/tap on-success)
-              (rx/catch on-error)))))))
+            team-id (:current-team-id state)
+            params  (cond-> {:id team-id}
+                      (uuid? reassign-to)
+                      (assoc :reassign-to reassign-to))]
+        (->> (rp/mutation! :leave-team params)
+             (rx/tap #(tm/schedule on-success))
+             (rx/catch on-error))))))
 
 (defn invite-team-member
   [{:keys [email role] :as params}]

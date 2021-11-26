@@ -6,26 +6,16 @@
 
 (ns app.main.ui.onboarding
   (:require
-   [app.common.spec :as us]
    [app.config :as cf]
-   [app.main.data.dashboard :as dd]
-   [app.main.data.messages :as dm]
    [app.main.data.modal :as modal]
    [app.main.data.users :as du]
    [app.main.store :as st]
-   [app.main.ui.components.forms :as fm]
+   [app.main.ui.onboarding.questions]
+   [app.main.ui.onboarding.team-choice]
+   [app.main.ui.onboarding.templates]
    [app.main.ui.releases.common :as rc]
-   [app.main.ui.releases.v1-4]
-   [app.main.ui.releases.v1-5]
-   [app.main.ui.releases.v1-6]
-   [app.main.ui.releases.v1-7]
-   [app.main.ui.releases.v1-8]
-   [app.main.ui.releases.v1-9]
    [app.util.i18n :as i18n :refer [tr]]
-   [app.util.object :as obj]
-   [app.util.router :as rt]
    [app.util.timers :as tm]
-   [cljs.spec.alpha :as s]
    [rumext.alpha :as mf]))
 
 ;; --- ONBOARDING LIGHTBOX
@@ -38,10 +28,11 @@
    [:div.modal-right
     [:div.modal-title
      [:h2 (tr "onboarding.welcome.title")]]
-    [:span.release "Alpha version " (:main @cf/version)]
+    [:span.release "Beta version " (:main @cf/version)]
     [:div.modal-content
      [:p (tr "onboarding.welcome.desc1")]
-     [:p (tr "onboarding.welcome.desc2")]]
+     [:p (tr "onboarding.welcome.desc2")]
+     [:p (tr "onboarding.welcome.desc3")]]
     [:div.modal-navigation
      [:button.btn-secondary {:on-click next} (tr "labels.continue")]]]
    [:img.deco {:src "images/deco-left.png" :border "0"}]
@@ -159,7 +150,7 @@
         skip
         (mf/use-callback
          (st/emitf (modal/hide)
-                   (modal/show {:type :onboarding-team})
+                   (modal/show {:type :onboarding-choice})
                    (du/mark-onboarding-as-viewed)))]
 
     (mf/use-layout-effect
@@ -182,122 +173,3 @@
                 :slide @slide
                 :navigate navigate
                 :skip skip)))]]))
-
-(s/def ::name ::us/not-empty-string)
-(s/def ::team-form
-  (s/keys :req-un [::name]))
-
-(mf/defc onboarding-team-modal
-  {::mf/register modal/components
-   ::mf/register-as :onboarding-team}
-  []
-  (let [close (mf/use-fn (st/emitf (modal/hide)))
-        form  (fm/use-form :spec ::team-form
-                           :initial {})
-        on-success
-        (mf/use-callback
-         (fn [_form response]
-           (st/emit! (modal/hide)
-                     (rt/nav :dashboard-projects {:team-id (:id response)}))))
-
-        on-error
-        (mf/use-callback
-         (fn [_form _response]
-           (st/emit! (dm/error "Error on creating team."))))
-
-        on-submit
-        (mf/use-callback
-         (fn [form _event]
-           (let [mdata  {:on-success (partial on-success form)
-                         :on-error   (partial on-error form)}
-                 params {:name (get-in @form [:clean-data :name])}]
-             (st/emit! (dd/create-team (with-meta params mdata))))))]
-
-    [:div.modal-overlay
-     [:div.modal-container.onboarding.final.animated.fadeInUp
-      [:div.modal-left
-       [:img {:src "images/onboarding-team.jpg" :border "0" :alt (tr "onboarding.team.create.title")}]
-       [:h2 (tr "onboarding.team.create.title")]
-       [:p (tr "onboarding.team.create.desc1")]
-
-       [:& fm/form {:form form
-                    :on-submit on-submit}
-        [:& fm/input {:type "text"
-                   :name :name
-                   :label (tr "onboarding.team.create.input-placeholder")}]
-        [:& fm/submit-button
-         {:label (tr "onboarding.team.create.button")}]]]
-
-      [:div.modal-right
-       [:img {:src "images/onboarding-start.jpg" :border "0" :alt (tr "onboarding.team.start.title")}]
-       [:h2 (tr "onboarding.team.start.title")]
-       [:p (tr "onboarding.team.start.desc1")]
-       [:button.btn-primary.btn-large {:on-click close} (tr "onboarding.team.start.button")]]
-
-
-      [:img.deco {:src "images/deco-left.png" :border "0"}]
-      [:img.deco.right {:src "images/deco-right.png" :border "0"}]]]))
-
-
-;;; --- RELEASE NOTES MODAL
-
-(mf/defc release-notes
-  [{:keys [version] :as props}]
-  (let [slide (mf/use-state :start)
-        klass (mf/use-state "fadeInDown")
-
-        navigate
-        (mf/use-callback #(reset! slide %))
-
-        next
-        (mf/use-callback
-         (mf/deps slide)
-         (fn []
-           (if (= @slide :start)
-             (navigate 0)
-             (navigate (inc @slide)))))
-
-        finish
-        (mf/use-callback
-         (st/emitf (modal/hide)
-                   (du/mark-onboarding-as-viewed {:version version})))
-        ]
-
-    (mf/use-effect
-     (mf/deps)
-     (fn []
-       (st/emitf (du/mark-onboarding-as-viewed {:version version}))))
-
-    (mf/use-layout-effect
-     (mf/deps @slide)
-     (fn []
-       (when (not= :start @slide)
-         (reset! klass "fadeIn"))
-       (let [sem (tm/schedule 300 #(reset! klass nil))]
-         (fn []
-           (reset! klass nil)
-           (tm/dispose! sem)))))
-
-    (rc/render-release-notes
-     {:next next
-      :navigate navigate
-      :finish finish
-      :klass klass
-      :slide slide
-      :version version})))
-
-(mf/defc release-notes-modal
-  {::mf/wrap-props false
-   ::mf/register modal/components
-   ::mf/register-as :release-notes}
-  [props]
-  (let [versions (methods rc/render-release-notes)
-        version  (obj/get props "version")]
-    (when (contains? versions version)
-      [:div.relnotes
-       [:> release-notes props]])))
-
-(defmethod rc/render-release-notes "0.0"
-  [params]
-  (rc/render-release-notes (assoc params :version "1.9")))
-

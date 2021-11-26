@@ -69,6 +69,7 @@
 
         stroke-opacity (when-not (:stroke-color-gradient shape)
                          (:stroke-opacity shape))]
+
     [:*
       (when (or (= cap-start :line-arrow) (= cap-end :line-arrow))
         [:marker {:id (str marker-id-prefix "-line-arrow")
@@ -160,26 +161,27 @@
 
 (mf/defc stroke-defs
   [{:keys [shape render-id]}]
-  (when (or (not= (:type shape) :path)
-            (not (gsh/open-path? shape)))
+
+  (let [open-path? (and (= :path (:type shape)) (gsh/open-path? shape))]
     (cond
-      (and (= :inner (:stroke-alignment shape :center))
+      (and (not open-path?)
+           (= :inner (:stroke-alignment shape :center))
            (> (:stroke-width shape 0) 0))
       [:& inner-stroke-clip-path {:shape shape
                                   :render-id render-id}]
 
-      (and (= :outer (:stroke-alignment shape :center))
+      (and (not open-path?)
+           (= :outer (:stroke-alignment shape :center))
            (> (:stroke-width shape 0) 0))
       [:& outer-stroke-mask {:shape shape
                              :render-id render-id}]
 
-      (and (or (some? (:stroke-cap-start shape))
-               (some? (:stroke-cap-end shape)))
-           (= (:stroke-alignment shape) :center))
+      (or (some? (:stroke-cap-start shape))
+          (some? (:stroke-cap-end shape)))
       [:& cap-markers {:shape shape
                        :render-id render-id}])))
 
-;; Outer alingmnent: display the shape in two layers. One
+;; Outer alignment: display the shape in two layers. One
 ;; without stroke (only fill), and another one only with stroke
 ;; at double width (transparent fill) and passed through a mask
 ;; that shows the whole shape, but hides the original shape

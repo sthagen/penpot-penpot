@@ -37,10 +37,15 @@
 
 (sv/defmethod ::profile {:auth false}
   [{:keys [pool] :as cfg} {:keys [profile-id] :as params}]
-  (if profile-id
-    (retrieve-profile pool profile-id)
-    {:id uuid/zero
-     :fullname "Anonymous User"}))
+
+  ;; We need to return the anonymous profile object in two cases, when
+  ;; no profile-id is in session, and when db call raises not found. In all other
+  ;; cases we need to reraise the exception.
+  (or (ex/try*
+       #(some->> profile-id (retrieve-profile pool))
+       #(when (not= :not-found (:type (ex-data %))) (throw %)))
+      {:id uuid/zero
+       :fullname "Anonymous User"}))
 
 (def ^:private sql:default-profile-team
   "select t.id, name
@@ -87,13 +92,9 @@
 
 (defn retrieve-profile
   [conn id]
-  (let [profile (some->> (retrieve-profile-data conn id)
-                         (strip-private-attrs)
-                         (populate-additional-data conn))]
-    (when (nil? profile)
-      (ex/raise :type :not-found
-                :hint "Object doest not exists."))
-
+  (let [profile (->> (retrieve-profile-data conn id)
+                     (strip-private-attrs)
+                     (populate-additional-data conn))]
     (update profile :props filter-profile-props)))
 
 (def ^:private sql:profile-by-email
@@ -110,6 +111,6 @@
 ;; --- Attrs Helpers
 
 (defn strip-private-attrs
-  "Only selects a publicy visible profile attrs."
+  "Only selects a publicly visible profile attrs."
   [row]
   (dissoc row :password :deleted-at))

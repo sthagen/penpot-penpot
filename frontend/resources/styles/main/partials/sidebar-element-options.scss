@@ -70,12 +70,6 @@
       width: 100%;
       align-items: center;
     }
-
-    &:hover {
-      .element-set-title {
-        color: $color-gray-10;
-      }
-    }
   }
 
   .element-list {
@@ -207,6 +201,9 @@
       border-color: $color-gray-40;
     }
 
+    &.error {
+      border-color: $color-danger;
+    }
   }
 
   .input-select {

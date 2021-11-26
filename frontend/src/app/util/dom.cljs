@@ -28,17 +28,6 @@
   [e]
   (.-target e))
 
-(defn classnames
-  [& params]
-  (assert (even? (count params)))
-  (str/join " " (reduce (fn [acc [k v]]
-                          (if (true? (boolean v))
-                            (conj acc (name k))
-                            acc))
-                        []
-                        (partition 2 params))))
-
-
 ;; --- New methods
 
 (defn set-html-title
@@ -55,7 +44,7 @@
     (.insertAdjacentHTML head "beforeend"
                          (str "<style>"
                               "  @page {" style-str "}"
-                              "  html, body {"            ; Fix issue having Chromium to add random 1px marging at the bottom
+                              "  html, body {"            ; Fix issue having Chromium to add random 1px margin at the bottom
                               "    overflow: hidden;"     ; https://github.com/puppeteer/puppeteer/issues/2278#issuecomment-410381934
                               "    font-size: 0;"
                               "  }"
@@ -92,7 +81,7 @@
 
 (defn get-current-target
   "Extract the current target from event instance (different from target
-   when event triggered in a child of the suscribing element)."
+   when event triggered in a child of the subscribing element)."
   [event]
   (.-currentTarget event))
 
@@ -177,7 +166,7 @@
 
 (defn append-child!
   [el child]
-  (.appendChild el child))
+  (.appendChild ^js el child))
 
 (defn get-first-child
   [el]
@@ -252,7 +241,7 @@
 
     :else
     (ex/raise :type :not-supported
-              :hint "seems like the current browset does not support fullscreen api.")))
+              :hint "seems like the current browser does not support fullscreen api.")))
 
 (defn ^boolean blob?
   [v]
@@ -288,14 +277,33 @@
   (-> event get-target (.setPointerCapture (.-pointerId event))))
 
 (defn release-pointer [event]
-  (-> event get-target (.releasePointerCapture (.-pointerId event))))
+  (when (.-pointerId event)
+    (-> event get-target (.releasePointerCapture (.-pointerId event)))))
 
 (defn get-root []
   (query globals/document "#app"))
 
+(defn classnames
+  [& params]
+  (assert (even? (count params)))
+  (str/join " " (reduce (fn [acc [k v]]
+                          (if (true? (boolean v))
+                            (conj acc (name k))
+                            acc))
+                        []
+                        (partition 2 params))))
+
 (defn ^boolean class? [node class-name]
   (let [class-list (.-classList ^js node)]
     (.contains ^js class-list class-name)))
+
+(defn add-class! [node class-name]
+  (let [class-list (.-classList ^js node)]
+    (.add ^js class-list class-name)))
+
+(defn remove-class! [node class-name]
+  (let [class-list (.-classList ^js node)]
+    (.remove ^js class-list class-name)))
 
 (defn child? [node1 node2]
   (.contains ^js node2 ^js node1))
@@ -331,6 +339,14 @@
 
 (defn remove-attribute [^js node ^string attr]
   (.removeAttribute node attr))
+
+(defn get-scroll-pos
+  [element]
+  (.-scrollTop ^js element))
+
+(defn set-scroll-pos!
+  [element scroll]
+  (obj/set! ^js element "scrollTop" scroll))
 
 (defn scroll-into-view!
   ([element]
@@ -395,13 +411,15 @@
   (let [event  (.-nativeEvent ^js bevent)]
     (= 1 (.-which event))))
 
+;; Warning: need to protect against reverse tabnabbing attack
+;; https://www.comparitech.com/blog/information-security/reverse-tabnabbing/
 (defn open-new-window
   ([uri]
-   (open-new-window uri "_blank"))
+   (open-new-window uri "_blank" "noopener,noreferrer"))
   ([uri name]
-   ;; Warning: need to protect against reverse tabnabbing attack
-   ;; https://www.comparitech.com/blog/information-security/reverse-tabnabbing/
-   (.open js/window (str uri) name "noopener,noreferrer")))
+   (open-new-window uri name "noopener,noreferrer"))
+  ([uri name features]
+   (.open js/window (str uri) name features)))
 
 (defn browser-back
   []

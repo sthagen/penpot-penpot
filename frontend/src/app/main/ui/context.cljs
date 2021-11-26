@@ -11,8 +11,13 @@
 (def render-ctx (mf/create-context nil))
 (def def-ctx (mf/create-context false))
 
-(def current-route (mf/create-context nil))
-(def current-team-id (mf/create-context nil))
+;; This content is used to replace complex colors to simple ones
+;; for text shapes in the export process
+(def text-plain-colors-ctx (mf/create-context false))
+
+(def current-route      (mf/create-context nil))
+(def current-profile    (mf/create-context nil))
+(def current-team-id    (mf/create-context nil))
 (def current-project-id (mf/create-context nil))
-(def current-page-id (mf/create-context nil))
-(def current-file-id (mf/create-context nil))
+(def current-page-id    (mf/create-context nil))
+(def current-file-id    (mf/create-context nil))

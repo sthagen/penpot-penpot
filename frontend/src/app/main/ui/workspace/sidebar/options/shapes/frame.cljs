@@ -87,7 +87,7 @@
       ;; WIDTH & HEIGHT
       [:div.row-flex
        [:span.element-set-subtitle (tr "workspace.options.size")]
-       [:div.input-element.pixels
+       [:div.input-element.pixels {:title (tr "workspace.options.width")}
         [:> numeric-input {:min 1
                            :on-click select-all
                            :on-change on-width-change
@@ -95,7 +95,7 @@
                                       (math/precision 2)
                                       (d/coalesce-str "1"))}]]
 
-       [:div.input-element.pixels
+       [:div.input-element.pixels {:title (tr "workspace.options.height")}
         [:> numeric-input {:min 1
                            :on-click select-all
                            :on-change on-height-change
@@ -112,14 +112,14 @@
       ;; POSITION
       [:div.row-flex
        [:span.element-set-subtitle (tr "workspace.options.position")]
-       [:div.input-element.pixels
+       [:div.input-element.pixels {:title (tr "workspace.options.x")}
         [:> numeric-input {:placeholder "x"
                            :on-click select-all
                            :on-change on-pos-x-change
                            :value (-> (:x shape)
                                       (math/precision 2)
                                       (d/coalesce-str "0"))}]]
-       [:div.input-element.pixels
+       [:div.input-element.pixels {:title (tr "workspace.options.y")}
         [:> numeric-input {:placeholder "y"
                            :on-click select-all
                            :on-change on-pos-y-change
@@ -199,6 +199,11 @@
    {:name "Surface Pro 4/5/6/7"
     :width 1368
     :height 912}
+
+   {:name "ReMarkable"}
+   {:name "Remarkable 2"
+    :width 840
+    :height 1120}
 
    {:name "WEB"}
    {:name "Web 1280"
@@ -280,13 +285,13 @@
    {:name "Twitter post"
     :width 1024
     :height 512}
-   {:name "Youtube profile"
+   {:name "YouTube profile"
     :width 800
     :height 800}
-   {:name "Youtube banner"
+   {:name "YouTube banner"
     :width 2560
     :height 1440}
-   {:name "Youtube thumb"
+   {:name "YouTube thumb"
     :width 1280
     :height 720}
    ])
@@ -313,4 +318,3 @@
      [:& blur-menu {:ids ids
                     :values (select-keys shape [:blur])}]
      [:& frame-grid {:shape shape}]]))
-

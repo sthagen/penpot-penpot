@@ -13,7 +13,6 @@
    [app.db :as db]
    [app.loggers.audit :as audit]
    [app.rpc.mutations.profile :as profile]
-   [app.setup.initial-data :as sid]
    [app.util.services :as sv]
    [app.util.time :as dt]
    [buddy.core.codecs :as bc]
@@ -34,10 +33,11 @@
         params   {:id id
                   :email email
                   :fullname fullname
-                  :is-demo true
+                  :is-active true
                   :deleted-at (dt/in-future cf/deletion-delay)
                   :password password
-                  :props {:onboarding-viewed true}}]
+                  :props {}
+                  }]
 
     (when-not (contains? cf/flags :demo-users)
       (ex/raise :type :validation
@@ -46,8 +46,7 @@
 
     (db/with-atomic [conn pool]
       (->> (#'profile/create-profile conn params)
-           (#'profile/create-profile-relations conn)
-           (sid/load-initial-project! conn))
+           (#'profile/create-profile-relations conn))
 
       (with-meta {:email email
                   :password password}
