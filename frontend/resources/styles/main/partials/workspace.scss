@@ -18,7 +18,6 @@
   top: 40px;
   width: 240px;
   z-index: 12;
-  padding: $size-1 0;
 
   li {
     align-items: center;
@@ -35,11 +34,11 @@
       margin: 2px;
     }
 
-    span:first-child {
+    span {
       color: $color-gray-60;
     }
 
-    span:last-child {
+    span.shortcut {
       color: $color-gray-20;
       font-size: $fs12;
     }
@@ -57,7 +56,40 @@
         height: 10px;
       }
     }
+  }
 
+  .icon-menu-item {
+    display: flex;
+    justify-content: flex-start;
+
+    &:hover {
+      background-color: $color-primary-lighter;
+    }
+
+    span.title {
+      margin-left: 5px;
+    }
+
+    .selected-icon {
+      svg {
+        width: 10px;
+        height: 10px;
+      }
+    }
+
+    .shape-icon {
+      margin-left: 3px;
+      svg {
+        width: 13px;
+        height: 13px;
+      }
+    }
+
+    .icon-wrapper {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin: 0;
+    }
   }
 }
 
@@ -106,10 +138,10 @@
   .coordinates {
     background-color: $color-dark-bg;
     border-radius: $br-small;
-    bottom: -10px;
+    bottom: 0px;
     padding-left: 5px;
     position: fixed;
-    right: calc(#{$width-settings-bar} + 10px);
+    right: calc(#{$width-settings-bar} + 14px);
     text-align: center;
     width: 125px;
     white-space: nowrap;
@@ -182,10 +214,10 @@
     .viewport-controls {
       position: absolute;
     }
-
   }
 
-  .page-canvas, .page-layout {
+  .page-canvas,
+  .page-layout {
     overflow: visible;
   }
 
@@ -225,7 +257,6 @@
       stroke: $color-gray-20;
     }
   }
-
 }
 
 .workspace-frame-label {
@@ -234,27 +265,20 @@
 }
 
 .multiuser-cursor {
-  align-items: center;
-  display: flex;
-  left: 0;
-  position: absolute;
-  top: 0;
   z-index: 10000;
+  pointer-events: none;
+}
 
-  svg {
-    height: 15px;
-    fill: #f3dd14;
-    width: 15px;
-  }
-
-  span {
-    background-color: #f3dd14;
-    border-radius: $br-small;
-    color: $color-black;
-    font-size: $fs12;
-    margin-left: $size-2;
-    padding: $size-1;
-  }
+.profile-name {
+  width: fit-content;
+  font-family: worksans;
+  padding: 2px 12px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  height: 20px;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .viewport-actions {
@@ -343,4 +367,3 @@
     margin-right: 0;
   }
 }
-

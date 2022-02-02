@@ -25,13 +25,13 @@
   [cfg {:keys [host id public-uri] :as event}]
   (try
     (let [uri  (:uri cfg)
-          text (str "Exception on (host: " host ", url: " public-uri "/dbg/error-by-id/" id ")\n"
+          text (str "Exception on (host: " host ", url: " public-uri "/dbg/error/" id ")\n"
                     (when-let [pid (:profile-id event)]
                       (str "- profile-id: #uuid-" pid "\n")))
           rsp  (http/send! {:uri uri
                             :method :post
                             :headers {"content-type" "application/json"}
-                            :body (json/encode-str {:text text})})]
+                            :body (json/write-str {:text text})})]
       (when (not= (:status rsp) 200)
         (l/error :hint "error on sending data to mattermost"
                  :response (pr-str rsp))))
@@ -62,7 +62,8 @@
   (when uri
     (l/info :msg "initializing mattermost error reporter" :uri uri)
     (let [output (a/chan (a/sliding-buffer 128)
-                         (filter #(= (:level %) "error")))]
+                         (filter (fn [event]
+                                   (= (:logger/level event) "error"))))]
       (receiver :sub output)
       (a/go-loop []
         (let [msg (a/<! output)]

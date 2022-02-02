@@ -1753,7 +1753,7 @@ msgid "viewer.frame-not-found"
 msgstr "Keine Zeichenfläche gefunden."
 
 msgid "viewer.header.comments-section"
-msgstr "Kommentare"
+msgstr "Kommentare (%s)"
 
 #: src/app/main/ui/viewer/header.cljs
 msgid "viewer.header.dont-show-interactions"
@@ -1767,15 +1767,15 @@ msgstr "Seite bearbeiten"
 msgid "viewer.header.fullscreen"
 msgstr "Vollbildmodus"
 
-msgid "viewer.header.handsoff-section"
-msgstr "Übergabe"
+msgid "viewer.header.handoff-section"
+msgstr "Übergabe (%s)"
 
 #: src/app/main/ui/viewer/header.cljs
 msgid "viewer.header.interactions"
 msgstr "Interaktionen"
 
 msgid "viewer.header.interactions-section"
-msgstr "Interaktionen"
+msgstr "Interaktionen (%s)"
 
 #: src/app/main/ui/viewer/header.cljs
 msgid "viewer.header.share.copy-link"
@@ -1811,35 +1811,35 @@ msgstr "Sitemap"
 
 #: src/app/main/ui/workspace/sidebar/align.cljs
 msgid "workspace.align.hcenter"
-msgstr "Zentrieren (horizontal)"
+msgstr "Zentrieren (horizontal) (%s)"
 
 #: src/app/main/ui/workspace/sidebar/align.cljs
 msgid "workspace.align.hdistribute"
-msgstr "Horizontal verteilen"
+msgstr "Horizontal verteilen (%s)"
 
 #: src/app/main/ui/workspace/sidebar/align.cljs
 msgid "workspace.align.hleft"
-msgstr "Linksbündig ausrichten"
+msgstr "Linksbündig ausrichten (%s)"
 
 #: src/app/main/ui/workspace/sidebar/align.cljs
 msgid "workspace.align.hright"
-msgstr "Rechtsbündig ausrichten"
+msgstr "Rechtsbündig ausrichten (%s)"
 
 #: src/app/main/ui/workspace/sidebar/align.cljs
 msgid "workspace.align.vbottom"
-msgstr "Unten ausrichten"
+msgstr "Unten ausrichten (%s)"
 
 #: src/app/main/ui/workspace/sidebar/align.cljs
 msgid "workspace.align.vcenter"
-msgstr "Mittig ausrichten (vertikal)"
+msgstr "Mittig ausrichten (vertikal) (%s)"
 
 #: src/app/main/ui/workspace/sidebar/align.cljs
 msgid "workspace.align.vdistribute"
-msgstr "Vertikal verteilen"
+msgstr "Vertikal verteilen (%s)"
 
 #: src/app/main/ui/workspace/sidebar/align.cljs
 msgid "workspace.align.vtop"
-msgstr "Oben ausrichten"
+msgstr "Oben ausrichten (%s)"
 
 #: src/app/main/ui/workspace/sidebar/assets.cljs
 msgid "workspace.assets.assets"
@@ -3076,7 +3076,7 @@ msgstr "Bild (%s)"
 
 #: src/app/main/ui/workspace/left_toolbar.cljs
 msgid "workspace.toolbar.move"
-msgstr "Verschieben"
+msgstr "Verschieben (%s)"
 
 #: src/app/main/ui/workspace/left_toolbar.cljs
 msgid "workspace.toolbar.path"

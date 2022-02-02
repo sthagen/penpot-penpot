@@ -16,6 +16,7 @@
    [app.main.ui.icons :as i]
    [app.util.dom :as dom]
    [app.util.i18n :as i18n :refer [tr]]
+   [cuerdas.core :as str]
    [rumext.alpha :as mf]))
 
 (mf/defc header
@@ -63,11 +64,13 @@
        (if (:edition @local)
          [:& inline-edition {:content (:name project)
                              :on-end (fn [name]
-                                       (st/emit! (-> (dd/rename-project (assoc project :name name))
-                                                     (with-meta {::ev/origin "project"})))
-                                       (swap! local assoc :edition false))}]
+                                       (let [name (str/trim name)]
+                                         (when-not (str/empty? name)
+                                           (st/emit! (-> (dd/rename-project (assoc project :name name))
+                                                         (with-meta {::ev/origin "project"}))))
+                                         (swap! local assoc :edition false)))}]
          [:div.dashboard-title
-          [:h1 {:on-double-click on-edit}
+          [:h1 {:on-double-click on-edit :data-test "project-title"}
            (:name project)]]))
 
      [:& project-menu {:project project
@@ -79,7 +82,7 @@
                        :on-import on-import}]
 
      [:div.dashboard-header-actions
-      [:a.btn-secondary.btn-small {:on-click on-create-clicked}
+      [:a.btn-secondary.btn-small {:on-click on-create-clicked :data-test "new-file"}
        (tr "dashboard.new-file")]
 
       (when-not (:is-default project)

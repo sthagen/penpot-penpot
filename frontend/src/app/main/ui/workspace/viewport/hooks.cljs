@@ -121,7 +121,7 @@
              (->> move-stream
                   ;; When transforming shapes we stop querying the worker
                   (rx/filter #(not (some? (mf/ref-val transform-ref))))
-                  (rx/switch-map query-point))
+                  (rx/merge-map query-point))
 
              (->> move-stream
                   ;; When transforming shapes we stop querying the worker
@@ -162,31 +162,40 @@
              remove-xfm (mapcat #(cp/get-parents % objects))
              remove-id? (cond-> (into #{} remove-xfm selected)
                           @ctrl?
-                          (d/concat (filterv is-group? ids)))
+                          (into (filter is-group?) ids))
 
-             ids (->> ids (filterv (comp not remove-id?)))
-
-             hover-shape (get objects (first ids))]
-
+             hover-shape (->> ids
+                              (filterv (comp not remove-id?))
+                              (first)
+                              (get objects))]
          (reset! hover hover-shape)
          (reset! hover-ids ids))))))
 
-(defn setup-viewport-modifiers [modifiers selected objects render-ref]
-  (let [roots (mf/use-memo
-               (mf/deps objects selected)
-               (fn []
-                 (let [roots-ids (cp/clean-loops objects selected)]
-                   (->> roots-ids (mapv #(get objects %))))))]
+(defn setup-viewport-modifiers
+  [modifiers objects]
+  (let [transforms
+        (mf/use-memo
+         (mf/deps modifiers)
+         (fn []
+           (d/mapm (fn [id {modifiers :modifiers}]
+                     (let [center (gsh/center-shape (get objects id))]
+                       (gsh/modifiers->transform center modifiers)))
+                   modifiers)))
+
+        shapes
+        (mf/use-memo
+         (mf/deps transforms)
+         (fn []
+           (->> (keys transforms)
+                (mapv (d/getf objects)))))]
 
     ;; Layout effect is important so the code is executed before the modifiers
     ;; are applied to the shape
     (mf/use-layout-effect
-     (mf/deps modifiers roots)
-
-     #(when-let [render-node (mf/ref-val render-ref)]
-        (if modifiers
-          (utils/update-transform render-node roots modifiers)
-          (utils/remove-transform render-node roots))))))
+     (mf/deps transforms)
+     (fn []
+       (utils/update-transform shapes transforms modifiers)
+       #(utils/remove-transform shapes)))))
 
 (defn inside-vbox [vbox objects frame-id]
   (let [frame (get objects frame-id)]

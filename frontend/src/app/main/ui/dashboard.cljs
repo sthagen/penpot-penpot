@@ -8,6 +8,7 @@
   (:require
    [app.common.spec :as us]
    [app.main.data.dashboard :as dd]
+   [app.main.data.dashboard.shortcuts :as sc]
    [app.main.refs :as refs]
    [app.main.store :as st]
    [app.main.ui.context :as ctx]
@@ -20,6 +21,7 @@
    [app.main.ui.dashboard.search :refer [search-page]]
    [app.main.ui.dashboard.sidebar :refer [sidebar]]
    [app.main.ui.dashboard.team :refer [team-settings-page team-members-page]]
+   [app.main.ui.hooks :as hooks]
    [rumext.alpha :as mf]))
 
 (defn ^boolean uuid-str?
@@ -74,9 +76,8 @@
      nil)])
 
 (mf/defc dashboard
-  [{:keys [route] :as props}]
-  (let [profile      (mf/deref refs/profile)
-        section      (get-in route [:data :name])
+  [{:keys [route profile] :as props}]
+  (let [section      (get-in route [:data :name])
         params       (parse-params route)
 
         project-id   (:project-id params)
@@ -89,10 +90,10 @@
         projects     (mf/deref refs/dashboard-projects)
         project      (get projects project-id)]
 
-    (mf/use-effect
-     (mf/deps team-id)
-     (fn []
-       (st/emit! (dd/initialize {:id team-id}))))
+    (hooks/use-shortcuts ::dashboard sc/shortcuts)
+
+    (mf/with-effect [team-id]
+      (st/emit! (dd/initialize {:id team-id})))
 
     [:& (mf/provider ctx/current-team-id) {:value team-id}
      [:& (mf/provider ctx/current-project-id) {:value project-id}

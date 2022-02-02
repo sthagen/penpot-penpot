@@ -17,96 +17,73 @@
    [clojure.spec.alpha :as s]
    [integrant.core :as ig]
    [reitit.ring :as rr]
-   [ring.adapter.jetty9 :as jetty])
+   [yetti.adapter :as yt])
   (:import
    org.eclipse.jetty.server.Server
-   org.eclipse.jetty.server.handler.ErrorHandler
    org.eclipse.jetty.server.handler.StatisticsHandler))
 
-(declare router-handler)
+(declare wrap-router)
 
 (s/def ::handler fn?)
 (s/def ::router some?)
-(s/def ::ws (s/map-of ::us/string fn?))
 (s/def ::port ::us/integer)
+(s/def ::host ::us/string)
 (s/def ::name ::us/string)
 
 (defmethod ig/pre-init-spec ::server [_]
   (s/keys :req-un [::port]
-          :opt-un [::ws ::name ::mtx/metrics ::router ::handler]))
+          :opt-un [::name ::mtx/metrics ::router ::handler ::host]))
 
 (defmethod ig/prep-key ::server
   [_ cfg]
   (merge {:name "http"} (d/without-nils cfg)))
 
+(defn- instrument-metrics
+  [^Server server metrics]
+  (let [stats (doto (StatisticsHandler.)
+                (.setHandler (.getHandler server)))]
+    (.setHandler server stats)
+    (mtx/instrument-jetty! (:registry metrics) stats)
+    server))
+
 (defmethod ig/init-key ::server
-  [_ {:keys [handler router ws port name metrics] :as opts}]
-  (l/info :msg "starting http server" :port port :name name)
-  (let [pre-start (fn [^Server server]
-                    (let [handler (doto (ErrorHandler.)
-                                    (.setShowStacks true)
-                                    (.setServer server))]
-                      (.setErrorHandler server ^ErrorHandler handler)
-                      (when metrics
-                        (let [stats (StatisticsHandler.)]
-                          (.setHandler ^StatisticsHandler stats (.getHandler server))
-                          (.setHandler server stats)
-                          (mtx/instrument-jetty! (:registry metrics) stats)))))
-
-        options   (merge
-                   {:port port
-                    :h2c? true
-                    :join? false
-                    :allow-null-path-info true
-                    :configurator pre-start}
-                   (when (seq ws)
-                     {:websockets ws}))
-
-        handler   (cond
-                    (fn? handler)  handler
-                    (some? router) (router-handler router)
-                    :else (ex/raise :type :internal
-                                    :code :invalid-argument
-                                    :hint "Missing `handler` or `router` option."))
-
-        server    (jetty/run-jetty handler options)]
-    (assoc opts :server server)))
+  [_ {:keys [handler router port name metrics host] :as opts}]
+  (l/info :msg "starting http server" :port port :host host :name name)
+  (let [options {:http/port port :http/host host}
+        handler (cond
+                  (fn? handler)  handler
+                  (some? router) (wrap-router router)
+                  :else (ex/raise :type :internal
+                                  :code :invalid-argument
+                                  :hint "Missing `handler` or `router` option."))
+        server  (-> (yt/server handler options)
+                    (cond-> metrics (instrument-metrics metrics)))]
+    (assoc opts :server (yt/start! server))))
 
 (defmethod ig/halt-key! ::server
   [_ {:keys [server name port] :as opts}]
-  (l/info :msg "stoping http server"
-          :name name
-          :port port)
-  (jetty/stop-server server))
+  (l/info :msg "stoping http server" :name name :port port)
+  (yt/stop! server))
 
-(defn- router-handler
+(defn- wrap-router
   [router]
-  (let [handler (rr/ring-handler router
-                                 (rr/routes
-                                  (rr/create-resource-handler {:path "/"})
-                                  (rr/create-default-handler))
-                                 {:middleware [middleware/server-timing]})]
+  (let [default (rr/routes
+                 (rr/create-resource-handler {:path "/"})
+                 (rr/create-default-handler))
+        options {:middleware [middleware/server-timing]}
+        handler (rr/ring-handler router default options)]
     (fn [request]
       (try
         (handler request)
         (catch Throwable e
-          (try
-            (let [cdata (errors/get-error-context request e)]
-              (l/update-thread-context! cdata)
-              (l/error :hint "unhandled exception"
-                       :message (ex-message e)
-                       :error-id (str (:id cdata))
-                       :cause e))
-            {:status 500 :body "internal server error"}
-            (catch Throwable e
-              (l/error :hint "unhandled exception"
-                       :message (ex-message e)
-                       :cause e)
-              {:status 500 :body "internal server error"})))))))
-
+          (l/with-context (errors/get-error-context request e)
+            (l/error :hint "unexpected error processing request"
+                     :query-string (:query-string request)
+                     :cause e)
+            {:status 500 :body "internal server error"}))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Http Main Handler (Router)
+;; Http Router
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (s/def ::rpc map?)
@@ -115,17 +92,17 @@
 (s/def ::storage map?)
 (s/def ::assets map?)
 (s/def ::feedback fn?)
-(s/def ::error-report-handler fn?)
+(s/def ::ws fn?)
 (s/def ::audit-http-handler fn?)
+(s/def ::debug map?)
 
 (defmethod ig/pre-init-spec ::router [_]
-  (s/keys :req-un [::rpc ::session ::mtx/metrics
+  (s/keys :req-un [::rpc ::session ::mtx/metrics ::ws
                    ::oauth ::storage ::assets ::feedback
-                   ::error-report-handler
-                   ::audit-http-handler]))
+                   ::debug ::audit-http-handler]))
 
 (defmethod ig/init-key ::router
-  [_ {:keys [session rpc oauth metrics assets feedback] :as cfg}]
+  [_ {:keys [ws session rpc oauth metrics assets feedback debug] :as cfg}]
   (rr/router
    [["/metrics" {:get (:handler metrics)}]
     ["/assets" {:middleware [[middleware/format-response-body]
@@ -136,18 +113,39 @@
      ["/by-file-media-id/:id" {:get (:file-objects-handler assets)}]
      ["/by-file-media-id/:id/thumbnail" {:get (:file-thumbnails-handler assets)}]]
 
-    ["/dbg"
-     ["/error-by-id/:id" {:get (:error-report-handler cfg)}]]
+    ["/dbg" {:middleware [[middleware/multipart-params]
+                          [middleware/params]
+                          [middleware/keyword-params]
+                          [middleware/format-response-body]
+                          [middleware/errors errors/handle]
+                          [middleware/cookies]
+                          [(:middleware session)]]}
+     ["" {:get (:index debug)}]
+     ["/error-by-id/:id" {:get (:retrieve-error debug)}]
+     ["/error/:id" {:get (:retrieve-error debug)}]
+     ["/error" {:get (:retrieve-error-list debug)}]
+     ["/file/data" {:get (:retrieve-file-data debug)
+                    :post (:upload-file-data debug)}]
+     ["/file/changes" {:get (:retrieve-file-changes debug)}]]
 
     ["/webhooks"
      ["/sns" {:post (:sns-webhook cfg)}]]
 
+    ["/ws/notifications"
+     {:middleware [[middleware/params]
+                   [middleware/keyword-params]
+                   [middleware/format-response-body]
+                   [middleware/errors errors/handle]
+                   [middleware/cookies]
+                   [(:middleware session)]]
+      :get ws}]
+
     ["/api" {:middleware [[middleware/cors]
-                          [middleware/etag]
-                          [middleware/format-response-body]
                           [middleware/params]
                           [middleware/multipart-params]
                           [middleware/keyword-params]
+                          [middleware/format-response-body]
+                          [middleware/etag]
                           [middleware/parse-request-body]
                           [middleware/errors errors/handle]
                           [middleware/cookies]]}

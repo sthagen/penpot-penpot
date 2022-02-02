@@ -27,14 +27,16 @@
    com.zaxxer.hikari.HikariConfig
    com.zaxxer.hikari.HikariDataSource
    com.zaxxer.hikari.metrics.prometheus.PrometheusMetricsTrackerFactory
+   java.io.InputStream
+   java.io.OutputStream
    java.lang.AutoCloseable
    java.sql.Connection
    java.sql.Savepoint
    org.postgresql.PGConnection
    org.postgresql.geometric.PGpoint
+   org.postgresql.jdbc.PgArray
    org.postgresql.largeobject.LargeObject
    org.postgresql.largeobject.LargeObjectManager
-   org.postgresql.jdbc.PgArray
    org.postgresql.util.PGInterval
    org.postgresql.util.PGobject))
 
@@ -60,12 +62,13 @@
           :opt-un [::migrations ::mtx/metrics ::read-only]))
 
 (defmethod ig/init-key ::pool
-  [_ {:keys [migrations metrics name] :as cfg}]
+  [_ {:keys [migrations metrics name read-only] :as cfg}]
   (l/info :action "initialize connection pool" :name (d/name name) :uri (:uri cfg))
   (some-> metrics :registry instrument-jdbc!)
 
   (let [pool (create-pool cfg)]
-    (some->> (seq migrations) (apply-migrations! pool))
+    (when-not read-only
+      (some->> (seq migrations) (apply-migrations! pool)))
     pool))
 
 (defmethod ig/halt-key! ::pool
@@ -134,9 +137,13 @@
 
 (s/def ::pool pool?)
 
-(defn pool-closed?
+(defn closed?
   [pool]
   (.isClosed ^HikariDataSource pool))
+
+(defn read-only?
+  [pool]
+  (.isReadOnly ^HikariDataSource pool))
 
 (defn create-pool
   [cfg]
@@ -356,7 +363,7 @@
         val (.getValue o)]
     (if (or (= typ "json")
             (= typ "jsonb"))
-      (json/decode-str val)
+      (json/read val)
       val)))
 
 (defn decode-transit-pgobject
@@ -392,7 +399,7 @@
   [data]
   (doto (org.postgresql.util.PGobject.)
     (.setType "jsonb")
-    (.setValue (json/encode-str data))))
+    (.setValue (json/write-str data))))
 
 ;; --- Locks
 

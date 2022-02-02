@@ -13,6 +13,7 @@
    [app.main.data.users :as du]
    [app.main.sentry :as sentry]
    [app.main.store :as st]
+   [app.util.i18n :refer [tr]]
    [app.util.router :as rt]
    [app.util.timers :as ts]
    [cljs.pprint :refer [pprint]]
@@ -48,7 +49,9 @@
 ;; here and not in app.main.errors because of circular dependency.
 (defmethod ptk/handle-error :authentication
   [_]
-  (ts/schedule (st/emitf (du/logout))))
+  (let [msg (tr "errors.auth.unable-to-login")]
+    (st/emit! (du/logout {:capture-redirect true}))
+    (ts/schedule 500 (st/emitf (dm/warn msg)))))
 
 
 ;; That are special case server-errors that should be treated
@@ -78,10 +81,13 @@
   (js/console.group "Validation Error:")
   (ex/ignoring
    (js/console.info
-    (with-out-str
-      (pprint (dissoc error :explain))))
-   (when-let [explain (:explain error)]
-     (js/console.error explain)))
+    (with-out-str (pprint (dissoc error :explain)))))
+
+  (when-let [explain (:explain error)]
+    (js/console.group "Spec explain:")
+    (js/console.log explain)
+    (js/console.groupEnd "Spec explain:"))
+
   (js/console.groupEnd "Validation Error:"))
 
 
@@ -106,14 +112,14 @@
 ;; assertion (assertion that is preserved on production builds). From
 ;; the user perspective this should be treated as internal error.
 (defmethod ptk/handle-error :assertion
-  [{:keys [data stack message hint context] :as error}]
+  [{:keys [message hint] :as error}]
   (let [message (or message hint)
         message (str "Internal Assertion Error: " message)
         context (str/fmt "ns: '%s'\nname: '%s'\nfile: '%s:%s'"
-                              (:ns context)
-                              (:name context)
-                              (str cf/public-uri "js/cljs-runtime/" (:file context))
-                              (:line context))]
+                              (:ns error)
+                              (:name error)
+                              (str cf/public-uri "js/cljs-runtime/" (:file error))
+                              (:line error))]
     (ts/schedule
      (st/emitf
       (dm/show {:content "Internal error: assertion."
@@ -123,10 +129,7 @@
     ;; Print to the console some debugging info
     (js/console.group message)
     (js/console.info context)
-    (js/console.groupCollapsed "Stack Trace")
-    (js/console.info stack)
-    (js/console.groupEnd "Stack Trace")
-    (js/console.error (with-out-str (expound/printer data)))
+    (js/console.error (with-out-str (expound/printer error)))
     (js/console.groupEnd message)))
 
 ;; This happens when the backed server fails to process the
@@ -135,8 +138,7 @@
 (defmethod ptk/handle-error :server-error
   [{:keys [data hint] :as error}]
   (let [hint (or hint (:hint data) (:message data))
-        info (with-out-str (pprint (dissoc data :explain)))
-        expl (:explain data)
+        info (with-out-str (pprint data))
         msg  (str "Internal Server Error: " hint)]
 
     (ts/schedule
@@ -147,7 +149,6 @@
 
     (js/console.group msg)
     (js/console.info info)
-    (when expl (js/console.error expl))
     (js/console.groupEnd msg)))
 
 (defn on-unhandled-error

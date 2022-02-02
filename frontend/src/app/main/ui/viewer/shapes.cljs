@@ -7,12 +7,11 @@
 (ns app.main.ui.viewer.shapes
   "The main container for a frame in viewer mode"
   (:require
-   [app.common.data :as d]
    [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as geom]
    [app.common.pages :as cp]
-   [app.common.types.interactions :as cti]
+   [app.common.spec.interactions :as cti]
    [app.main.data.viewer :as dv]
    [app.main.refs :as refs]
    [app.main.store :as st]
@@ -39,7 +38,7 @@
 (def viewer-interactions-show?
   (l/derived :interactions-show? refs/viewer-local))
 
-(defn activate-interaction
+(defn- activate-interaction
   [interaction shape base-frame frame-offset objects]
   (case (:action-type interaction)
     :navigate
@@ -49,7 +48,7 @@
                      (dom/get-scroll-pos viewer-section)
                      0)]
         (st/emit! (dv/set-nav-scroll scroll)
-                  (dv/go-to-frame frame-id))))
+                  (dv/go-to-frame frame-id (:animation interaction)))))
 
     :open-overlay
     (let [dest-frame-id       (:destination interaction)
@@ -65,7 +64,8 @@
         (st/emit! (dv/open-overlay dest-frame-id
                                    position
                                    close-click-outside
-                                   background-overlay))))
+                                   background-overlay
+                                   (:animation interaction)))))
 
     :toggle-overlay
     (let [frame-id            (:destination interaction)
@@ -76,14 +76,15 @@
         (st/emit! (dv/toggle-overlay frame-id
                                      position
                                      close-click-outside
-                                     background-overlay))))
+                                     background-overlay
+                                     (:animation interaction)))))
 
     :close-overlay
     (let [frame-id (or (:destination interaction)
                        (if (= (:type shape) :frame)
                          (:id shape)
                          (:frame-id shape)))]
-      (st/emit! (dv/close-overlay frame-id)))
+      (st/emit! (dv/close-overlay frame-id (:animation interaction))))
 
     :prev-screen
     (st/emit! (rt/nav-back-local))
@@ -94,7 +95,7 @@
     nil))
 
 ;; Perform the opposite action of an interaction, if possible
-(defn deactivate-interaction
+(defn- deactivate-interaction
   [interaction shape base-frame frame-offset objects]
   (case (:action-type interaction)
     :open-overlay
@@ -113,7 +114,8 @@
         (st/emit! (dv/toggle-overlay frame-id
                                      position
                                      close-click-outside
-                                     background-overlay))))
+                                     background-overlay
+                                     (:animation interaction)))))
 
     :close-overlay
     (let [dest-frame-id       (:destination interaction)
@@ -129,10 +131,11 @@
         (st/emit! (dv/open-overlay dest-frame-id
                                    position
                                    close-click-outside
-                                   background-overlay))))
+                                   background-overlay
+                                   (:animation interaction)))))
     nil))
 
-(defn on-mouse-down
+(defn- on-mouse-down
   [event shape base-frame frame-offset objects]
   (let [interactions (->> (:interactions shape)
                           (filter #(or (= (:event-type %) :click)
@@ -142,7 +145,7 @@
       (doseq [interaction interactions]
         (activate-interaction interaction shape base-frame frame-offset objects)))))
 
-(defn on-mouse-up
+(defn- on-mouse-up
   [event shape base-frame frame-offset objects]
   (let [interactions (->> (:interactions shape)
                           (filter #(= (:event-type %) :mouse-press)))]
@@ -151,7 +154,7 @@
       (doseq [interaction interactions]
         (deactivate-interaction interaction shape base-frame frame-offset objects)))))
 
-(defn on-mouse-enter
+(defn- on-mouse-enter
   [event shape base-frame frame-offset objects]
   (let [interactions (->> (:interactions shape)
                           (filter #(or (= (:event-type %) :mouse-enter)
@@ -161,7 +164,7 @@
       (doseq [interaction interactions]
         (activate-interaction interaction shape base-frame frame-offset objects)))))
 
-(defn on-mouse-leave
+(defn- on-mouse-leave
   [event shape base-frame frame-offset objects]
   (let [interactions     (->> (:interactions shape)
                               (filter #(= (:event-type %) :mouse-leave)))
@@ -174,7 +177,7 @@
       (doseq [interaction interactions-inv]
         (deactivate-interaction interaction shape base-frame frame-offset objects)))))
 
-(defn on-load
+(defn- on-load
   [shape base-frame frame-offset objects]
   (let [interactions (->> (:interactions shape)
                           (filter #(= (:event-type %) :after-delay)))]
@@ -196,8 +199,8 @@
               :y (- y 1)
               :width (+ width 2)
               :height (+ height 2)
-              :fill "#31EFB8"
-              :stroke "#31EFB8"
+              :fill "var(--color-primary)"
+              :stroke "var(--color-primary)"
               :stroke-width (if interactions-show? 1 0)
               :fill-opacity (if interactions-show? 0.2 0)
               :style {:pointer-events (when frame? "none")}
@@ -396,7 +399,7 @@
         update-fn    #(assoc-in %1 [%2 :modifiers :displacement] modifier)
 
         frame-id     (:id frame)
-        modifier-ids (d/concat [frame-id] (cp/get-children frame-id objects))
+        modifier-ids (into [frame-id] (cp/get-children frame-id objects))
         objects      (reduce update-fn objects modifier-ids)
         frame        (assoc-in frame [:modifiers :displacement] modifier)
 

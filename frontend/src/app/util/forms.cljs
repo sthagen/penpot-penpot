@@ -37,10 +37,16 @@
   [& {:keys [initial] :as opts}]
   (let [state      (mf/useState 0)
         render     (aget state 1)
-        state-ref  (mf/use-ref {:data (if (fn? initial) (initial) initial)
-                                :errors {}
-                                :touched {}})
-        form       (mf/use-memo #(create-form-mutator state-ref render opts))]
+
+        get-state  (mf/use-callback
+                    (mf/deps initial)
+                    (fn []
+                      {:data (if (fn? initial) (initial) initial)
+                       :errors {}
+                       :touched {}}))
+
+        state-ref  (mf/use-ref (get-state))
+        form       (mf/use-memo (mf/deps initial) #(create-form-mutator state-ref render get-state opts))]
 
     (mf/use-effect
      (mf/deps initial)
@@ -72,36 +78,37 @@
                          (not= cleaned ::s/invalid))))))
 
 (defn- create-form-mutator
-  [state-ref render opts]
+  [state-ref render get-state opts]
   (reify
     IDeref
     (-deref [_]
       (mf/ref-val state-ref))
 
     IReset
-    (-reset! [it new-value]
-      (mf/set-ref-val! state-ref new-value)
+    (-reset! [_ new-value]
+      (if (nil? new-value)
+        (mf/set-ref-val! state-ref (get-state))
+        (mf/set-ref-val! state-ref new-value))
       (render inc))
 
     ISwap
-    (-swap! [self f]
+    (-swap! [_ f]
       (let [f (wrap-update-fn f opts)]
         (mf/set-ref-val! state-ref (f (mf/ref-val state-ref)))
         (render inc)))
 
 
-    (-swap! [self f x]
+    (-swap! [_ f x]
       (let [f (wrap-update-fn f opts)]
         (mf/set-ref-val! state-ref (f (mf/ref-val state-ref) x))
         (render inc)))
 
-
-    (-swap! [self f x y]
+    (-swap! [_ f x y]
       (let [f (wrap-update-fn f opts)]
         (mf/set-ref-val! state-ref (f (mf/ref-val state-ref) x y))
         (render inc)))
 
-    (-swap! [self f x y more]
+    (-swap! [_ f x y more]
       (let [f (wrap-update-fn f opts)]
         (mf/set-ref-val! state-ref (apply f (mf/ref-val state-ref) x y more))
         (render inc)))))

@@ -30,8 +30,7 @@
         (mf/use-callback
          (fn [_ _]
            (reset! submitted false)
-           (st/emit! (dm/info (tr "auth.notifications.recovery-token-sent"))
-                     (rt/nav :auth-login))))
+           (st/emit! (dm/info (tr "auth.notifications.recovery-token-sent")))))
 
         on-error
         (mf/use-callback
@@ -68,7 +67,8 @@
                     :type "text"}]]
 
      [:& fm/submit-button
-      {:label (tr "auth.recovery-request-submit")}]]))
+      {:label (tr "auth.recovery-request-submit")
+       :data-test "recovery-resquest-submit"}]]))
 
 
 ;; --- Recovery Request Page
@@ -83,5 +83,6 @@
 
     [:div.links
      [:div.link-entry
-      [:a {:on-click #(st/emit! (rt/nav :auth-login))}
+      [:a {:on-click #(st/emit! (rt/nav :auth-login))
+           :data-test "go-back-link"}
        (tr "labels.go-back")]]]]])

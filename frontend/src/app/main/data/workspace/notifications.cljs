@@ -8,8 +8,8 @@
   (:require
    [app.common.data :as d]
    [app.common.geom.point :as gpt]
-   [app.common.pages :as cp]
    [app.common.spec :as us]
+   [app.common.spec.change :as spec.change]
    [app.common.transit :as t]
    [app.common.uri :as u]
    [app.config :as cf]
@@ -131,17 +131,17 @@
 ;; --- Handle: Presence
 
 (def ^:private presence-palette
-  #{"#2e8b57" ; seagreen
-    "#808000" ; olive
-    "#b22222" ; firebrick
-    "#ff8c00" ; darkorage
-    "#ffd700" ; gold
-    "#ba55d3" ; mediumorchid
-    "#00fa9a" ; mediumspringgreen
-    "#00bfff" ; deepskyblue
-    "#dda0dd" ; plum
-    "#ff1493" ; deeppink
-    "#ffa07a" ; lightsalmon
+  #{"#02bf51" ; darkpastelgreen text white
+    "#00fa9a" ; mediumspringgreen text black
+    "#b22222" ; firebrick text white
+    "#ff8c00" ; darkorage text white
+    "#ffd700" ; gold text black
+    "#ba55d3" ; mediumorchid text white
+    "#dda0dd" ; plum text black
+    "#008ab8" ; blueNCS text white
+    "#00bfff" ; deepskyblue text white
+    "#ff1493" ; deeppink text white
+    "#ffafda" ; carnationpink text black
     })
 
 (defn handle-presence
@@ -152,7 +152,7 @@
                               (remove nil?))
                   used  (into #{} xfm presence)
                   avail (set/difference presence-palette used)]
-              (or (first avail) "#000000")))
+              (or (first avail) "var(--color-black)")))
 
           (update-color [color presence]
             (if (some? color)
@@ -164,7 +164,10 @@
                 (assoc :id session-id)
                 (assoc :profile-id profile-id)
                 (assoc :updated-at (dt/now))
-                (update :color update-color presence)))
+                (update :color update-color presence)
+                (assoc :text-color (if (contains? ["#00fa9a" "#ffd700" "#dda0dd" "#ffafda"] (update-color (:color presence) presence))
+                                     "#000"
+                                     "#fff"))))
 
           (update-presence [presence]
             (-> presence
@@ -198,7 +201,7 @@
 (s/def ::file-id uuid?)
 (s/def ::session-id uuid?)
 (s/def ::revn integer?)
-(s/def ::changes ::cp/changes)
+(s/def ::changes ::spec.change/changes)
 
 (s/def ::file-change-event
   (s/keys :req-un [::type ::profile-id ::file-id ::session-id ::revn ::changes]))

@@ -9,7 +9,7 @@
    [app.common.data :as d]
    [app.common.geom.shapes :as gsh]
    [app.common.spec :as us]
-   [app.common.types.interactions :as cti]
+   [app.common.spec.interactions :as cti]
    [app.common.uuid :as uuid]
    [cuerdas.core :as str]))
 
@@ -46,13 +46,14 @@
 (defn get-root-shape
   "Get the root shape linked to a component for this shape, if any"
   [shape objects]
-  (if-not (:shape-ref shape)
-    nil
-    (if (:component-root? shape)
-      shape
-      (if-let [parent-id (:parent-id shape)]
-        (get-root-shape (get objects parent-id) objects)
-        nil))))
+
+  (cond
+    (some? (:component-root? shape))
+    shape
+
+    (some? (:shape-ref shape))
+    (recur (get objects (:parent-id shape))
+           objects)))
 
 (defn make-container
   [page-or-component type]
@@ -98,36 +99,10 @@
   [component]
   (get-in component [:objects (:id component)]))
 
-;; Implemented with transient for performance
-(defn get-children
-  "Retrieve all children ids recursively for a given object. The
-  children's order will be breadth first."
-  [id objects]
-
-  (loop [result  (transient [])
-         pending (transient [])
-         next    id]
-    (let [children (get-in objects [next :shapes] [])
-          [result pending]
-          ;; Iterate through children and add them to the result
-          ;; also add them in pending to check for their children
-          (loop [result result
-                 pending pending
-                 current  (first children)
-                 children (rest children)]
-            (if current
-              (recur (conj! result current)
-                     (conj! pending current)
-                     (first children)
-                     (rest children))
-              [result pending]))
-
-          ;; If we have still pending, advance the iterator
-          length (count pending)]
-      (if (pos? length)
-        (let [next (get pending (dec length))]
-          (recur result (pop! pending) next))
-        (persistent! result)))))
+(defn get-children [id objects]
+  (if-let [shapes (-> (get objects id) :shapes (some-> vec))]
+    (into shapes (mapcat #(get-children % objects)) shapes)
+    []))
 
 (defn get-children-objects
   "Retrieve all children objects recursively for a given object"
@@ -162,9 +137,8 @@
 
 (defn get-parents
   [shape-id objects]
-  (let [{:keys [parent-id]} (get objects shape-id)]
-    (when parent-id
-      (lazy-seq (cons parent-id (get-parents parent-id objects))))))
+  (when-let [parent-id (->> shape-id (get objects) :parent-id)]
+    (lazy-seq (cons parent-id (get-parents parent-id objects)))))
 
 (defn get-frame
   "Get the frame that contains the shape. If the shape is already a frame, get itself."
@@ -176,6 +150,7 @@
 (defn clean-loops
   "Clean a list of ids from circular references."
   [objects ids]
+
   (let [parent-selected?
         (fn [id]
           (let [parents (get-parents id objects)]
@@ -213,16 +188,11 @@
 (defn insert-at-index
   [objects index ids]
   (let [[before after] (split-at index objects)
-        p?      (complement (set ids))
-        before' (filterv p? before)
-        after'  (filterv p? after)]
-
-    (if (and (not= (count before) (count before'))
-             (pos? (count after')))
-      (let [before' (conj before' (first after'))
-            after'  (into [] (rest after'))]
-        (d/concat [] before' ids after'))
-      (d/concat [] before' ids after'))))
+        p? (set ids)]
+    (d/concat-vec []
+                  (remove p? before)
+                  ids
+                  (remove p? after))))
 
 (defn append-at-the-end
   [prev-ids ids]
@@ -238,43 +208,36 @@
   ([objects {:keys [include-frames? include-frame-children?]
              :or {include-frames? false
                   include-frame-children? true}}]
-   (let [lookup #(get objects %)
-         root   (lookup uuid/zero)
+
+   (let [lookup        #(get objects %)
+         root          (lookup uuid/zero)
          root-children (:shapes root)
 
          lookup-shapes
          (fn [result id]
            (if (nil? id)
              result
-             (let [obj (lookup id)
-                   typ (:type obj)
+             (let [obj      (lookup id)
+                   typ      (:type obj)
                    children (:shapes obj)]
 
                (cond-> result
                  (or (not= :frame typ) include-frames?)
-                 (d/concat [obj])
+                 (conj obj)
 
                  (and (= :frame typ) include-frame-children?)
-                 (d/concat (map lookup children))))))]
+                 (into (map lookup) children)))))]
 
      (reduce lookup-shapes [] root-children))))
 
 (defn select-frames
   [objects]
-  (let [root   (get objects uuid/zero)
-        loopfn (fn loopfn [ids]
-                 (let [id (first ids)
-                       obj (get objects id)]
-                   (cond
-                     (or (nil? id) (nil? obj))
-                     nil
-
-                     (= :frame (:type obj))
-                     (lazy-seq (cons obj (loopfn (rest ids))))
-
-                     :else
-                     (lazy-seq (loopfn (rest ids))))))]
-    (loopfn (:shapes root))))
+  (let [lookup #(get objects %)
+        frame? #(= :frame (:type %))
+        xform  (comp (map lookup)
+                     (filter frame?))]
+    (->> (:shapes (lookup uuid/zero))
+         (into [] xform))))
 
 (defn clone-object
   "Gets a copy of the object and all its children, with new ids
@@ -304,15 +267,13 @@
                             (some? (:shapes object))
                             (assoc :shapes (mapv :id new-direct-children)))
 
-               new-object (update-new-object new-object object)
+               new-object  (update-new-object new-object object)
+               new-objects (into [new-object] new-children)
 
-               new-objects (d/concat [new-object] new-children)
-
-               updated-object (update-original-object object new-object)
-
+               updated-object  (update-original-object object new-object)
                updated-objects (if (identical? object updated-object)
                                  updated-children
-                                 (d/concat [updated-object] updated-children))]
+                                 (into [updated-object] updated-children))]
 
            [new-object new-objects updated-objects])
 
@@ -325,9 +286,9 @@
 
            (recur
             (next child-ids)
-            (d/concat new-direct-children [new-child])
-            (d/concat new-children new-child-objects)
-            (d/concat updated-children updated-child-objects))))))))
+            (into new-direct-children [new-child])
+            (into new-children new-child-objects)
+            (into updated-children updated-child-objects))))))))
 
 (defn indexed-shapes
   "Retrieves a list with the indexes for each element in the layer tree.
@@ -443,7 +404,7 @@
   [path-name]
   (let [path-name-split (split-path path-name)
         path (str/join " / " (butlast path-name-split))
-        name (last path-name-split)]
+        name (or (last path-name-split) "")]
     [path name]))
 
 (defn merge-path-item
@@ -495,4 +456,12 @@
   [shape]
   (and (not= (:type shape) :frame)
        (= (:frame-id shape) uuid/zero)))
+
+(defn children-seq
+  "Creates a sequence of shapes through the objects tree"
+  [shape objects]
+  (let [getter (partial get objects)]
+    (tree-seq #(d/not-empty? (get shape :shapes))
+              #(->> (get % :shapes) (map getter))
+              shape)))
 

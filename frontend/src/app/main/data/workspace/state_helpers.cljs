@@ -9,6 +9,12 @@
    [app.common.data :as d]
    [app.common.pages :as cp]))
 
+(defn lookup-page
+  ([state]
+   (lookup-page state (:current-page-id state)))
+  ([state page-id]
+   (get-in state [:workspace-data :pages-index page-id])))
+
 (defn lookup-page-objects
   ([state]
    (lookup-page-objects state (:current-page-id state)))
@@ -24,6 +30,10 @@
 (defn lookup-component-objects
   ([state component-id]
    (get-in state [:workspace-data :components component-id :objects])))
+
+(defn lookup-local-components
+  ([state]
+   (get-in state [:workspace-data :components])))
 
 (defn lookup-selected
   ([state]

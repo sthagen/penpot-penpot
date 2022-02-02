@@ -5,6 +5,7 @@
 ;; Copyright (c) UXBOX Labs SL
 
 (ns app.common.pages.changes
+  #_:clj-kondo/ignore
   (:require
    [app.common.data :as d]
    [app.common.exceptions :as ex]
@@ -13,9 +14,9 @@
    [app.common.pages.common :refer [component-sync-attrs]]
    [app.common.pages.helpers :as cph]
    [app.common.pages.init :as init]
-   [app.common.pages.spec :as spec]
-   [app.common.spec :as us]))
-
+   [app.common.spec :as us]
+   [app.common.spec.change :as spec.change]
+   [app.common.spec.shape :as spec.shape]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Specific helpers
@@ -40,12 +41,14 @@
 (defmulti process-operation (fn [_ op] (:type op)))
 
 (defn process-changes
-  ([data items] (process-changes data items true))
+  ([data items]
+   (process-changes data items true))
+
   ([data items verify?]
    ;; When verify? false we spec the schema validation. Currently used to make just
    ;; 1 validation even if the changes are applied twice
    (when verify?
-     (us/assert ::spec/changes items))
+     (us/assert ::spec.change/changes items))
 
    (let [result (reduce #(or (process-change %1 %2) %1) data items)]
      ;; Validate result shapes (only on the backend)
@@ -55,7 +58,7 @@
             (doseq [[id shape] (:objects page)]
               (when-not (= shape (get-in data [:pages-index page-id :objects id]))
                 ;; If object has change verify is correct
-                (us/verify ::spec/shape shape))))))
+                (us/verify ::spec.shape/shape shape))))))
 
      result)))
 
@@ -152,29 +155,35 @@
 ;; reg-objects operation "regenerates" the geometry and selrect of the parent groups
 (defmethod process-change :reg-objects
   [data {:keys [page-id component-id shapes]}]
+  ;; FIXME: Improve performance
   (letfn [(reg-objects [objects]
-            (reduce #(d/update-when %1 %2 update-group %1) objects
-                    (sequence (comp
-                               (mapcat #(cons % (cph/get-parents % objects)))
-                               (map #(get objects %))
-                               (filter #(contains? #{:group :bool} (:type %)))
-                               (map :id)
-                               (distinct))
-                              shapes)))
+            (let [lookup    (d/getf objects)
+                  update-fn #(d/update-when %1 %2 update-group %1)
+                  xform     (comp
+                             (mapcat #(cons % (cph/get-parents % objects)))
+                             (filter #(contains? #{:group :bool} (-> % lookup :type)))
+                             (distinct))]
+
+              (->> (sequence xform shapes)
+                   (reduce update-fn objects))))
+
           (set-mask-selrect [group children]
             (let [mask (first children)]
               (-> group
-                  (merge (select-keys mask [:selrect :points]))
-                  (assoc :x (-> mask :selrect :x)
-                         :y (-> mask :selrect :y)
-                         :width (-> mask :selrect :width)
-                         :height (-> mask :selrect :height)
-                         :flip-x (-> mask :flip-x)
-                         :flip-y (-> mask :flip-y)))))
+                  (assoc :selrect (-> mask :selrect))
+                  (assoc :points  (-> mask :points))
+                  (assoc :x       (-> mask :selrect :x))
+                  (assoc :y       (-> mask :selrect :y))
+                  (assoc :width   (-> mask :selrect :width))
+                  (assoc :height  (-> mask :selrect :height))
+                  (assoc :flip-x  (-> mask :flip-x))
+                  (assoc :flip-y  (-> mask :flip-y)))))
+
           (update-group [group objects]
-            (let [children (->> group :shapes (map #(get objects %)))]
+            (let [lookup   (d/getf objects)
+                  children (->> group :shapes (map lookup))]
               (cond
-                ;; If the group is empty we don't make any changes. Should be removed by a later process
+                ;; If the group is empty we don't make any changes. Will be removed by a later process
                 (empty? children)
                 group
 
@@ -195,7 +204,8 @@
   [data {:keys [parent-id shapes index page-id component-id ignore-touched]}]
   (letfn [(is-valid-move? [objects shape-id]
             (let [invalid-targets (cph/calculate-invalid-targets shape-id objects)]
-              (and (not (invalid-targets parent-id))
+              (and (contains? objects shape-id)
+                   (not (invalid-targets parent-id))
                    (cph/valid-frame-target shape-id parent-id objects))))
 
           (insert-items [prev-shapes index shapes]
@@ -214,7 +224,7 @@
                     not-mask-shapes (without-obj shapes mask-id)
                     new-index       (if (nil? index) nil (max (dec index) 0))
                     new-shapes      (insert-items other-ids new-index not-mask-shapes)]
-                (d/concat [mask-id] new-shapes))))
+                (into [mask-id] new-shapes))))
 
           (add-to-parent [parent index shapes]
             (let [parent (-> parent
@@ -469,4 +479,3 @@
   (ex/raise :type :not-implemented
             :code :operation-not-implemented
             :context {:type (:type op)}))
-

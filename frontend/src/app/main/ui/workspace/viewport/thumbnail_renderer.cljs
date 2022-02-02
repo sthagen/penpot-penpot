@@ -6,7 +6,6 @@
 
 (ns app.main.ui.workspace.viewport.thumbnail-renderer
   (:require
-   [app.main.data.workspace.changes :as dwc]
    [app.main.data.workspace.persistence :as dwp]
    [app.main.store :as st]
    [app.util.dom :as dom]
@@ -29,12 +28,24 @@
            (when node
              (let [img-node (mf/ref-val thumbnail-img)]
                (timers/schedule-on-idle
-                #(let [frame-node (dom/get-element (str "shape-" (:id shape)))
-                       loading-node (when frame-node
-                                      (dom/query frame-node "[data-loading=\"true\"]"))]
-                   (if (and (some? frame-node) (not (some? loading-node)))
-                     (let [xml  (-> (js/XMLSerializer.)
-                                    (.serializeToString frame-node)
+                #(let [frame-node   (dom/get-element (str "shape-" (:id shape)))
+                       thumb-node   (dom/query frame-node ".frame-thumbnail")
+                       loading-node (dom/query frame-node "[data-loading=\"true\"]")]
+                   (if (and (some? frame-node)
+                            ;; Not render if the thumbnail is in display
+                            (nil? thumb-node)
+                            ;; Not render if some image is still loading
+                            (nil? loading-node))
+                     (let [frame-html (->  (js/XMLSerializer.)
+                                           (.serializeToString frame-node))
+
+                           ;; We need to wrap the group node into a SVG with a viewbox that matches the selrect of the frame
+                           svg-node (.createElementNS js/document "http://www.w3.org/2000/svg" "svg")
+                           _ (.setAttribute svg-node "version" "1.1")
+                           _ (.setAttribute svg-node "viewBox" (str (:x shape) " " (:y shape) " " (:width shape) " " (:height shape)))
+                           _ (unchecked-set svg-node "innerHTML" frame-html)
+                           xml  (-> (js/XMLSerializer.)
+                                    (.serializeToString svg-node)
                                     js/encodeURIComponent
                                     js/unescape
                                     js/btoa)
@@ -80,7 +91,7 @@
   "Component in charge of creating thumbnails and storing them"
   {::mf/wrap-props false}
   [props]
-  (let [objects (obj/get props "objects")
+  (let [objects    (obj/get props "objects")
         background (obj/get props "background")
 
         ;; Id of the current frame being rendered
@@ -97,12 +108,9 @@
 
         updates-stream
         (mf/use-memo
-         (fn []
-           (let [update-events
-                 (->> st/stream
-                      (rx/filter dwp/update-frame-thumbnail?))]
-             (->> (rx/zip update-events next)
-                  (rx/map first)))))
+         #(let [update-events (rx/filter dwp/update-frame-thumbnail? st/stream)]
+            (->> (rx/zip update-events next)
+                 (rx/map first))))
 
         on-thumbnail-data
         (mf/use-callback
@@ -111,9 +119,7 @@
            (reset! shape-id nil)
            (timers/schedule
             (fn []
-              (st/emit! (dwc/update-shapes [@shape-id]
-                                           #(assoc % :thumbnail data)
-                                           {:save-undo? false}))
+              (st/emit! (dwp/update-shape-thumbnail @shape-id data))
               (rx/push! next :next)))))
 
         on-frame-not-found
@@ -123,7 +129,9 @@
            ;; after a time
            (reset! shape-id nil)
            (rx/push! next :next)
-           (timers/schedule-on-idle (st/emitf (dwp/update-frame-thumbnail frame-id)))))]
+           (timers/schedule-on-idle
+            100
+            (st/emitf (dwp/update-frame-thumbnail frame-id)))))]
 
     (mf/use-effect
      (mf/deps render-frame)

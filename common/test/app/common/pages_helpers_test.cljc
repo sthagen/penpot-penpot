@@ -29,7 +29,7 @@
 
   ;; insert existing in a contiguos index
   (t/is (= (cph/insert-at-index [:a :b] 1 [:a])
-           [:b :a]))
+           [:a :b]))
 
   ;; insert existing in the same index
   (t/is (= (cph/insert-at-index [:a :b] 0 [:a])
@@ -37,7 +37,7 @@
 
   ;; insert existing in other index case 1
   (t/is (= (cph/insert-at-index [:a :b :c] 2 [:a])
-           [:b :c :a]))
+           [:b :a :c]))
 
   ;; insert existing in other index case 2
   (t/is (= (cph/insert-at-index [:a :b :c :d] 0 [:d])
@@ -45,6 +45,15 @@
 
   ;; insert existing in other index case 3
   (t/is (= (cph/insert-at-index [:a :b :c :d] 1 [:a])
-           [:b :a :c :d]))
+           [:a :b :c :d]))
 
+  )
+
+
+(t/deftest parse-path-name
+  (t/is (= ["foo" "bar"] (cph/parse-path-name "foo/bar")))
+  (t/is (= ["" "foo"] (cph/parse-path-name "foo")))
+  (t/is (= ["" "foo"] (cph/parse-path-name "/foo")))
+  (t/is (= ["" ""] (cph/parse-path-name "")))
+  (t/is (= ["" ""] (cph/parse-path-name nil)))
   )

@@ -7,7 +7,7 @@
 .workspace-header {
   align-items: center;
   background-color: $color-gray-50;
-  border-bottom: 1px solid  $color-gray-60;
+  border-bottom: 1px solid $color-gray-60;
   display: flex;
   height: 48px;
   padding: $size-1 $size-4 $size-1 55px;
@@ -35,17 +35,13 @@
         fill: $color-gray-30;
         height: 30px;
         width: 28px;
-
       }
 
       &:hover {
-
         svg {
           fill: $color-primary;
         }
-
       }
-
     }
   }
 
@@ -116,19 +112,19 @@
         cursor: pointer;
 
         &:hover {
-            color: $color-primary;
+          color: $color-primary;
         }
       }
     }
 
     .file-name {
-        margin: 0;
-        padding: 0;
-        border: none;
-        border-bottom: 1px solid $color-gray-10;
-        background: $color-gray-50;
-        color: $color-gray-10;
-        margin-bottom: -1px;
+      margin: 0;
+      padding: 0;
+      border: none;
+      border-bottom: 1px solid $color-gray-10;
+      background: $color-gray-50;
+      color: $color-gray-10;
+      margin-bottom: -1px;
     }
   }
 
@@ -136,9 +132,9 @@
     position: absolute;
     top: 40px;
     left: 40px;
-    width: 270px;
+    width: 183px;
     z-index: 12;
-    @include animation(0,.2s,fadeInDown);
+    @include animation(0, 0.2s, fadeInDown);
 
     background-color: $color-white;
     border-radius: $br-small;
@@ -162,6 +158,54 @@
         margin: 0 $size-1;
       }
 
+      &:hover {
+        background-color: $color-primary-lighter;
+      }
+
+      &.feedback {
+        border-top: 1px solid $color-gray-10;
+      }
+    }
+  }
+
+  .sub-menu {
+    position: absolute;
+    left: 230px;
+    width: 270px;
+    z-index: 12;
+    @include animation(0, 0.2s, fadeInDown);
+    background-color: $color-white;
+    border-radius: $br-small;
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.25);
+
+    &.file {
+      top: 40px;
+    }
+
+    &.edit {
+      top: 77px;
+    }
+
+    &.view {
+      top: 114px;
+    }
+
+    &.preferences {
+      top: 150px;
+    }
+
+    li {
+      cursor: pointer;
+      font-size: $fs14;
+      padding: $size-2;
+      display: flex;
+      justify-content: space-between;
+
+      span {
+        color: $color-gray-60;
+        margin: 0 $size-1;
+      }
+
       .shortcut {
         color: $color-gray-20;
         font-size: $fs12;
@@ -169,10 +213,6 @@
 
       &:hover {
         background-color: $color-primary-lighter;
-      }
-
-      &.feedback {
-        border-top: 1px solid $color-gray-10;
       }
     }
   }
@@ -208,13 +248,21 @@
     display: flex;
 
     &.error {
-      .label { color: $color-danger; }
-      .icon svg { fill: $color-danger; }
+      .label {
+        color: $color-danger;
+      }
+      .icon svg {
+        fill: $color-danger;
+      }
     }
 
     &.pending {
-      .label { color: $color-warning; }
-      .icon svg { fill: $color-warning; }
+      .label {
+        color: $color-warning;
+      }
+      .icon svg {
+        fill: $color-warning;
+      }
     }
   }
 

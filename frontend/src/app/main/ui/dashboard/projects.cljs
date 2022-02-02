@@ -18,6 +18,7 @@
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.router :as rt]
    [app.util.time :as dt]
+   [cuerdas.core :as str]
    [okulary.core :as l]
    [rumext.alpha :as mf]))
 
@@ -29,7 +30,7 @@
      [:div.dashboard-title
       [:h1 (tr "dashboard.projects-title")]]
 
-     [:a.btn-secondary.btn-small {:on-click create}
+     [:a.btn-secondary.btn-small {:on-click create :data-test "new-project-button"}
       (tr "dashboard.new-project")]]))
 
 (mf/defc project-item
@@ -73,9 +74,11 @@
         (mf/use-callback
          (mf/deps project)
          (fn [name]
-           (st/emit! (-> (dd/rename-project (assoc project :name name))
-                         (with-meta {::ev/origin "dashboard"})))
-           (swap! local assoc :edition? false)))
+           (let [name (str/trim name)]
+             (when-not (str/empty? name)
+               (st/emit! (-> (dd/rename-project (assoc project :name name))
+                             (with-meta {::ev/origin "dashboard"}))))
+             (swap! local assoc :edition? false))))
 
         on-file-created
         (mf/use-callback
@@ -137,11 +140,11 @@
            i/pin)])
 
       [:a.btn-secondary.btn-small.tooltip.tooltip-bottom
-       {:on-click create-file :alt (tr "dashboard.new-file")}
+       {:on-click create-file :alt (tr "dashboard.new-file") :data-test "project-new-file"}
        i/close]
 
       [:a.btn-secondary.btn-small.tooltip.tooltip-bottom
-       {:on-click on-menu-click :alt (tr "dashboard.options")}
+       {:on-click on-menu-click :alt (tr "dashboard.options") :data-test "project-options"}
        i/actions]]
 
      [:& line-grid

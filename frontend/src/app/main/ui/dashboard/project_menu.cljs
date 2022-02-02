@@ -6,6 +6,7 @@
 
 (ns app.main.ui.dashboard.project-menu
   (:require
+   [app.common.spec :as us]
    [app.main.data.dashboard :as dd]
    [app.main.data.messages :as dm]
    [app.main.data.modal :as modal]
@@ -17,14 +18,24 @@
    [app.util.dom :as dom]
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.router :as rt]
+   [cljs.spec.alpha :as s]
    [rumext.alpha :as mf]))
+
+(s/def ::project some?)
+(s/def ::show? boolean?)
+(s/def ::on-edit fn?)
+(s/def ::on-menu-close fn?)
+(s/def ::top (s/nilable ::us/number))
+(s/def ::left (s/nilable ::us/number))
+(s/def ::on-import fn?)
+
+(s/def ::project-menu
+  (s/keys :req-un [::project ::show? ::on-edit ::on-menu-close]
+          :opt-un [::top ::left ::on-import]))
 
 (mf/defc project-menu
   [{:keys [project show? on-edit on-menu-close top left on-import] :as props}]
-  (assert (some? project) "missing `project` prop")
-  (assert (boolean? show?) "missing `show?` prop")
-  (assert (fn? on-edit) "missing `on-edit` prop")
-  (assert (fn? on-menu-close) "missing `on-menu-close` prop")
+  (us/verify ::project-menu props)
   (let [top  (or top 0)
         left (or left 0)
 
@@ -83,7 +94,7 @@
         on-finish-import
         (mf/use-callback
          (fn []
-           (when (some? on-import) (on-import))))]
+           (when (fn? on-import) (on-import))))]
 
     [:*
      [:& udi/import-form {:ref file-input
@@ -97,19 +108,20 @@
        :top top
        :left left
        :options [(when-not (:is-default project)
-                   [(tr "labels.rename") on-edit])
+                   [(tr "labels.rename") on-edit nil "project-rename"])
                  (when-not (:is-default project)
-                   [(tr "dashboard.duplicate") on-duplicate])
+                   [(tr "dashboard.duplicate") on-duplicate nil "project-duplicate"])
                  (when-not (:is-default project)
                    [(tr "dashboard.pin-unpin") toggle-pin])
                  (when (and (seq teams) (not (:is-default project)))
                    [(tr "dashboard.move-to") nil
                     (for [team teams]
-                      [(:name team) (on-move (:id team))])])
+                      [(:name team) (on-move (:id team))])
+                    "project-move-to"])
                  (when (some? on-import)
-                   [(tr "dashboard.import") on-import-files])
+                   [(tr "dashboard.import") on-import-files nil "file-import"])
                  (when-not (:is-default project)
                    [:separator])
                  (when-not (:is-default project)
-                   [(tr "labels.delete") on-delete])]}]]))
+                   [(tr "labels.delete") on-delete nil "project-delete"])]}]]))
 

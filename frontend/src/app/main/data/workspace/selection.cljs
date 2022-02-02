@@ -12,7 +12,7 @@
    [app.common.math :as mth]
    [app.common.pages :as cp]
    [app.common.spec :as us]
-   [app.common.types.interactions :as cti]
+   [app.common.spec.interactions :as cti]
    [app.common.uuid :as uuid]
    [app.main.data.modal :as md]
    [app.main.data.workspace.changes :as dch]
@@ -65,27 +65,33 @@
       (watch [_ state stream]
         (let [zoom (get-in state [:workspace-local :zoom] 1)
               stop? (fn [event] (or (dwc/interrupt? event) (ms/mouse-up? event)))
-              stoper (->> stream (rx/filter stop?))]
+              stoper (->> stream (rx/filter stop?))
+
+              calculate-selrect
+              (fn [data pos]
+                (if data
+                  (assoc data :stop pos)
+                  {:start pos :stop pos}))
+
+              selrect-stream
+              (->> ms/mouse-position
+                   (rx/scan calculate-selrect nil)
+                   (rx/map data->selrect)
+                   (rx/filter #(or (> (:width %) (/ 10 zoom))
+                                   (> (:height %) (/ 10 zoom))))
+                   (rx/take-until stoper))]
           (rx/concat
-            (when-not preserve?
-              (rx/of (deselect-all)))
-            (->> ms/mouse-position
-                 (rx/scan (fn [data pos]
-                            (if data
-                              (assoc data :stop pos)
-                              {:start pos :stop pos}))
-                          nil)
-                 (rx/map data->selrect)
-                 (rx/filter #(or (> (:width %) (/ 10 zoom))
-                                 (> (:height %) (/ 10 zoom))))
+           (if preserve?
+             (rx/empty)
+             (rx/of (deselect-all)))
 
-                 (rx/flat-map
-                  (fn [selrect]
-                    (rx/of (update-selrect selrect)
-                           (select-shapes-by-current-selrect preserve?))))
+           (rx/merge
+            (->> selrect-stream (rx/map update-selrect))
+            (->> selrect-stream
+                 (rx/debounce 50)
+                 (rx/map #(select-shapes-by-current-selrect preserve?))))
 
-                 (rx/take-until stoper))
-            (rx/of (update-selrect nil))))))))
+           (rx/of (update-selrect nil))))))))
 
 ;; --- Toggle shape's selection status (selected or deselected)
 
@@ -144,7 +150,7 @@
 
     ptk/WatchEvent
     (watch [_ state _]
-       (let [objects (wsh/lookup-page-objects state)]
+      (let [objects (wsh/lookup-page-objects state)]
         (rx/of (dwc/expand-all-parents ids objects))))))
 
 (defn select-all
@@ -178,11 +184,13 @@
             is-not-blocked (fn [shape-id] (not (get-in state [:workspace-data
                                                               :pages-index page-id
                                                               :objects shape-id
-                                                              :blocked] false)))]
-        (rx/of (->> new-selected
-                    (filter is-not-blocked)
-                    (into lks/empty-linked-set)
-                    (select-shapes)))))))
+                                                              :blocked] false)))
+
+            selected-ids (into lks/empty-linked-set
+                               (comp (filter some?)
+                                     (filter is-not-blocked))
+                               new-selected)]
+        (rx/of (select-shapes selected-ids))))))
 
 (defn deselect-all
   "Clear all possible state of drawing, edition
@@ -221,11 +229,13 @@
             selrect (get-in state [:workspace-local :selrect])
             blocked? (fn [id] (get-in objects [id :blocked] false))]
         (when selrect
-          (->> (uw/ask! {:cmd :selection/query
-                         :page-id page-id
-                         :rect selrect
-                         :include-frames? true
-                         :full-frame? true})
+          (rx/empty)
+          (->> (uw/ask-buffered!
+                {:cmd :selection/query
+                 :page-id page-id
+                 :rect selrect
+                 :include-frames? true
+                 :full-frame? true})
                (rx/map #(cp/clean-loops objects %))
                (rx/map #(into initial-set (filter (comp not blocked?)) %))
                (rx/map select-shapes)))))))
@@ -246,7 +256,7 @@
             ;; in the later vector position
             selected (->> children
                           reverse
-                           (d/seek #(geom/has-point? % position)))]
+                          (d/seek #(geom/has-point? % position)))]
         (when selected
           (rx/of (select-shape (:id selected))))))))
 
@@ -302,8 +312,8 @@
               result (prepare-duplicate-change objects page-id unames update-unames! ids-map id delta)
               result (if (vector? result) result [result])]
           (recur
-            (next ids)
-            (into chgs result)))
+           (next ids)
+           (into chgs result)))
         chgs))))
 
 (defn duplicate-changes-update-indices
@@ -374,12 +384,12 @@
                         (mapcat #(prepare-duplicate-shape-change objects page-id unames update-unames! ids-map % delta new-id new-id)))
 
         new-frame  (-> obj
-                      (assoc :id new-id
-                             :name frame-name
-                             :frame-id uuid/zero
-                             :shapes [])
-                      (geom/move delta)
-                      (d/update-when :interactions #(cti/remap-interactions % ids-map objects)))
+                       (assoc :id new-id
+                              :name frame-name
+                              :frame-id uuid/zero
+                              :shapes [])
+                       (geom/move delta)
+                       (d/update-when :interactions #(cti/remap-interactions % ids-map objects)))
 
         fch {:type :add-obj
              :old-id (:id obj)
@@ -441,7 +451,7 @@
   (ptk/reify ::duplicate-selected
     ptk/WatchEvent
     (watch [it state _]
-      (when (nil? (get-in state [:workspace-local :transform]))
+      (when (or (not move-delta?) (nil? (get-in state [:workspace-local :transform])))
         (let [page-id  (:current-page-id state)
               objects  (wsh/lookup-page-objects state page-id)
               selected (wsh/lookup-selected state)
@@ -467,10 +477,10 @@
 
               id-duplicated (when (= (count selected) 1) (first selected))]
 
-          (rx/of (dch/commit-changes {:redo-changes rchanges
+          (rx/of (select-shapes selected)
+                 (dch/commit-changes {:redo-changes rchanges
                                       :undo-changes uchanges
                                       :origin it})
-                 (select-shapes selected)
                  (memorize-duplicated id-original id-duplicated)))))))
 
 (defn change-hover-state

@@ -11,7 +11,6 @@
    [app.main.store :as st]
    [app.main.ui.auth :refer [auth]]
    [app.main.ui.auth.verify-token :refer [verify-token]]
-   [app.main.ui.components.fullscreen :as fs]
    [app.main.ui.context :as ctx]
    [app.main.ui.cursors :as c]
    [app.main.ui.dashboard :refer [dashboard]]
@@ -30,7 +29,8 @@
 
 (mf/defc on-main-error
   [{:keys [error] :as props}]
-  (mf/use-effect (st/emitf (rt/assign-exception error)))
+  (mf/with-effect
+    (st/emit! (rt/assign-exception error)))
   [:span "Internal application error"])
 
 (mf/defc main-page
@@ -62,8 +62,7 @@
           [:h1 "Cursors"]
           [:& c/debug-preview]
           [:h1 "Icons"]
-          [:& i/debug-icons-preview]
-          ])
+          [:& i/debug-icons-preview]])
 
        (:dashboard-search
         :dashboard-projects
@@ -73,42 +72,43 @@
         :dashboard-font-providers
         :dashboard-team-members
         :dashboard-team-settings)
-       (when profile
-         (let [props (:props profile)]
-           [:*
-            #_[:div.modal-wrapper
-               #_[:& app.main.ui.onboarding/onboarding-templates-modal]
-               [:& app.main.ui.onboarding/onboarding-modal]
-               #_[:& app.main.ui.onboarding/onboarding-team-modal]
-               ]
-            (cond
-              (and cf/onboarding-form-id
-                   (not (:onboarding-questions-answered props false)))
-              [:& app.main.ui.onboarding.questions/questions
-               {:profile profile
-                :form-id cf/onboarding-form-id}]
 
-              (not (:onboarding-viewed props))
-              [:& app.main.ui.onboarding/onboarding-modal {}]
+       [:*
+        #_[:div.modal-wrapper
+           #_[:& app.main.ui.onboarding/onboarding-templates-modal]
+           #_[:& app.main.ui.onboarding/onboarding-modal]
+           #_[:& app.main.ui.onboarding/onboarding-team-modal]]
+        (when-let [props (some-> profile (get :props {}))]
+          (cond
+            (and cf/onboarding-form-id
+                 (not (:onboarding-questions-answered props false))
+                 (not (:onboarding-viewed props false)))
 
-              (and (:onboarding-viewed props)
-                   (not= (:release-notes-viewed props) (:main @cf/version))
-                   (not= "0.0" (:main @cf/version)))
-              [:& app.main.ui.releases/release-notes-modal {}])
-            [:& dashboard {:route route}]]))
+            [:& app.main.ui.onboarding.questions/questions
+             {:profile profile
+              :form-id cf/onboarding-form-id}]
+
+            (not (:onboarding-viewed props))
+            [:& app.main.ui.onboarding/onboarding-modal {}]
+
+            (and (:onboarding-viewed props)
+                 (not= (:release-notes-viewed props) (:main @cf/version))
+                 (not= "0.0" (:main @cf/version)))
+            [:& app.main.ui.releases/release-notes-modal {}]))
+
+        [:& dashboard {:route route :profile profile}]]
 
        :viewer
        (let [{:keys [query-params path-params]} route
              {:keys [index share-id section page-id] :or {section :interactions}} query-params
              {:keys [file-id]} path-params]
-         [:& fs/fullscreen-wrapper {}
-          (if (:token query-params)
-            [:& viewer/breaking-change-notice]
-            [:& viewer/viewer-page {:page-id page-id
-                                    :file-id file-id
-                                    :section section
-                                    :index index
-                                    :share-id share-id}])])
+         (if (:token query-params)
+           [:& viewer/breaking-change-notice]
+           [:& viewer/viewer-page {:page-id page-id
+                                   :file-id file-id
+                                   :section section
+                                   :index index
+                                   :share-id share-id}]))
 
        :render-object
        (do

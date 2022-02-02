@@ -12,8 +12,8 @@
    [app.common.geom.shapes :as gsh]
    [app.common.pages.changes :as ch]
    [app.common.pages.init :as init]
-   [app.common.pages.spec :as spec]
    [app.common.spec :as us]
+   [app.common.spec.change :as spec.change]
    [app.common.uuid :as uuid]
    [cuerdas.core :as str]))
 
@@ -21,15 +21,14 @@
 (def conjv (fnil conj []))
 (def conjs (fnil conj #{}))
 
-;; This flag controls if we should execute spec validation after every commit
-(def verify-on-commit? true)
-
 (defn- commit-change
   ([file change]
    (commit-change file change nil))
 
-  ([file change {:keys [add-container?]
-                 :or   {add-container? false}}]
+  ([file change {:keys [add-container?
+                        fail-on-spec?]
+                 :or   {add-container? false
+                        fail-on-spec? false}}]
    (let [component-id (:current-component-id file)
          change (cond-> change
                   (and add-container? (some? component-id))
@@ -39,11 +38,20 @@
                   (assoc :page-id  (:current-page-id file)
                          :frame-id (:current-frame-id file)))]
 
-     (when verify-on-commit?
-       (us/assert ::spec/change change))
-     (-> file
-         (update :changes conjv change)
-         (update :data ch/process-changes [change] verify-on-commit?)))))
+     (when fail-on-spec?
+       (us/verify ::spec.change/change change))
+
+     (let [valid? (us/valid? ::spec.change/change change)]
+       #?(:cljs
+          (when-not valid? (.warn js/console "Invalid shape" (clj->js change))))
+
+       (cond-> file
+         valid?
+         (-> (update :changes conjv change)
+             (update :data ch/process-changes [change] false))
+
+         (not valid?)
+         (update :errors conjv change))))))
 
 (defn- lookup-objects
   ([file]
@@ -51,20 +59,21 @@
      (get-in file [:data :components  (:current-component-id file) :objects])
      (get-in file [:data :pages-index (:current-page-id file) :objects]))))
 
-(defn- lookup-shape [file shape-id]
+(defn lookup-shape [file shape-id]
   (-> (lookup-objects file)
       (get shape-id)))
 
 (defn- commit-shape [file obj]
-  (let [parent-id (-> file :parent-stack peek)]
-    (-> file
-        (commit-change
-         {:type :add-obj
-          :id (:id obj)
-          :obj obj
-          :parent-id parent-id}
+  (let [parent-id (-> file :parent-stack peek)
+        change {:type :add-obj
+                :id (:id obj)
+                :obj obj
+                :parent-id parent-id}
 
-         {:add-container? true}))))
+        fail-on-spec? (or (= :group (:type obj))
+                          (= :frame (:type obj)))]
+
+    (commit-change file change {:add-container? true :fail-on-spec? fail-on-spec?})))
 
 (defn setup-rect-selrect [obj]
   (let [rect      (select-keys obj [:x :y :width :height])
@@ -321,16 +330,11 @@
         (update :parent-stack pop))))
 
 (defn create-shape [file type data]
-  (let [frame-id (:current-frame-id file)
-        frame (when-not (= frame-id root-frame)
-                (lookup-shape file frame-id))
-        obj (-> (init/make-minimal-shape type)
+  (let [obj (-> (init/make-minimal-shape type)
                 (merge data)
                 (check-name file :type)
                 (setup-selrect)
-                (d/without-nils))
-        obj (cond-> obj
-              frame (gsh/translate-from-frame frame))]
+                (d/without-nils))]
     (-> file
         (commit-shape obj)
         (assoc :last-id (:id obj))
@@ -426,35 +430,36 @@
 (defn add-interaction
   [file from-id interaction-src]
 
-  (assert (some? (lookup-shape file from-id)) (str "Cannot locate shape with id " from-id))
+  (let [shape (lookup-shape file from-id)]
+    (if (nil? shape)
+      file
+      (let [{:keys [event-type action-type]} (read-classifier interaction-src)
+            {:keys [delay]} (read-event-opts interaction-src)
+            {:keys [destination overlay-pos-type overlay-position url
+                    close-click-outside background-overlay preserve-scroll]}
+            (read-action-opts interaction-src)
 
-  (let [{:keys [event-type action-type]} (read-classifier interaction-src)
-        {:keys [delay]} (read-event-opts interaction-src)
-        {:keys [destination overlay-pos-type overlay-position url
-                close-click-outside background-overlay preserve-scroll]}
-        (read-action-opts interaction-src)
+            interactions (-> shape
+                             :interactions
+                             (conjv
+                              (d/without-nils {:event-type event-type
+                                               :action-type action-type
+                                               :delay delay
+                                               :destination destination
+                                               :overlay-pos-type overlay-pos-type
+                                               :overlay-position overlay-position
+                                               :url url
+                                               :close-click-outside close-click-outside
+                                               :background-overlay background-overlay
+                                               :preserve-scroll preserve-scroll})))]
+        (commit-change
+         file
+         {:type :mod-obj
+          :page-id (:current-page-id file)
+          :id from-id
 
-        interactions (-> (lookup-shape file from-id)
-                         :interactions
-                         (conjv
-                          (d/without-nils {:event-type event-type
-                                           :action-type action-type
-                                           :delay delay
-                                           :destination destination
-                                           :overlay-pos-type overlay-pos-type
-                                           :overlay-position overlay-position
-                                           :url url
-                                           :close-click-outside close-click-outside
-                                           :background-overlay background-overlay
-                                           :preserve-scroll preserve-scroll})))]
-    (commit-change
-     file
-     {:type :mod-obj
-      :page-id (:current-page-id file)
-      :id from-id
-
-      :operations
-      [{:type :set :attr :interactions :val interactions}]})))
+          :operations
+          [{:type :set :attr :interactions :val interactions}]})))))
 
 (defn generate-changes
   [file]
@@ -564,4 +569,78 @@
         (dissoc :current-component-id)
         (update :parent-stack pop))))
 
+(defn delete-object
+  [file id]
+  (let [page-id (:current-page-id file)]
+    (commit-change
+     file
+     {:type :del-obj
+      :page-id page-id
+      :id id})))
 
+(defn update-object
+  [file old-obj new-obj]
+  (let [page-id (:current-page-id file)
+        new-obj (setup-selrect new-obj)
+        attrs (d/concat-set (keys old-obj) (keys new-obj))
+        generate-operation
+        (fn [changes attr]
+          (let [old-val (get old-obj attr)
+                new-val (get new-obj attr)]
+            (if (= old-val new-val)
+              changes
+              (conj changes {:type :set :attr attr :val new-val}))))]
+    (-> file
+        (commit-change
+         {:type :mod-obj
+          :operations (reduce generate-operation [] attrs)
+          :page-id page-id
+          :id (:id old-obj)}))))
+
+(defn get-current-page
+  [file]
+  (let [page-id (:current-page-id file)]
+    (-> file (get-in [:data :pages-index page-id]))))
+
+(defn add-guide
+  [file guide]
+
+  (let [guide (cond-> guide
+                (nil? (:id guide))
+                (assoc :id (uuid/next)))
+        page-id (:current-page-id file)
+        old-guides (or (get-in file [:data :pages-index page-id :options :guides]) {})
+        new-guides (assoc old-guides (:id guide) guide)]
+    (-> file
+        (commit-change
+         {:type :set-option
+          :page-id page-id
+          :option :guides
+          :value new-guides})
+        (assoc :last-id (:id guide)))))
+
+(defn delete-guide
+  [file id]
+
+  (let [page-id (:current-page-id file)
+        old-guides (or (get-in file [:data :pages-index page-id :options :guides]) {})
+        new-guides (dissoc old-guides id)]
+    (-> file
+        (commit-change
+         {:type :set-option
+          :page-id page-id
+          :option :guides
+          :value new-guides}))))
+
+(defn update-guide
+  [file guide]
+
+  (let [page-id (:current-page-id file)
+        old-guides (or (get-in file [:data :pages-index page-id :options :guides]) {})
+        new-guides (assoc old-guides (:id guide) guide)]
+    (-> file
+        (commit-change
+         {:type :set-option
+          :page-id page-id
+          :option :guides
+          :value new-guides}))))

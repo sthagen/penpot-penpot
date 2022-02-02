@@ -61,18 +61,20 @@
    ::mf/register-as :onboarding-templates}
   ;; NOTE: the project usually comes empty, it only comes fullfilled
   ;; when a user creates a new team just after signup.
-  [{:keys [project-id] :as props}]
-  (let [close-fn   (mf/use-callback #(st/emit! (modal/hide)))
+  [props]
+  (let [project-id (unchecked-get props "project-id")
+        close-fn   (mf/use-callback #(st/emit! (modal/hide)))
         profile    (mf/deref refs/profile)
         project-id (or project-id (:default-project-id profile))]
     [:div.modal-overlay
      [:div.modal-container.onboarding-templates
       [:div.modal-header
        [:div.modal-close-button
-        {:on-click close-fn} i/close]]
+        {:on-click close-fn
+         :data-test "close-templates-btn"} i/close]]
 
       [:div.modal-content
-       [:h3 (tr "onboarding.templates.title")]
+       [:h3 {:data-test "onboarding-templates-title"} (tr "onboarding.templates.title")]
        [:p (tr "onboarding.templates.subtitle")]
 
        [:div.templates

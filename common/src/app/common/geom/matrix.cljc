@@ -10,14 +10,36 @@
       :clj  [clojure.pprint :as pp])
    [app.common.data :as d]
    [app.common.geom.point :as gpt]
-   [app.common.math :as mth]))
+   [app.common.math :as mth]
+   [app.common.spec :as us]
+   [clojure.spec.alpha :as s]))
 
 ;; --- Matrix Impl
 
-(defrecord Matrix [a b c d e f]
+(defrecord Matrix [^double a
+                   ^double b
+                   ^double c
+                   ^double d
+                   ^double e
+                   ^double f]
   Object
   (toString [_]
     (str "matrix(" a "," b "," c "," d "," e "," f ")")))
+
+(defn ^boolean matrix?
+  "Return true if `v` is Matrix instance."
+  [v]
+  (instance? Matrix v))
+
+(s/def ::a ::us/safe-number)
+(s/def ::b ::us/safe-number)
+(s/def ::c ::us/safe-number)
+(s/def ::d ::us/safe-number)
+(s/def ::e ::us/safe-number)
+(s/def ::f ::us/safe-number)
+
+(s/def ::matrix
+  (s/and (s/keys :req-un [::a ::b ::c ::d ::e ::f]) matrix?))
 
 (defn matrix
   "Create a new matrix instance."
@@ -36,15 +58,29 @@
     (apply matrix params)))
 
 (defn multiply
-  ([{m1a :a m1b :b m1c :c m1d :d m1e :e m1f :f}
-    {m2a :a m2b :b m2c :c m2d :d m2e :e m2f :f}]
-   (Matrix.
-    (+ (* m1a m2a) (* m1c m2b))
-    (+ (* m1b m2a) (* m1d m2b))
-    (+ (* m1a m2c) (* m1c m2d))
-    (+ (* m1b m2c) (* m1d m2d))
-    (+ (* m1a m2e) (* m1c m2f) m1e)
-    (+ (* m1b m2e) (* m1d m2f) m1f)))
+  ([^Matrix m1 ^Matrix m2]
+   (let [m1a (.-a m1)
+         m1b (.-b m1)
+         m1c (.-c m1)
+         m1d (.-d m1)
+         m1e (.-e m1)
+         m1f (.-f m1)
+
+         m2a (.-a m2)
+         m2b (.-b m2)
+         m2c (.-c m2)
+         m2d (.-d m2)
+         m2e (.-e m2)
+         m2f (.-f m2)]
+
+     (Matrix.
+      (+ (* m1a m2a) (* m1c m2b))
+      (+ (* m1b m2a) (* m1d m2b))
+      (+ (* m1a m2c) (* m1c m2d))
+      (+ (* m1b m2c) (* m1d m2d))
+      (+ (* m1a m2e) (* m1c m2f) m1e)
+      (+ (* m1b m2e) (* m1d m2f) m1f))))
+
   ([m1 m2 & others]
    (reduce multiply (multiply m1 m2) others)))
 
@@ -53,13 +89,8 @@
   values), combine them. Quicker than multiplying them, for this
   precise case."
   ([{m1e :e m1f :f} {m2e :e m2f :f}]
-   (Matrix.
-    1
-    0
-    0
-     1
-    (+ m1e m2e)
-    (+ m1f m2f)))
+   (Matrix. 1 0 0 1 (+ m1e m2e) (+ m1f m2f)))
+
   ([m1 m2 & others]
    (reduce add-translate (add-translate m1 m2) others)))
 
@@ -69,11 +100,6 @@
   (Matrix.
    (- m1a m2a) (- m1b m2b) (- m1c m2c)
    (- m1d m2d) (- m1e m2e) (- m1f m2f)))
-
-(defn ^boolean matrix?
-  "Return true if `v` is Matrix instance."
-  [v]
-  (instance? Matrix v))
 
 (def base (matrix))
 

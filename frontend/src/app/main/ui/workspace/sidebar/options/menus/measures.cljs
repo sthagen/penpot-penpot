@@ -9,7 +9,7 @@
    [app.common.data :as d]
    [app.common.geom.shapes :as gsh]
    [app.common.math :as math]
-   [app.common.types.radius :as ctr]
+   [app.common.spec.radius :as ctr]
    [app.main.data.workspace :as udw]
    [app.main.data.workspace.changes :as dch]
    [app.main.refs :as refs]
@@ -20,13 +20,14 @@
    [app.util.i18n :as i18n :refer [tr]]
    [rumext.alpha :as mf]))
 
-(def measure-attrs [:proportion-lock
-                    :width :height
-                    :x :y
-                    :rotation
-                    :rx :ry
-                    :r1 :r2 :r3 :r4
-                    :selrect])
+(def measure-attrs
+  [:proportion-lock
+   :width :height
+   :x :y
+   :rotation
+   :rx :ry
+   :r1 :r2 :r3 :r4
+   :selrect])
 
 (defn- attr->string [attr values]
   (let [value (attr values)]
@@ -198,13 +199,15 @@
                               :placeholder "--"
                               :on-click select-all
                               :on-change on-pos-x-change
-                              :value (attr->string :x values)}]]
+                              :value (attr->string :x values)
+                              :precision 2}]]
           [:div.input-element.Yaxis {:title (tr "workspace.options.y")}
            [:> numeric-input {:no-validate true
                               :placeholder "--"
                               :on-click select-all
                               :on-change on-pos-y-change
-                              :value (attr->string :y values)}]]])
+                              :value (attr->string :y values)
+                              :precision 2}]]])
 
        ;; ROTATION
        (when (options :rotation)

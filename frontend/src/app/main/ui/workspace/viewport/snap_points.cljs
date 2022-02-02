@@ -15,7 +15,7 @@
    [beicon.core :as rx]
    [rumext.alpha :as mf]))
 
-(def ^:private line-color "#D383DA")
+(def ^:private line-color "var(--color-snap)")
 (def ^:private line-opacity 0.6)
 (def ^:private line-width 1)
 
@@ -52,13 +52,13 @@
           :opacity line-opacity}])
 
 (defn get-snap
-  [coord {:keys [shapes page-id filter-shapes modifiers]}]
+  [coord {:keys [shapes page-id remove-snap? modifiers]}]
   (let [shape (if (> (count shapes) 1)
                 (->> shapes (map gsh/transform-shape) gsh/selection-rect (gsh/setup {:type :rect}))
                 (->> shapes (first)))
 
         shape (if modifiers
-                (-> shape (assoc :modifiers modifiers) gsh/transform-shape)
+                (-> shape (merge (get modifiers (:id shape))) gsh/transform-shape)
                 shape)
 
         frame-id (snap/snap-frame-id shapes)]
@@ -68,7 +68,7 @@
                         (->> (sp/shape-snap-points shape)
                              (map #(vector frame-id %)))))
          (rx/flat-map (fn [[frame-id point]]
-                        (->> (snap/get-snap-points page-id frame-id filter-shapes point coord)
+                        (->> (snap/get-snap-points page-id frame-id remove-snap? point coord)
                              (rx/map #(vector point % coord)))))
          (rx/reduce conj []))))
 
@@ -104,7 +104,7 @@
                                         (hash-map coord fixedv (flip coord) maxv)]))))
 
 (mf/defc snap-feedback
-  [{:keys [shapes filter-shapes zoom modifiers] :as props}]
+  [{:keys [shapes remove-snap? zoom modifiers] :as props}]
   (let [state (mf/use-state [])
         subject (mf/use-memo #(rx/subject))
 
@@ -121,7 +121,7 @@
                       (rx/switch-map #(rx/combine-latest (get-snap :x %)
                                                          (get-snap :y %)))
                       (rx/map (fn [result]
-                                (apply d/concat (seq result))))
+                                (apply d/concat-vec (seq result))))
                       (rx/subs #(let [rs (filter (fn [[_ snaps _]] (> (count snaps) 0)) %)]
                                   (reset! state rs))))]
 
@@ -129,7 +129,7 @@
          #(rx/dispose! sub))))
 
     (mf/use-effect
-     (mf/deps shapes filter-shapes modifiers)
+     (mf/deps shapes remove-snap? modifiers)
      (fn []
        (rx/push! subject props)))
 
@@ -152,29 +152,23 @@
   {::mf/wrap [mf/memo]}
   [{:keys [layout zoom objects selected page-id drawing transform modifiers] :as props}]
 
-  (let [;; shapes        (mf/deref (refs/objects-by-id selected))
-        ;; filter-shapes (mf/deref refs/selected-shapes-with-children)
+  (let [shapes (into [] (keep (d/getf objects)) selected)
 
-        shapes (->> selected
-                    (map #(get objects %))
-                    (filterv (comp not nil?)))
-        filter-shapes (into #{}
-                            (comp (mapcat #(cp/get-object-with-children % objects))
-                                  (map :id))
-                            selected)
+        filter-shapes
+        (into #{}
+              (comp (mapcat #(cp/get-object-with-children % objects))
+                    (map :id))
+              selected)
 
-        filter-shapes (fn [id]
-                        (if (= id :layout)
-                          (or (not (contains? layout :display-grid))
-                              (not (contains? layout :snap-grid)))
-                          (or (filter-shapes id)
-                              (not (contains? layout :dynamic-alignment)))))
+        remove-snap? (mf/use-memo
+                      (mf/deps layout filter-shapes)
+                      #(snap/make-remove-snap layout filter-shapes))
 
         shapes    (if drawing [drawing] shapes)]
     (when (or drawing transform)
       [:& snap-feedback {:shapes shapes
                          :page-id page-id
-                         :filter-shapes filter-shapes
+                         :remove-snap? remove-snap?
                          :zoom zoom
                          :modifiers modifiers}])))
 

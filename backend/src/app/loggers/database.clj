@@ -7,17 +7,13 @@
 (ns app.loggers.database
   "A specific logger impl that persists errors on the database."
   (:require
-   [app.common.exceptions :as ex]
    [app.common.logging :as l]
-   [app.common.spec :as us]
    [app.common.uuid :as uuid]
    [app.config :as cf]
    [app.db :as db]
    [app.util.async :as aa]
-   [app.util.template :as tmpl]
    [app.worker :as wrk]
    [clojure.core.async :as a]
-   [clojure.java.io :as io]
    [clojure.spec.alpha :as s]
    [cuerdas.core :as str]
    [integrant.core :as ig]))
@@ -32,11 +28,12 @@
 
 (defn- persist-on-database!
   [{:keys [pool] :as cfg} {:keys [id] :as event}]
-  (db/with-atomic [conn pool]
-    (db/insert! conn :server-error-report
-                {:id id :content (db/tjson event)})))
+  (when-not (db/read-only? pool)
+    (db/with-atomic [conn pool]
+      (db/insert! conn :server-error-report
+                  {:id id :content (db/tjson event)}))))
 
-(defn- parse-context
+(defn- parse-event-data
   [event]
   (reduce-kv
    (fn [acc k v]
@@ -46,22 +43,25 @@
        (str/blank? v)    acc
        :else             (assoc acc k v)))
    {}
-   (:context event)))
+   event))
 
 (defn parse-event
   [event]
-  (-> (parse-context event)
-      (merge (dissoc event :context))
+  (-> (parse-event-data event)
       (assoc :tenant (cf/get :tenant))
       (assoc :host (cf/get :host))
       (assoc :public-uri (cf/get :public-uri))
-      (assoc :version (:full cf/version))))
+      (assoc :version (:full cf/version))
+      (update :id (fn [id] (or id (uuid/next))))))
 
 (defn handle-event
   [{:keys [executor] :as cfg} event]
   (aa/with-thread executor
     (try
-      (let [event (parse-event event)]
+      (let [event (parse-event event)
+            uri   (cf/get :public-uri)]
+        (l/debug :hint "registering error on database" :id (:id event)
+                 :uri (str uri "/dbg/error/" (:id event)))
         (persist-on-database! cfg event))
       (catch Exception e
         (l/warn :hint "unexpected exception on database error logger"
@@ -74,7 +74,8 @@
   [_ {:keys [receiver] :as cfg}]
   (l/info :msg "initializing database error persistence")
   (let [output (a/chan (a/sliding-buffer 128)
-                       (filter #(= (:level %) "error")))]
+                       (filter (fn [event]
+                                 (= (:logger/level event) "error"))))]
     (receiver :sub output)
     (a/go-loop []
       (let [msg (a/<! output)]
@@ -88,39 +89,3 @@
 (defmethod ig/halt-key! ::reporter
   [_ output]
   (a/close! output))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Http Handler
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmethod ig/pre-init-spec ::handler [_]
-  (s/keys :req-un [::db/pool]))
-
-(defmethod ig/init-key ::handler
-  [_ {:keys [pool] :as cfg}]
-  (letfn [(parse-id [request]
-            (let [id (get-in request [:path-params :id])
-                  id (us/uuid-conformer id)]
-              (when (uuid? id)
-                id)))
-          (retrieve-report [id]
-            (ex/ignoring
-             (when-let [{:keys [content] :as row} (db/get-by-id pool :server-error-report id)]
-               (assoc row :content (db/decode-transit-pgobject content)))))
-
-          (render-template [{:keys [content] :as report}]
-            (some-> (io/resource "error-report.tmpl")
-                    (tmpl/render content)))]
-
-
-    (fn [request]
-      (let [result (some-> (parse-id request)
-                           (retrieve-report)
-                           (render-template))]
-        (if result
-          {:status 200
-           :headers {"content-type" "text/html; charset=utf-8"
-                     "x-robots-tag" "noindex"}
-           :body result}
-          {:status 404
-           :body "not found"})))))

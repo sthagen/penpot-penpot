@@ -13,12 +13,21 @@
 ;; Auxiliary functions to help create a set of changes (undo + redo)
 
 (defn empty-changes
-  [origin page-id]
-  (let [changes {:redo-changes []
-                 :undo-changes []
-                 :origin origin}]
-    (with-meta changes
-      {::page-id page-id})))
+  ([origin page-id]
+   (let [changes (empty-changes origin)]
+     (with-meta changes
+       {::page-id page-id})))
+
+  ([origin]
+   {:redo-changes []
+    :undo-changes []
+    :origin origin}))
+
+(defn with-page [changes page]
+  (vary-meta changes assoc
+             ::page page
+             ::page-id (:id page)
+             ::objects (:objects page)))
 
 (defn with-objects [changes objects]
   (vary-meta changes assoc ::objects objects))
@@ -47,29 +56,33 @@
          (update :undo-changes d/preconj del-change)))))
 
 (defn change-parent
-  [changes parent-id shapes]
-  (assert (contains? (meta changes) ::objects) "Call (with-objects) first to use this function")
+  ([changes parent-id shapes] (change-parent changes parent-id shapes nil))
+  ([changes parent-id shapes index]
+   (assert (contains? (meta changes) ::objects) "Call (with-objects) first to use this function")
 
-  (let [objects (::objects (meta changes))
-        set-parent-change
-        {:type :mov-objects
-         :parent-id parent-id
-         :page-id (::page-id (meta changes))
-         :shapes (->> shapes (mapv :id))}
+   (let [objects (::objects (meta changes))
+         set-parent-change
+         (cond-> {:type :mov-objects
+                  :parent-id parent-id
+                  :page-id (::page-id (meta changes))
+                  :shapes (->> shapes (mapv :id))}
 
-        mk-undo-change
-        (fn [change-set shape]
-          (d/preconj
-           change-set
-           {:type :mov-objects
-            :page-id (::page-id (meta changes))
-            :parent-id (:parent-id shape)
-            :shapes [(:id shape)]
-            :index (cp/position-on-parent (:id shape) objects)}))]
+           (some? index)
+           (assoc :index index))
 
-    (-> changes
-        (update :redo-changes conj set-parent-change)
-        (update :undo-changes #(reduce mk-undo-change % shapes)))))
+         mk-undo-change
+         (fn [change-set shape]
+           (d/preconj
+             change-set
+             {:type :mov-objects
+              :page-id (::page-id (meta changes))
+              :parent-id (:parent-id shape)
+              :shapes [(:id shape)]
+              :index (cp/position-on-parent (:id shape) objects)}))]
+
+     (-> changes
+         (update :redo-changes conj set-parent-change)
+         (update :undo-changes #(reduce mk-undo-change % shapes))))))
 
 (defn- generate-operation
   "Given an object old and new versions and an attribute will append into changes
@@ -98,7 +111,7 @@
            (let [old-obj (get objects id)
                  new-obj (update-fn old-obj)
 
-                 attrs (or attrs (d/concat #{} (keys old-obj) (keys new-obj)))
+                 attrs (or attrs (d/concat-set (keys old-obj) (keys new-obj)))
 
                  {rops :rops uops :uops}
                  (reduce #(generate-operation %1 %2 old-obj new-obj ignore-geometry?)
@@ -167,10 +180,25 @@
                                  (reduce add-undo-change-parent $ ids)
                                  (reduce add-undo-change-shape $ ids))))))
 
-
 (defn move-page
   [chdata index prev-index]
   (let [page-id (::page-id (meta chdata))]
     (-> chdata
         (update :redo-changes conj {:type :mov-page :id page-id :index index})
         (update :undo-changes conj {:type :mov-page :id page-id :index prev-index}))))
+
+(defn set-page-option
+  [chdata option-key option-val]
+  (let [page-id (::page-id (meta chdata))
+        page (::page (meta chdata))
+        old-val (get-in page [:options option-key])]
+
+    (-> chdata
+        (update :redo-changes conj {:type :set-option
+                                    :page-id page-id
+                                    :option option-key
+                                    :value option-val})
+        (update :undo-changes conj {:type :set-option
+                                    :page-id page-id
+                                    :option option-key
+                                    :value old-val}))))

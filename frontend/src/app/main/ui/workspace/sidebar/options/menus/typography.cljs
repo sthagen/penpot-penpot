@@ -11,10 +11,13 @@
    [app.common.exceptions :as ex]
    [app.common.pages :as cp]
    [app.common.text :as txt]
+   [app.main.data.fonts :as fts]
    [app.main.data.shortcuts :as dsc]
    [app.main.fonts :as fonts]
+   [app.main.refs :as refs]
    [app.main.store :as st]
    [app.main.ui.components.editable-select :refer [editable-select]]
+   [app.main.ui.components.numeric-input :refer [numeric-input]]
    [app.main.ui.icons :as i]
    [app.main.ui.workspace.sidebar.options.common :refer [advanced-options]]
    [app.util.dom :as dom]
@@ -22,6 +25,7 @@
    [app.util.keyboard :as kbd]
    [app.util.object :as obj]
    [app.util.router :as rt]
+   [app.util.strings :as ust]
    [app.util.timers :as tm]
    [cuerdas.core :as str]
    [goog.events :as events]
@@ -30,7 +34,7 @@
 (defn- attr->string [value]
   (if (= value :multiple)
     ""
-    (str value)))
+    (ust/format-precision value 2)))
 
 (defn- get-next-font
   [{:keys [id] :as current} fonts]
@@ -91,13 +95,14 @@
 
 (mf/defc font-selector
   [{:keys [on-select on-close current-font] :as props}]
-  (let [selected (mf/use-state current-font)
-        state    (mf/use-state {:term "" :backends #{}})
+  (let [selected     (mf/use-state current-font)
+        state        (mf/use-state {:term "" :backends #{}})
 
-        flist    (mf/use-ref)
-        input    (mf/use-ref)
+        flist        (mf/use-ref)
+        input        (mf/use-ref)
 
-        fonts    (mf/use-memo (mf/deps @state) #(filter-fonts @state @fonts/fonts))
+        fonts        (mf/use-memo (mf/deps @state) #(filter-fonts @state @fonts/fonts))
+        recent-fonts (mf/deref refs/workspace-recent-fonts)
 
         select-next
         (mf/use-callback
@@ -140,6 +145,10 @@
            (on-select font)
            (on-close)))
         ]
+    
+    (mf/use-effect
+     (fn []
+       (st/emit! (fts/load-recent-fonts))))
 
     (mf/use-effect
      (mf/deps fonts)
@@ -181,6 +190,13 @@
                 :ref input
                 :spell-check false
                 :on-change on-filter-change}]
+       (when recent-fonts
+         (for [font recent-fonts]
+           [:& font-item {:key (:id font)
+                          :font font
+                          :style {}
+                          :on-click on-select-and-close
+                          :current? (= (:id font) (:id @selected))}]))
 
        #_[:div.options
           {:on-click #(swap! state assoc :show-options true)
@@ -240,12 +256,13 @@
 
         fonts           (mf/deref fonts/fontsdb)
         font            (get fonts font-id)
+        recent-fonts    (mf/deref refs/workspace-recent-fonts)
 
         open-selector?  (mf/use-state false)
 
         change-font
         (mf/use-callback
-         (mf/deps on-change fonts)
+         (mf/deps on-change fonts recent-fonts)
          (fn [new-font-id]
            (let [{:keys [family] :as font} (get fonts new-font-id)
                  {:keys [id name weight style]} (fonts/get-default-variant font)]
@@ -253,7 +270,8 @@
                          :font-family family
                          :font-variant-id (or id name)
                          :font-weight weight
-                         :font-style style}))))
+                         :font-style style})
+             (st/emit! (fts/add-recent-font font)))))
 
         on-font-size-change
         (mf/use-callback
@@ -350,20 +368,19 @@
         letter-spacing (or letter-spacing "0")
 
         handle-change
-        (fn [event attr]
-          (let [new-spacing (dom/get-target-val event)]
-            (on-change {attr new-spacing})))]
+        (fn [value attr]
+          (on-change {attr (str value)}))]
 
     [:div.spacing-options
      [:div.input-icon
       [:span.icon-before.tooltip.tooltip-bottom
        {:alt (tr "workspace.options.text-options.line-height")}
        i/line-height]
-      [:input.input-text
-       {:type "number"
-        :step "0.1"
-        :min "0"
-        :max "200"
+      [:> numeric-input
+       {:min -200
+        :max 200
+        :step 0.1
+        :precision 2
         :value (attr->string line-height)
         :placeholder (tr "settings.multiple")
         :on-change #(handle-change % :line-height)
@@ -373,11 +390,11 @@
       [:span.icon-before.tooltip.tooltip-bottom
        {:alt (tr "workspace.options.text-options.letter-spacing")}
        i/letter-spacing]
-      [:input.input-text
-       {:type "number"
-        :step "0.1"
-        :min "0"
-        :max "200"
+      [:> numeric-input
+       {:min -200
+        :max 200
+        :step 0.1
+        :precision 2
         :value (attr->string letter-spacing)
         :placeholder (tr "settings.multiple")
         :on-change #(handle-change % :letter-spacing)
