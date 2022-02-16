@@ -21,9 +21,13 @@
    [integrant.core :as ig]
    [ring.middleware.session.store :as rss]))
 
-;; A default cookie name for storing the session. We don't allow
-;; configure it.
-(def cookie-name "auth-token")
+;; A default cookie name for storing the session. We don't allow to configure it.
+(def token-cookie-name "auth-token")
+
+;; A cookie that we can use to check from other sites of the same domain if a user
+;; is registered. Is not intended for on premise installations, although nothing
+;; prevents using it if some one wants to.
+(def authenticated-cookie-name "authenticated")
 
 (deftype DatabaseStore [pool tokens]
   rss/SessionStore
@@ -36,8 +40,12 @@
           token      (tokens :generate {:iss "authentication"
                                         :iat (dt/now)
                                         :uid profile-id})
+
+          now        (dt/now)
           params     {:user-agent user-agent
                       :profile-id profile-id
+                      :created-at now
+                      :updated-at now
                       :id token}]
       (db/insert! pool :http-session params)
       token))
@@ -78,7 +86,7 @@
 
 (defn- delete-session
   [store {:keys [cookies] :as request}]
-  (when-let [token (get-in cookies [cookie-name :value])]
+  (when-let [token (get-in cookies [token-cookie-name :value])]
     (rss/delete-session store token)))
 
 (defn- retrieve-session
@@ -88,21 +96,41 @@
 
 (defn- retrieve-from-request
   [store {:keys [cookies] :as request}]
-  (->> (get-in cookies [cookie-name :value])
+  (->> (get-in cookies [token-cookie-name :value])
        (retrieve-session store)))
 
 (defn- add-cookies
   [response token]
   (let [cors?   (contains? cfg/flags :cors)
-        secure? (contains? cfg/flags :secure-session-cookies)]
-    (assoc response :cookies {cookie-name {:path "/"
-                                           :http-only true
-                                           :value token
-                                           :same-site (if cors? :none :lax)
-                                           :secure secure?}})))
+        secure? (contains? cfg/flags :secure-session-cookies)
+        authenticated-cookie-domain (cfg/get :authenticated-cookie-domain)]
+    (update response :cookies
+            (fn [cookies]
+              (cond-> cookies
+                :always
+                (assoc token-cookie-name {:path "/"
+                                          :http-only true
+                                          :value token
+                                          :same-site (if cors? :none :lax)
+                                          :secure secure?})
+
+                (some? authenticated-cookie-domain)
+                (assoc authenticated-cookie-name {:domain authenticated-cookie-domain
+                                                  :path "/"
+                                                  :value true
+                                                  :same-site :strict
+                                                  :secure secure?}))))))
+
 (defn- clear-cookies
   [response]
-  (assoc response :cookies {cookie-name {:value "" :max-age -1}}))
+  (let [authenticated-cookie-domain (cfg/get :authenticated-cookie-domain)]
+    (assoc response :cookies {token-cookie-name {:path "/"
+                                                 :value ""
+                                                 :max-age -1}
+                              authenticated-cookie-name {:domain authenticated-cookie-domain
+                                                         :path "/"
+                                                         :value ""
+                                                         :max-age -1}})))
 
 (defn- middleware
   [events-ch store handler]
@@ -122,8 +150,7 @@
 
 (defmethod ig/prep-key ::session
   [_ cfg]
-  (d/merge {:buffer-size 64}
-           (d/without-nils cfg)))
+  (d/merge {:buffer-size 128} (d/without-nils cfg)))
 
 (defmethod ig/init-key ::session
   [_ {:keys [pool tokens] :as cfg}]
@@ -198,7 +225,7 @@
 
             (= :size reason)
             (l/debug :task "updater"
-                     :action "update sessions"
+                     :hint "update sessions"
                      :reason (name reason)
                      :count result))
           (recur))))))
@@ -227,17 +254,20 @@
 
 (defmethod ig/init-key ::gc-task
   [_ {:keys [pool max-age] :as cfg}]
+  (l/debug :hint "initializing session gc task" :max-age max-age)
   (fn [_]
     (db/with-atomic [conn pool]
       (let [interval (db/interval max-age)
-            result   (db/exec-one! conn [sql:delete-expired interval])
+            result   (db/exec-one! conn [sql:delete-expired interval interval])
             result   (:next.jdbc/update-count result)]
         (l/debug :task "gc"
-                 :action "clean http sessions"
-                 :count result)
+                 :hint "clean http sessions"
+                 :deleted result)
         result))))
 
 (def ^:private
   sql:delete-expired
   "delete from http_session
-    where updated_at < now() - ?::interval")
+    where updated_at < now() - ?::interval
+       or (updated_at is null and
+           created_at < now() - ?::interval)")

@@ -8,7 +8,8 @@
   (:require
    [app.common.exceptions :as ex]
    [clojure.spec.alpha :as s]
-   [cuerdas.core :as str])
+   [cuerdas.core :as str]
+   [fipp.ednize :as fez])
   (:import
    java.time.Duration
    java.time.Instant
@@ -111,6 +112,11 @@
 (defmethod print-dup Duration [o w]
   (print-method o w))
 
+(extend-protocol fez/IEdn
+  Duration
+  (-edn [o] (pr-str o)))
+
+
 ;; --- INSTANT
 
 (defn instant
@@ -174,6 +180,10 @@
 
 (defmethod print-dup Instant [o w]
   (print-method o w))
+
+(extend-protocol fez/IEdn
+  Instant
+  (-edn [o] (pr-str o)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Cron Expression
@@ -285,6 +295,11 @@
   (s/assert cron? cron)
   (.toInstant (.getNextValidTimeAfter cron (Date/from now))))
 
+(defn get-next
+  [cron tnow]
+  (let [nt (next-valid-instant-from cron tnow)]
+    (cons nt (lazy-seq (get-next cron nt)))))
+
 (defmethod print-method CronExpression
   [mv ^java.io.Writer writer]
   (.write writer (str "#app/cron \"" (.toString ^CronExpression mv) "\"")))
@@ -292,3 +307,8 @@
 (defmethod print-dup CronExpression
   [o w]
   (print-ctor o (fn [o w] (print-dup (.toString ^CronExpression o) w)) w))
+
+(extend-protocol fez/IEdn
+  CronExpression
+  (-edn [o] (pr-str o)))
+

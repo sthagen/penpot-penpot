@@ -84,6 +84,7 @@
 
         ;; REFS
         viewport-ref      (mf/use-ref nil)
+        raw-position-ref  (mf/use-ref nil) ;; Stores the raw position of the cursor
 
         ;; VARS
         disable-paste     (mf/use-var false)
@@ -115,21 +116,21 @@
         node-editing?     (and edition (not= :text (get-in base-objects [edition :type])))
         text-editing?     (and edition (= :text (get-in base-objects [edition :type])))
 
-        on-click          (actions/on-click hover selected edition drawing-path? drawing-tool)
+        on-click          (actions/on-click hover selected edition drawing-path? drawing-tool space?)
         on-context-menu   (actions/on-context-menu hover hover-ids)
         on-double-click   (actions/on-double-click hover hover-ids drawing-path? base-objects edition)
         on-drag-enter     (actions/on-drag-enter)
         on-drag-over      (actions/on-drag-over)
         on-drop           (actions/on-drop file viewport-ref zoom)
         on-mouse-down     (actions/on-mouse-down @hover selected edition drawing-tool text-editing? node-editing?
-                                                 drawing-path? create-comment? space? viewport-ref zoom)
+                                                 drawing-path? create-comment? space? viewport-ref zoom panning)
         on-mouse-up       (actions/on-mouse-up disable-paste)
         on-pointer-down   (actions/on-pointer-down)
         on-pointer-enter  (actions/on-pointer-enter in-viewport?)
         on-pointer-leave  (actions/on-pointer-leave in-viewport?)
-        on-pointer-move   (actions/on-pointer-move viewport-ref zoom move-stream)
+        on-pointer-move   (actions/on-pointer-move viewport-ref raw-position-ref zoom move-stream)
         on-pointer-up     (actions/on-pointer-up)
-        on-move-selected  (actions/on-move-selected hover hover-ids selected)
+        on-move-selected  (actions/on-move-selected hover hover-ids selected space?)
         on-menu-selected  (actions/on-menu-selected hover hover-ids selected)
 
         on-frame-enter    (actions/on-frame-enter frame-hover)
@@ -142,7 +143,7 @@
         show-draw-area?          drawing-obj
         show-gradient-handlers?  (= (count selected) 1)
         show-grids?              (contains? layout :display-grid)
-        show-outlines?           (and (nil? transform) (not edition) (not drawing-obj) (not (#{:comments :path} drawing-tool)))
+        show-outlines?           (and (nil? transform) (not edition) (not drawing-obj) (not (#{:comments :path :curve} drawing-tool)))
         show-pixel-grid?         (>= zoom 8)
         show-presence?           page-id
         show-prototypes?         (= options-mode :prototype)
@@ -156,22 +157,19 @@
         show-selrect?            (and selrect (empty? drawing))
         show-measures?           (and (not transform) (not node-editing?) show-distances?)
         show-artboard-names?     (contains? layout :display-artboard-names)
-        show-rules?              (contains? layout :rules)
+        show-rules?              (and (contains? layout :rules) (not (contains? layout :hide-ui)))
 
         disabled-guides?         (or drawing-tool transform)]
 
     (hooks/setup-dom-events viewport-ref zoom disable-paste in-viewport?)
     (hooks/setup-viewport-size viewport-ref)
-    (hooks/setup-cursor cursor alt? panning drawing-tool drawing-path? node-editing?)
-    (hooks/setup-resize layout viewport-ref)
+    (hooks/setup-cursor cursor alt? ctrl? space? panning drawing-tool drawing-path? node-editing?)
     (hooks/setup-keyboard alt? ctrl? space?)
-    (hooks/setup-hover-shapes page-id move-stream base-objects transform selected ctrl? hover hover-ids @hover-disabled? zoom)
+    (hooks/setup-hover-shapes page-id move-stream raw-position-ref base-objects transform selected ctrl? hover hover-ids @hover-disabled? zoom)
     (hooks/setup-viewport-modifiers modifiers base-objects)
     (hooks/setup-shortcuts node-editing? drawing-path?)
     (hooks/setup-active-frames base-objects vbox hover active-frames)
 
-    
-    
     [:div.viewport
      [:div.viewport-overlays
 
@@ -222,8 +220,6 @@
        :xmlnsXlink "http://www.w3.org/1999/xlink"
        :preserveAspectRatio "xMidYMid meet"
        :key (str "viewport" page-id)
-       :width (:width vport 0)
-       :height (:height vport 0)
        :view-box (utils/format-viewbox vbox)
        :ref viewport-ref
        :class (when drawing-tool "drawing")
@@ -248,16 +244,10 @@
          [:& outline/shape-outlines
           {:objects base-objects
            :selected selected
-           :hover (when (not= :frame (:type @hover))
+           :hover (when (or @ctrl? (not= :frame (:type @hover)))
                     #{(or @frame-hover (:id @hover))})
            :edition edition
            :zoom zoom}])
-
-       [:& scroll-bars/viewport-scrollbars
-        {:objects base-objects
-         :zoom zoom
-         :vbox vbox
-         :viewport-ref viewport-ref}]
 
        (when show-selection-handlers?
          [:& selection/selection-handlers
@@ -265,7 +255,7 @@
            :shapes selected-shapes
            :zoom zoom
            :edition edition
-           :disable-handlers (or drawing-tool edition)
+           :disable-handlers (or drawing-tool edition @space?)
            :on-move-selected on-move-selected
            :on-context-menu on-menu-selected}])
 
@@ -366,11 +356,18 @@
 
        [:& widgets/viewport-actions]
 
+       [:& scroll-bars/viewport-scrollbars
+        {:objects base-objects
+         :zoom zoom
+         :vbox vbox
+         :viewport-ref viewport-ref}]
+
        (when show-rules?
          [:*
           [:& rules/rules
            {:zoom zoom
-            :vbox vbox}]
+            :vbox vbox
+            :selected-shapes selected-shapes}]
 
           [:& guides/viewport-guides
            {:zoom zoom

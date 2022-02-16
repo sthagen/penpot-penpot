@@ -14,15 +14,18 @@
    [app.common.spec :as us]
    [app.config :as cfg]
    [app.db :as db]
+   [app.util.async :refer [thread-sleep]]
    [app.util.http :as http]
    [app.util.json :as json]
    [clojure.spec.alpha :as s]
    [integrant.core :as ig]))
 
-(declare handler)
-(declare acquire-lock)
-(declare release-all-locks)
-(declare retrieve-stats)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TASK ENTRY POINT
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(declare get-stats)
+(declare send!)
 
 (s/def ::version ::us/string)
 (s/def ::uri ::us/string)
@@ -34,49 +37,69 @@
   (s/keys :req-un [::db/pool ::version ::uri ::sprops]))
 
 (defmethod ig/init-key ::handler
-  [_ {:keys [pool] :as cfg}]
+  [_ {:keys [pool sprops version] :as cfg}]
   (fn [_]
-    (db/with-atomic [conn pool]
-      (try
-        (acquire-lock conn)
-        (handler (assoc cfg :conn conn))
-        (finally
-          (release-all-locks conn))))))
+    ;; Sleep randomly between 0 to 10s
+    (thread-sleep (rand-int 10000))
 
-(defn- acquire-lock
-  [conn]
-  (db/exec-one! conn ["select pg_advisory_lock(87562985867332);"]))
+    (let [instance-id (:instance-id sprops)]
+      (-> (get-stats pool version)
+          (assoc :instance-id instance-id)
+          (send! cfg)))))
 
-(defn- release-all-locks
-  [conn]
-  (db/exec-one! conn ["select pg_advisory_unlock_all();"]))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IMPL
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn- handler
-  [{:keys [sprops] :as cfg}]
-  (let [instance-id (:instance-id sprops)
-        data        (retrieve-stats cfg)
-        data        (assoc data :instance-id instance-id)
-        response    (http/send! {:method :post
-                                 :uri (:uri cfg)
-                                 :headers {"content-type" "application/json"}
-                                 :body (json/write-str data)})]
+(defn- send!
+  [data cfg]
+  (let [response (http/send! {:method :post
+                              :uri (:uri cfg)
+                              :headers {"content-type" "application/json"}
+                              :body (json/write-str data)})]
     (when (> (:status response) 206)
       (ex/raise :type :internal
                 :code :invalid-response
-                :context {:status (:status response)
-                          :body (:body response)}))))
+                :response-status (:status response)
+                :response-body (:body response)))))
 
-(defn retrieve-num-teams
+(defn- retrieve-num-teams
   [conn]
   (-> (db/exec-one! conn ["select count(*) as count from team;"]) :count))
 
-(defn retrieve-num-projects
+(defn- retrieve-num-projects
   [conn]
   (-> (db/exec-one! conn ["select count(*) as count from project;"]) :count))
 
-(defn retrieve-num-files
+(defn- retrieve-num-files
   [conn]
-  (-> (db/exec-one! conn ["select count(*) as count from project;"]) :count))
+  (-> (db/exec-one! conn ["select count(*) as count from file;"]) :count))
+
+(defn- retrieve-num-file-changes
+  [conn]
+  (let [sql (str "select count(*) as count "
+                 "  from file_change "
+                 " where date_trunc('day', created_at) = date_trunc('day', now())")]
+    (-> (db/exec-one! conn [sql]) :count)))
+
+(defn- retrieve-num-touched-files
+  [conn]
+  (let [sql (str "select count(distinct file_id) as count "
+                 "  from file_change "
+                 " where date_trunc('day', created_at) = date_trunc('day', now())")]
+    (-> (db/exec-one! conn [sql]) :count)))
+
+(defn- retrieve-num-users
+  [conn]
+  (-> (db/exec-one! conn ["select count(*) as count from profile;"]) :count))
+
+(defn- retrieve-num-fonts
+  [conn]
+  (-> (db/exec-one! conn ["select count(*) as count from team_font_variant;"]) :count))
+
+(defn- retrieve-num-comments
+  [conn]
+  (-> (db/exec-one! conn ["select count(*) as count from comment;"]) :count))
 
 (def sql:team-averages
   "with projects_by_team as (
@@ -98,7 +121,6 @@
      select t.id, count(tp.profile_id) as num_users
        from team as t
        left join team_profile_rel as tp on(tp.team_id = t.id)
-      where t.is_default = false
       group by 1
    )
    select (select avg(num_projects)::integer from projects_by_team) as avg_projects_on_team,
@@ -110,20 +132,20 @@
           (select avg(num_users)::integer from users_by_team) as avg_users_on_team,
           (select max(num_users)::integer from users_by_team) as max_users_on_team;")
 
-(defn retrieve-team-averages
+(defn- retrieve-team-averages
   [conn]
   (->> [sql:team-averages]
        (db/exec-one! conn)))
 
-(defn retrieve-jvm-stats
+(defn- retrieve-jvm-stats
   []
   (let [^Runtime runtime (Runtime/getRuntime)]
     {:jvm-heap-current (.totalMemory runtime)
      :jvm-heap-max     (.maxMemory runtime)
      :jvm-cpus         (.availableProcessors runtime)}))
 
-(defn- retrieve-stats
-  [{:keys [conn version]}]
+(defn get-stats
+  [conn version]
   (let [referer (if (cfg/get :telemetry-with-taiga)
                   "taiga"
                   (cfg/get :telemetry-referer))]
@@ -131,7 +153,12 @@
          :referer        referer
          :total-teams    (retrieve-num-teams conn)
          :total-projects (retrieve-num-projects conn)
-         :total-files    (retrieve-num-files conn)}
+         :total-files    (retrieve-num-files conn)
+         :total-users    (retrieve-num-users conn)
+         :total-fonts    (retrieve-num-fonts conn)
+         :total-comments (retrieve-num-comments conn)
+         :total-file-changes  (retrieve-num-file-changes conn)
+         :total-touched-files (retrieve-num-touched-files conn)}
         (d/merge
          (retrieve-team-averages conn)
          (retrieve-jvm-stats))

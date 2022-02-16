@@ -42,7 +42,7 @@
 
 (def defaults
   {:http-server-port 6060
-   :http-server-host "localhost"
+   :http-server-host "0.0.0.0"
    :host "devenv"
    :tenant "dev"
    :database-uri "postgresql://postgres/penpot"
@@ -109,6 +109,7 @@
 (s/def ::secret-key ::us/string)
 (s/def ::allow-demo-users ::us/boolean)
 (s/def ::assets-path ::us/string)
+(s/def ::authenticated-cookie-domain ::us/string)
 (s/def ::database-password (s/nilable ::us/string))
 (s/def ::database-uri ::us/string)
 (s/def ::database-username (s/nilable ::us/string))
@@ -180,9 +181,11 @@
 (s/def ::storage-assets-fs-directory ::us/string)
 (s/def ::storage-assets-s3-bucket ::us/string)
 (s/def ::storage-assets-s3-region ::us/keyword)
+(s/def ::storage-assets-s3-endpoint ::us/string)
 (s/def ::storage-fdata-s3-bucket ::us/string)
 (s/def ::storage-fdata-s3-region ::us/keyword)
 (s/def ::storage-fdata-s3-prefix ::us/string)
+(s/def ::storage-fdata-s3-endpoint ::us/string)
 (s/def ::telemetry-uri ::us/string)
 (s/def ::telemetry-with-taiga ::us/boolean)
 (s/def ::tenant ::us/string)
@@ -199,6 +202,7 @@
                    ::allow-demo-users
                    ::audit-log-archive-uri
                    ::audit-log-gc-max-age
+                   ::authenticated-cookie-domain
                    ::database-password
                    ::database-uri
                    ::database-username
@@ -276,10 +280,12 @@
                    ::storage-assets-fs-directory
                    ::storage-assets-s3-bucket
                    ::storage-assets-s3-region
+                   ::storage-assets-s3-endpoint
                    ::fdata-storage-backend
                    ::storage-fdata-s3-bucket
                    ::storage-fdata-s3-region
                    ::storage-fdata-s3-prefix
+                   ::storage-fdata-s3-endpoint
                    ::telemetry-enabled
                    ::telemetry-uri
                    ::telemetry-referer

@@ -33,6 +33,7 @@
    software.amazon.awssdk.services.s3.model.GetObjectRequest
    software.amazon.awssdk.services.s3.model.ObjectIdentifier
    software.amazon.awssdk.services.s3.model.PutObjectRequest
+   software.amazon.awssdk.services.s3.model.S3Error
    ;; software.amazon.awssdk.services.s3.model.GetObjectResponse
    software.amazon.awssdk.services.s3.presigner.S3Presigner
    software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest
@@ -55,9 +56,10 @@
 (s/def ::region #{:eu-central-1})
 (s/def ::bucket ::us/string)
 (s/def ::prefix ::us/string)
+(s/def ::endpoint ::us/string)
 
 (defmethod ig/pre-init-spec ::backend [_]
-  (s/keys :opt-un [::region ::bucket ::prefix]))
+  (s/keys :opt-un [::region ::bucket ::prefix ::endpoint]))
 
 (defmethod ig/prep-key ::backend
   [_ {:keys [prefix] :as cfg}]
@@ -118,20 +120,31 @@
 
 (defn- ^Region lookup-region
   [region]
-  (case region
-    :eu-central-1 Region/EU_CENTRAL_1))
+  (Region/of (name region)))
 
 (defn build-s3-client
-  [{:keys [region]}]
-  (.. (S3Client/builder)
-      (region (lookup-region region))
-      (build)))
+  [{:keys [region endpoint]}]
+  (if (string? endpoint)
+    (let [uri (java.net.URI. endpoint)]
+      (.. (S3Client/builder)
+          (endpointOverride uri)
+          (region (lookup-region region))
+          (build)))
+    (.. (S3Client/builder)
+        (region (lookup-region region))
+        (build))))
 
 (defn build-s3-presigner
-  [{:keys [region]}]
-  (.. (S3Presigner/builder)
-      (region (lookup-region region))
-      (build)))
+  [{:keys [region endpoint]}]
+  (if (string? endpoint)
+    (let [uri (java.net.URI. endpoint)]
+      (.. (S3Presigner/builder)
+          (endpointOverride uri)
+          (region (lookup-region region))
+          (build)))
+    (.. (S3Presigner/builder)
+        (region (lookup-region region))
+        (build))))
 
 (defn put-object
   [{:keys [client bucket prefix]} {:keys [id] :as object} content]
@@ -231,6 +244,9 @@
                              ^DeleteObjectsRequest dor)]
     (when (.hasErrors ^DeleteObjectsResponse dres)
       (let [errors (seq (.errors ^DeleteObjectsResponse dres))]
-        (ex/raise :type :s3-error
-                  :code :error-on-bulk-delete
-                  :context errors)))))
+        (ex/raise :type :internal
+                  :code :error-on-s3-bulk-delete
+                  :s3-errors (mapv (fn [^S3Error error]
+                                     {:key (.key error)
+                                      :msg (.message error)})
+                                   errors))))))

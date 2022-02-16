@@ -3,9 +3,25 @@
 ## :rocket: Next
 
 ### :boom: Breaking changes
+### :sparkles: New features
+### :bug: Bugs fixed
+### :arrow_up: Deps updates
+### :heart: Community contributions by (Thank you!)
+
+
+## 1.12.0-beta
+
+### :boom: Breaking changes
 
 ### :sparkles: New features
-
+- Rotation to snap to 15º intervals with shift [Taiga #2437](https://tree.taiga.io/project/penpot/issue/2437)
+- Support border radius and stroke properties for images [Taiga #497](https://tree.taiga.io/project/penpot/us/497)
+- Disallow using same password as user email [Taiga #2454](https://tree.taiga.io/project/penpot/us/2454)
+- Add configurable nudge amount [Taiga #910](https://tree.taiga.io/project/penpot/us/910)
+- Add stroke properties for image shapes [Taiga #497](https://tree.taiga.io/project/penpot/us/497)
+- On user settings, hide the theme selector as long as we only have one theme [Taiga #2610](https://tree.taiga.io/project/penpot/us/2610)
+- Automatically open comments from dashboard notifications [Taiga #2605](https://tree.taiga.io/project/penpot/us/2605)
+- Enhance the behaviour of the artboards list on view mode [Taiga #2634](https://tree.taiga.io/project/penpot/us/2634)
 - Add recent used fonts in font selection widget [Taiga #1381](https://tree.taiga.io/project/penpot/us/1381)
 - Allow to align items relative to groups [Taiga #2533](https://tree.taiga.io/project/penpot/us/2533)
 - Scroll bars [Taiga #2550](https://tree.taiga.io/project/penpot/task/2550)
@@ -14,10 +30,56 @@
 - Improve file menu by adding semantically groups [Github #1203](https://github.com/penpot/penpot/issues/1203)
 - Add update components in bulk option in context menu [Taiga #1975](https://tree.taiga.io/project/penpot/us/1975)
 - Create first E2E tests [Taiga #2608](https://tree.taiga.io/project/penpot/task/2608), [Taiga #2608](https://tree.taiga.io/project/penpot/task/2608)
+- Redesign of workspace toolbars [Taiga #2319](https://tree.taiga.io/project/penpot/us/2319)
+- Graphic Tablet usability improvements [Taiga #1913](https://tree.taiga.io/project/penpot/us/1913)
+- Improved mouse collision detection for groups and text shapes [Taiga #2452](https://tree.taiga.io/project/penpot/us/2452), [Taiga #2453](https://tree.taiga.io/project/penpot/us/2453)
+- Add support for alternative S3 storage providers and all aws regions [#1267](https://github.com/penpot/penpot/issues/1267)
 
 ### :bug: Bugs fixed
+
+- Fixed ungroup typography when editing it [Taiga #2391](https://tree.taiga.io/project/penpot/issue/2391) 
+- Fixed error when trying to post an empty comment [Taiga #2603](https://tree.taiga.io/project/penpot/issue/2603)
+- Fixed missing translation strings [Taiga #2786](https://tree.taiga.io/project/penpot/issue/2786)
+- Fixed color palette outside viewport [Taiga #2715](https://tree.taiga.io/project/penpot/issue/2715)
+- Fixed missing translate string [Taiga #2780](https://tree.taiga.io/project/penpot/issue/2780)
+- Fixed handoff shadow type text [Taiga #2717](https://tree.taiga.io/project/penpot/issue/2717)
+- Fixed components get "dirty" marker when moved [Taiga #2764](https://tree.taiga.io/project/penpot/issue/2764)
+
 ### :arrow_up: Deps updates
+
 ### :heart: Community contributions by (Thank you!)
+
+- Cleanup unused static images (by @rhcarvalho) [#1561](https://github.com/penpot/penpot/pull/1561)
+- Compress static images to save space (by @rhcarvalho) [#1562](https://github.com/penpot/penpot/pull/1562)
+
+## 1.11.2-beta
+
+### :bug: Bugs fixed
+
+- Fix issue on handling empty content on boolean shapes
+- Fix race condition issue on component renaming
+- Handle EOF errors on writting streamed response
+- Handle EOF errors on websocket send/ping methods
+- Disable parallel upload of file media on import (causes too much
+  contention on the rlimit subsistem that does not works as expected
+  on high load).
+
+### :sparkles: New features
+
+- Add health check endpoint on API
+- Increase default max connection pool size to 60
+- Reduce resource usage of the error reporter.
+
+## 1.11.1-beta
+
+### :bug: Bugs fixed
+
+- Fix issue related to default http host config value.
+- Fix issue on rendering frames on firefox.
+
+### :arrow_up: Deps updates
+
+- Update nodejs version to 16.13.1 on docker images.
 
 ## 1.11.0-beta
 

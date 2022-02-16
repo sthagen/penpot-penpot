@@ -148,7 +148,7 @@
             (dom/remove-attribute node "transform")))))))
 
 (defn format-viewbox [vbox]
-  (str/join " " [(+ (:x vbox 0) (:left-offset vbox 0))
+  (str/join " " [(:x vbox 0)
                  (:y vbox 0)
                  (:width vbox 0)
                  (:height vbox 0)]))
@@ -179,4 +179,7 @@
     :pencil cur/pencil
     :create-shape cur/create-shape
     :duplicate cur/duplicate
+    :zoom cur/zoom
+    :zoom-in cur/zoom-in
+    :zooom-out cur/zoom-out
     cur/pointer-inner))

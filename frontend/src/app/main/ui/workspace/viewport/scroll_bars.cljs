@@ -15,6 +15,16 @@
    [app.util.dom :as dom]
    [rumext.alpha :as mf]))
 
+(def scroll-x 10)
+(def scroll-y 10)
+(def scroll-height (+ scroll-x 4))
+(def scroll-width (+ scroll-y 4))
+(def other-x 26)
+(def other-y 26)
+(def other-width 100)
+(def other-height 100)
+
+
 (mf/defc viewport-scrollbars
   {::mf/wrap [mf/memo]}
   [{:keys [objects viewport-ref zoom vbox]}]
@@ -40,17 +50,14 @@
         vbox-x                    (:x vbox)
         vbox-y                    (:y vbox)
 
-        base-objects-rect
-        (mf/use-memo
-         (mf/deps objects)
-         (fn []
-           (let [root-shapes (-> objects cph/get-top-frame :shapes)
-                 shapes      (->> root-shapes (mapv #(get objects %)))]
-             (gsh/selection-rect shapes))))
+        base-objects-rect         (mf/with-memo [objects]
+                                    (-> objects
+                                        (cph/get-immediate-children)
+                                        (gsh/selection-rect)))
 
         inv-zoom                 (/ 1 zoom)
-        vbox-height              (- (:height vbox) (* inv-zoom 44))
-        vbox-width               (- (:width vbox) (* inv-zoom 34))
+        vbox-height              (- (:height vbox) (* inv-zoom scroll-height))
+        vbox-width               (- (:width vbox) (* inv-zoom scroll-width))
 
         ;; top space hidden because of the scroll
         top-offset               (-> (- vbox-y (:y base-objects-rect))
@@ -78,28 +85,28 @@
         show-v-scroll?           (or @v-scrolling? (> top-offset 0) (> bottom-offset 0))
         show-h-scroll?           (or @h-scrolling? (> left-offset 0) (> right-offset 0))
 
-        v-scrollbar-x            (+ vbox-x (:width vbox) (* inv-zoom -32))
+        v-scrollbar-x            (+ vbox-x (:width vbox) (* inv-zoom (- scroll-x)))
         v-scrollbar-y            (+ vbox-y top-offset)
 
         h-scrollbar-x            (+ vbox-x left-offset)
-        h-scrollbar-y            (+ vbox-y (:height vbox) (* inv-zoom -40))
+        h-scrollbar-y            (+ vbox-y (:height vbox) (* inv-zoom (- scroll-y)))
 
         scrollbar-height         (-> (- (+ vbox-y vbox-height) bottom-offset v-scrollbar-y))
         scrollbar-height         (-> (cond
                                        @v-scrolling? scrollbar-height-stored
                                        :else scrollbar-height)
-                                     (max (* inv-zoom 100)))
+                                     (max (* inv-zoom other-height)))
 
         scrollbar-width          (-> (- (+ vbox-x vbox-width) right-offset h-scrollbar-x))
         scrollbar-width          (-> (cond
                                        @h-scrolling? scrollbar-width-stored
                                        :else scrollbar-width)
-                                     (max (* inv-zoom 100)))
+                                     (max (* inv-zoom other-width)))
 
         v-scrollbar-y            (-> (cond
                                        @v-scrolling? (- v-scrollbar-y-stored (- (- vbox-y (mf/ref-val vbox-y-ref))))
                                        :else v-scrollbar-y)
-                                     (max (+ vbox-y (* inv-zoom 26))))
+                                     (max (+ vbox-y (* inv-zoom other-y))))
 
         v-scrollbar-y            (if (> (+ v-scrollbar-y scrollbar-height) (+ vbox-y vbox-height)) ;; the scroll bar is stick to the bottom
                                    (-> (+ vbox-y vbox-height)
@@ -109,7 +116,7 @@
         h-scrollbar-x            (-> (cond
                                        @h-scrolling? (- h-scrollbar-x-stored (- (- vbox-x (mf/ref-val vbox-x-ref))))
                                        :else h-scrollbar-x)
-                                     (max (+ vbox-x (* inv-zoom 26))))
+                                     (max (+ vbox-x (* inv-zoom other-x))))
 
         h-scrollbar-x            (if (> (+ h-scrollbar-x scrollbar-width) (+ vbox-x vbox-width)) ;; the scroll bar is stick to the right
                                    (-> (+ vbox-x vbox-width)
@@ -147,20 +154,20 @@
         (mf/use-callback
          (mf/deps v-scrollbar-y scrollbar-height)
          (fn [event axis]
-           (let [viewport                      (mf/ref-val viewport-ref)
-                 start-pt                      (dom/get-client-position event)
-                 new-v-scrollbar-y      (-> (utils/translate-point-to-viewport-raw viewport zoom start-pt) :y)
-                 new-h-scrollbar-x    (-> (utils/translate-point-to-viewport-raw viewport zoom start-pt) :x)
-                 v-scrollbar-y-padding  (- v-scrollbar-y new-v-scrollbar-y)
-                 h-scrollbar-x-padding  (- h-scrollbar-x new-h-scrollbar-x)
-                 vbox-rect                     {:x vbox-x
-                                                :y vbox-y
-                                                :x1 vbox-x
-                                                :y1 vbox-y
-                                                :x2 (+ vbox-x (:width vbox))
-                                                :y2 (+ vbox-y (:height vbox))
-                                                :width (:width vbox)
-                                                :height (:height vbox)}
+           (let [viewport              (mf/ref-val viewport-ref)
+                 start-pt              (dom/get-client-position event)
+                 new-v-scrollbar-y     (-> (utils/translate-point-to-viewport-raw viewport zoom start-pt) :y)
+                 new-h-scrollbar-x     (-> (utils/translate-point-to-viewport-raw viewport zoom start-pt) :x)
+                 v-scrollbar-y-padding (- v-scrollbar-y new-v-scrollbar-y)
+                 h-scrollbar-x-padding (- h-scrollbar-x new-h-scrollbar-x)
+                 vbox-rect             {:x vbox-x
+                                        :y vbox-y
+                                        :x1 vbox-x
+                                        :y1 vbox-y
+                                        :x2 (+ vbox-x (:width vbox))
+                                        :y2 (+ vbox-y (:height vbox))
+                                        :width (:width vbox)
+                                        :height (:height vbox)}
                  containing-rect               (gpr/join-selrects [base-objects-rect vbox-rect])
                  height-factor                 (/ (:height containing-rect) vbox-height)
                  width-factor                  (/ (:width containing-rect) vbox-width)]
@@ -185,7 +192,7 @@
            (reset! v-scrolling? false)
            (reset! h-scrolling? false)))]
 
-    [*
+    [:*
      (when show-v-scroll?
        [:g.v-scroll
         [:rect {:on-mouse-move #(on-mouse-move % :y)
@@ -197,7 +204,9 @@
                 :height scrollbar-height
                 :fill-opacity 0.4
                 :x v-scrollbar-x
-                :y v-scrollbar-y}]])
+                :y v-scrollbar-y
+                :style {:stroke "white"
+                        :stroke-width 0.15}}]])
      (when show-h-scroll?
        [:g.h-scroll
         [:rect {:on-mouse-move #(on-mouse-move % :x)
@@ -209,4 +218,6 @@
                 :height (* inv-zoom 7)
                 :fill-opacity 0.4
                 :x h-scrollbar-x
-                :y h-scrollbar-y}]])]))
+                :y h-scrollbar-y
+                :style {:stroke "white"
+                        :stroke-width 0.15}}]])]))

@@ -22,7 +22,7 @@
     :migrations (ig/ref :app.migrations/all)
     :name :main
     :min-pool-size 0
-    :max-pool-size 30}
+    :max-pool-size 60}
 
    :app.migrations/migrations
    {}
@@ -48,10 +48,6 @@
 
    :app.storage/gc-touched-task
    {:pool     (ig/ref :app.db/pool)}
-
-   :app.storage/recheck-task
-   {:pool     (ig/ref :app.db/pool)
-    :storage  (ig/ref :app.storage/storage)}
 
    :app.http.session/session
    {:pool   (ig/ref :app.db/pool)
@@ -163,9 +159,6 @@
      {:cron #app/cron "0 0 0 * * ?"  ;; daily
       :task :session-gc}
 
-     {:cron #app/cron "0 0 * * * ?"  ;; hourly
-      :task :storage-recheck}
-
      {:cron #app/cron "0 0 0 * * ?"  ;; daily
       :task :objects-gc}
 
@@ -177,7 +170,7 @@
         :task :file-offload})
 
      (when (contains? cf/flags :audit-log-archive)
-       {:cron #app/cron "0 */3 * * * ?" ;; every 3m
+       {:cron #app/cron "0 */5 * * * ?" ;; every 5m
         :task :audit-log-archive})
 
      (when (contains? cf/flags :audit-log-gc)
@@ -186,7 +179,7 @@
 
      (when (or (contains? cf/flags :telemetry)
                (cf/get :telemetry-enabled))
-       {:cron #app/cron "0 0 */6 * * ?" ;; every 6h
+       {:cron #app/cron "0 30 */3,23 * * ?"
         :task :telemetry})]}
 
    :app.worker/registry
@@ -198,7 +191,6 @@
      :file-xlog-gc       (ig/ref :app.tasks.file-xlog-gc/handler)
      :storage-deleted-gc (ig/ref :app.storage/gc-deleted-task)
      :storage-touched-gc (ig/ref :app.storage/gc-touched-task)
-     :storage-recheck    (ig/ref :app.storage/recheck-task)
      :tasks-gc           (ig/ref :app.tasks.tasks-gc/handler)
      :telemetry          (ig/ref :app.tasks.telemetry/handler)
      :session-gc         (ig/ref :app.http.session/gc-task)
@@ -304,27 +296,28 @@
 
    :app.storage/storage
    {:pool     (ig/ref :app.db/pool)
-    :executor (ig/ref :app.worker/executor)
+    :backends
+    {:assets-s3 (ig/ref [::assets :app.storage.s3/backend])
+     :assets-db (ig/ref [::assets :app.storage.db/backend])
+     :assets-fs (ig/ref [::assets :app.storage.fs/backend])
 
-    :backends {
-               :assets-s3 (ig/ref [::assets :app.storage.s3/backend])
-               :assets-db (ig/ref [::assets :app.storage.db/backend])
-               :assets-fs (ig/ref [::assets :app.storage.fs/backend])
-               :tmp       (ig/ref [::tmp  :app.storage.fs/backend])
-               :fdata-s3  (ig/ref [::fdata :app.storage.s3/backend])
+     :tmp       (ig/ref [::tmp  :app.storage.fs/backend])
+     :fdata-s3  (ig/ref [::fdata :app.storage.s3/backend])
 
-               ;; keep this for backward compatibility
-               :s3        (ig/ref [::assets :app.storage.s3/backend])
-               :fs        (ig/ref [::assets :app.storage.fs/backend])}}
+     ;; keep this for backward compatibility
+     :s3        (ig/ref [::assets :app.storage.s3/backend])
+     :fs        (ig/ref [::assets :app.storage.fs/backend])}}
 
    [::fdata :app.storage.s3/backend]
-   {:region (cf/get :storage-fdata-s3-region)
-    :bucket (cf/get :storage-fdata-s3-bucket)
-    :prefix (cf/get :storage-fdata-s3-prefix)}
+   {:region   (cf/get :storage-fdata-s3-region)
+    :bucket   (cf/get :storage-fdata-s3-bucket)
+    :endpoint (cf/get :storage-fdata-s3-endpoint)
+    :prefix   (cf/get :storage-fdata-s3-prefix)}
 
    [::assets :app.storage.s3/backend]
-   {:region (cf/get :storage-assets-s3-region)
-    :bucket (cf/get :storage-assets-s3-bucket)}
+   {:region   (cf/get :storage-assets-s3-region)
+    :endpoint (cf/get :storage-assets-s3-endpoint)
+    :bucket   (cf/get :storage-assets-s3-bucket)}
 
    [::assets :app.storage.fs/backend]
    {:directory (cf/get :storage-assets-fs-directory)}

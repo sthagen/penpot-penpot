@@ -9,11 +9,9 @@
   (:require
    [app.common.exceptions :as ex]
    [app.common.logging :as l]
-   [app.common.uuid :as uuid]
-   [clojure.pprint]
+   [app.common.spec :as us]
    [clojure.spec.alpha :as s]
-   [cuerdas.core :as str]
-   [expound.alpha :as expound]))
+   [cuerdas.core :as str]))
 
 (defn- parse-client-ip
   [{:keys [headers] :as request}]
@@ -25,8 +23,7 @@
   [request error]
   (let [data (ex-data error)]
     (merge
-     {:id            (uuid/next)
-      :path          (:uri request)
+     {:path          (:uri request)
       :method        (:request-method request)
       :hint          (ex-message error)
       :params        (:params request)
@@ -36,14 +33,13 @@
       :data          (some-> data (dissoc ::s/problems ::s/value ::s/spec))
       :ip-addr       (parse-client-ip request)
       :profile-id    (:profile-id request)}
+
      (let [headers (:headers request)]
        {:user-agent (get headers "user-agent")
         :frontend-version (get headers "x-frontend-version" "unknown")})
 
      (when (and data (::s/problems data))
-       {:spec-explain (binding [s/*explain-out* expound/printer]
-                        (with-out-str
-                          (s/explain-out (update data ::s/problems #(take 10 %)))))}))))
+       {:spec-explain (us/pretty-explain data)}))))
 
 (defmulti handle-exception
   (fn [err & _rest]
@@ -62,20 +58,20 @@
 (defmethod handle-exception :validation
   [err _]
   (let [data    (ex-data err)
-        explain (binding [s/*explain-out* expound/printer]
-                  (with-out-str
-                    (s/explain-out (update data ::s/problems #(take 10 %)))))]
+        explain (us/pretty-explain data)]
     {:status 400
      :body (-> data
                (dissoc ::s/problems)
                (dissoc ::s/value)
-               (assoc :explain explain))}))
+               (cond-> explain (assoc :explain explain)))}))
 
 (defmethod handle-exception :assertion
   [error request]
   (let [edata (ex-data error)]
-    (l/with-context (get-error-context request error)
-      (l/error ::l/raw (ex-message error) :cause error))
+    (l/error ::l/raw (ex-message error)
+             ::l/context (get-error-context request error)
+             :cause error)
+
     {:status 500
      :body {:type :server-error
             :code :assertion
@@ -97,9 +93,9 @@
              (ex/exception? (:handling edata)))
       (handle-exception (:handling edata) request)
       (do
-        (l/with-context (get-error-context request error)
-          (l/error ::l/raw (ex-message error) :cause error))
-
+        (l/error ::l/raw (ex-message error)
+                 ::l/context (get-error-context request error)
+                 :cause error)
         {:status 500
          :body {:type :server-error
                 :code :unexpected
@@ -109,10 +105,9 @@
 (defmethod handle-exception org.postgresql.util.PSQLException
   [error request]
   (let [state (.getSQLState ^java.sql.SQLException error)]
-
-    (l/with-context (get-error-context request error)
-      (l/error ::l/raw (ex-message error) :cause error))
-
+    (l/error ::l/raw (ex-message error)
+             ::l/context (get-error-context request error)
+             :cause error)
     (cond
       (= state "57014")
       {:status 504
