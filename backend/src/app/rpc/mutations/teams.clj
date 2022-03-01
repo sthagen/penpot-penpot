@@ -18,8 +18,8 @@
    [app.rpc.permissions :as perms]
    [app.rpc.queries.profile :as profile]
    [app.rpc.queries.teams :as teams]
+   [app.rpc.rlimit :as rlimit]
    [app.storage :as sto]
-   [app.util.rlimit :as rlimit]
    [app.util.services :as sv]
    [app.util.time :as dt]
    [clojure.spec.alpha :as s]
@@ -387,8 +387,7 @@
                 :code :member-is-muted
                 :hint "looks like the profile has reported repeatedly as spam or has permanent bounces"))
 
-    ;; Secondly check if the invited member email is part of the
-    ;; global spam/bounce report.
+    ;; Secondly check if the invited member email is part of the global spam/bounce report.
     (when (eml/has-bounce-reports? conn email)
       (ex/raise :type :validation
                 :code :email-has-permanent-bounces
@@ -415,13 +414,21 @@
   (s/and ::create-team (s/keys :req-un [::emails ::role])))
 
 (sv/defmethod ::create-team-and-invite-members
-  [{:keys [pool] :as cfg} {:keys [profile-id emails role] :as params}]
+  [{:keys [pool audit] :as cfg} {:keys [profile-id emails role] :as params}]
   (db/with-atomic [conn pool]
     (let [team    (create-team conn params)
           profile (db/get-by-id conn :profile profile-id)]
 
       ;; Create invitations for all provided emails.
       (doseq [email emails]
+        (audit :cmd :submit
+               :type "mutation"
+               :name "create-team-invitation"
+               :profile-id profile-id
+               :props {:email email
+                       :role role
+                       :profile-id profile-id})
+
         (create-team-invitation
          (assoc cfg
                 :conn conn
@@ -440,8 +447,7 @@
 (sv/defmethod ::update-team-invitation-role
   [{:keys [pool] :as cfg} {:keys [profile-id team-id email role] :as params}]
   (db/with-atomic [conn pool]
-    (let [perms    (teams/get-permissions conn profile-id team-id)
-          team     (db/get-by-id conn :team team-id)]
+    (let [perms    (teams/get-permissions conn profile-id team-id)]
 
       (when-not (:is-admin perms)
         (ex/raise :type :validation
@@ -449,5 +455,23 @@
 
       (db/update! conn :team-invitation
                   {:role (name role) :updated-at (dt/now)}
-                  {:team-id (:id team) :email-to (str/lower email)})
+                  {:team-id team-id :email-to (str/lower email)})
+      nil)))
+
+;; --- Mutation: Delete invitation
+
+(s/def ::delete-team-invitation
+  (s/keys :req-un [::profile-id ::team-id ::email]))
+
+(sv/defmethod ::delete-team-invitation
+  [{:keys [pool] :as cfg} {:keys [profile-id team-id email] :as params}]
+  (db/with-atomic [conn pool]
+    (let [perms    (teams/get-permissions conn profile-id team-id)]
+
+      (when-not (:is-admin perms)
+        (ex/raise :type :validation
+                  :code :insufficient-permissions))
+
+      (db/delete! conn :team-invitation
+                {:team-id team-id :email-to (str/lower email)})
       nil)))

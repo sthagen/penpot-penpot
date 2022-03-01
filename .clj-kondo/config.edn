@@ -1,14 +1,18 @@
 {:lint-as
  {promesa.core/let clojure.core/let
+  promesa.core/->> clojure.core/->>
+  promesa.core/-> clojure.core/->
   rumext.alpha/defc clojure.core/defn
   rumext.alpha/fnc clojure.core/fn
   app.common.data/export clojure.core/def
   app.db/with-atomic clojure.core/with-open
+  app.common.data.macros/get-in clojure.core/get-in
+  app.common.data.macros/select-keys clojure.core/select-keys
   app.common.logging/with-context clojure.core/do}
 
  :hooks
  {:analyze-call
-  {app.common.data/export hooks.export/export
+  {app.common.data.macros/export hooks.export/export
    potok.core/reify hooks.export/potok-reify
    app.util.services/defmethod hooks.export/service-defmethod
    }}

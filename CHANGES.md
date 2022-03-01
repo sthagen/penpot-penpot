@@ -4,7 +4,22 @@
 
 ### :boom: Breaking changes
 ### :sparkles: New features
+
+- Persist color palette and color picker across refresh [Taiga #1660](https://tree.taiga.io/project/penpot/issue/1660)
+- Ability to add multiple strokes to a shape [Taiga #2778](https://tree.taiga.io/project/penpot/us/2778)
+- Scroll to selected size in font size selector [Taiga #2825](https://tree.taiga.io/project/penpot/us/2825)
+- Duplicate artboards create new flows if needed [Taiga #2221](https://tree.taiga.io/project/penpot/issue/2221)
+- Add new invitations section [Taiga #2797](https://tree.taiga.io/project/penpot/us/2797)
+- Ability to add multiple fills to a shape [Taiga #1394](https://tree.taiga.io/project/penpot/us/1394)
+- Team members redesign [Taiga #2283](https://tree.taiga.io/project/penpot/us/2283)
+- Changed text shapes to be displayed as natives SVG text elements [Taiga #2759](https://tree.taiga.io/project/penpot/us/2759)
+- Texts now can have strokes, multiple fills and can be used as masks
+
 ### :bug: Bugs fixed
+
+- Fix color palette animation [Taiga #2852](https://tree.taiga.io/project/penpot/issue/2852)
+- Fix display code icon on preview hover [Taiga #2838](https://tree.taiga.io/project/penpot/us/2838)
+
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
 
@@ -14,6 +29,9 @@
 ### :boom: Breaking changes
 
 ### :sparkles: New features
+
+- Open feedback in a new window [Taiga #2901](https://tree.taiga.io/project/penpot/us/2901)
+- Improve usage of file menu [Taiga #2853](https://tree.taiga.io/project/penpot/us/2853)
 - Rotation to snap to 15º intervals with shift [Taiga #2437](https://tree.taiga.io/project/penpot/issue/2437)
 - Support border radius and stroke properties for images [Taiga #497](https://tree.taiga.io/project/penpot/us/497)
 - Disallow using same password as user email [Taiga #2454](https://tree.taiga.io/project/penpot/us/2454)
@@ -37,15 +55,16 @@
 
 ### :bug: Bugs fixed
 
-- Fixed ungroup typography when editing it [Taiga #2391](https://tree.taiga.io/project/penpot/issue/2391) 
+- Fixed ungroup typography when editing it [Taiga #2391](https://tree.taiga.io/project/penpot/issue/2391)
 - Fixed error when trying to post an empty comment [Taiga #2603](https://tree.taiga.io/project/penpot/issue/2603)
 - Fixed missing translation strings [Taiga #2786](https://tree.taiga.io/project/penpot/issue/2786)
 - Fixed color palette outside viewport [Taiga #2715](https://tree.taiga.io/project/penpot/issue/2715)
 - Fixed missing translate string [Taiga #2780](https://tree.taiga.io/project/penpot/issue/2780)
 - Fixed handoff shadow type text [Taiga #2717](https://tree.taiga.io/project/penpot/issue/2717)
 - Fixed components get "dirty" marker when moved [Taiga #2764](https://tree.taiga.io/project/penpot/issue/2764)
-
-### :arrow_up: Deps updates
+- Fixed cannot align objects in a group that is not part of a frame [Taiga #2762](https://tree.taiga.io/project/penpot/issue/2762)
+- Fix problem with double click on exit path editing [Taiga #2906](https://tree.taiga.io/project/penpot/issue/2906)
+- Fixed alignment of layers with children [Taiga #2862](https://tree.taiga.io/project/penpot/issue/2862)
 
 ### :heart: Community contributions by (Thank you!)
 

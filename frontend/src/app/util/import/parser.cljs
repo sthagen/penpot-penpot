@@ -185,7 +185,7 @@
          (d/deep-mapm
           (fn [pair] (->> pair (mapv convert)))))))
 
-(def search-data-node? #{:rect :image :path :text :circle})
+(def search-data-node? #{:rect :image :path :circle})
 
 (defn get-svg-data
   [type node]
@@ -200,8 +200,19 @@
              (map #(:attrs %))
              (reduce add-attrs node-attrs)))
 
+      (= type :text)
+      (->> node
+           (node-seq)
+           (filter #(contains? #{:g :foreignObject} (:tag %)))
+           (map #(:attrs %))
+           (reduce add-attrs node-attrs))
+
       (= type :frame)
-      (let [svg-node (->> node :content (d/seek #(= "frame-background" (get-in % [:attrs :class]))))]
+      (let [;; The nodes with the "frame-background" class can have some anidation depending on the strokes they have
+            g-nodes (find-all-nodes node :g)
+            defs-nodes (flatten (map #(find-all-nodes % :defs) g-nodes))
+            rect-nodes (flatten [(map #(find-all-nodes % :rect) defs-nodes) (map #(find-all-nodes % :rect) g-nodes)])
+            svg-node (d/seek #(= "frame-background" (get-in % [:attrs :class])) rect-nodes)]
         (merge (add-attrs {} (:attrs svg-node)) node-attrs))
 
       (= type :svg-raw)
@@ -358,16 +369,40 @@
       (= type :path)
       (parse-path center svg-data))))
 
+(defn add-library-refs
+  [props node]
+
+  (let [stroke-color-ref-id   (get-meta node :stroke-color-ref-id uuid/uuid)
+        stroke-color-ref-file (get-meta node :stroke-color-ref-file uuid/uuid)
+        component-id          (get-meta node :component-id uuid/uuid)
+        component-file        (get-meta node :component-file uuid/uuid)
+        shape-ref             (get-meta node :shape-ref uuid/uuid)
+        component-root?       (get-meta node :component-root str->bool)]
+
+    (cond-> props
+      (some? stroke-color-ref-id)
+      (assoc :stroke-color-ref-id stroke-color-ref-id
+             :stroke-color-ref-file stroke-color-ref-file)
+
+      (some? component-id)
+      (assoc :component-id component-id
+             :component-file component-file)
+
+      component-root?
+      (assoc :component-root? component-root?)
+
+      (some? shape-ref)
+      (assoc :shape-ref shape-ref))))
+
 (defn add-fill
   [props node svg-data]
 
   (let [fill (:fill svg-data)
         hide-fill-on-export (get-meta node :hide-fill-on-export str->bool)
+        fill-color-ref-id     (get-meta node :fill-color-ref-id uuid/uuid)
+        fill-color-ref-file   (get-meta node :fill-color-ref-file uuid/uuid)
         gradient (when (str/starts-with? fill "url")
-                   (parse-gradient node fill))
-        meta-fill-color (get-meta node :fill-color)
-        meta-fill-opacity (get-meta node :fill-opacity)
-        meta-fill-color-gradient (get-meta node :fill-color-gradient)]
+                   (parse-gradient node fill))]
 
     (cond-> props
       :always
@@ -386,14 +421,9 @@
       (some? hide-fill-on-export)
       (assoc :hide-fill-on-export hide-fill-on-export)
 
-      (some? meta-fill-color)
-      (assoc :fill-color meta-fill-color
-             :fill-opacity (d/parse-double meta-fill-opacity))
-
-      (some? meta-fill-color-gradient)
-      (assoc :fill-color-gradient meta-fill-color-gradient
-             :fill-color nil
-             :fill-opacity nil))))
+      (some? fill-color-ref-id)
+      (assoc :fill-color-ref-id fill-color-ref-id
+             :fill-color-ref-file fill-color-ref-file))))
 
 (defn add-stroke
   [props node svg-data]
@@ -462,8 +492,9 @@
 (defn add-text-data
   [props node]
   (-> props
-      (assoc :grow-type (get-meta node :grow-type keyword))
-      (assoc :content   (get-meta node :content (comp string->uuid json/decode)))))
+      (assoc :grow-type     (get-meta node :grow-type keyword))
+      (assoc :content       (get-meta node :content (comp string->uuid json/decode)))
+      (assoc :position-data (get-meta node :position-data (comp string->uuid json/decode)))))
 
 (defn add-group-data
   [props node]
@@ -658,6 +689,49 @@
 
       props)))
 
+(defn parse-fills
+  [node svg-data]
+  (let [fills-node (get-data node :penpot:fills)
+        fills (->> (find-all-nodes fills-node :penpot:fill)
+                   (mapv (fn [fill-node]
+                           {:fill-color  (when (not (str/starts-with? (get-meta fill-node :fill-color) "url"))
+                                           (get-meta fill-node :fill-color))
+                            :fill-color-gradient (when (str/starts-with? (get-meta fill-node :fill-color) "url")
+                                                   (parse-gradient node (get-meta fill-node :fill-color)))
+                            :fill-color-ref-file (get-meta fill-node :fill-color-ref-file uuid/uuid)
+                            :fill-color-ref-id (get-meta fill-node :fill-color-ref-id uuid/uuid)
+                            :fill-opacity (get-meta fill-node :fill-opacity d/parse-double)}))
+                   (mapv d/without-nils))]
+    (if (seq fills)
+      fills
+      (->> [(-> (add-fill {} node svg-data)
+                (d/without-nils))]
+           (filterv not-empty)))))
+
+(defn parse-strokes
+  [node svg-data]
+  (let [strokes-node (get-data node :penpot:strokes)
+        strokes (->> (find-all-nodes strokes-node :penpot:stroke)
+                     (mapv (fn [stroke-node]
+                             {:stroke-color  (when (not (str/starts-with? (get-meta stroke-node :stroke-color) "url"))
+                                               (get-meta stroke-node :stroke-color))
+                              :stroke-color-gradient (when (str/starts-with? (get-meta stroke-node :stroke-color) "url")
+                                                       (parse-gradient node (get-meta stroke-node :stroke-color)))
+                              :stroke-color-ref-file (get-meta stroke-node :stroke-color-ref-file uuid/uuid)
+                              :stroke-color-ref-id (get-meta stroke-node :stroke-color-ref-id uuid/uuid)
+                              :stroke-opacity (get-meta stroke-node :stroke-opacity d/parse-double)
+                              :stroke-style (get-meta stroke-node :stroke-style keyword)
+                              :stroke-width (get-meta stroke-node :stroke-width d/parse-double)
+                              :stroke-alignment (get-meta stroke-node :stroke-alignment keyword)
+                              :stroke-cap-start (get-meta stroke-node :stroke-cap-start keyword)
+                              :stroke-cap-end (get-meta stroke-node :stroke-cap-end keyword)}))
+                     (mapv d/without-nils))]
+    (if (seq strokes)
+      strokes
+      (->> [(-> (add-stroke {} node svg-data)
+                (d/without-nils))]
+           (filterv #(and (not-empty %) (not= (:stroke-style %) :none)))))))
+
 (defn add-svg-content
   [props node]
   (let [svg-content (get-data node :penpot:svg-content)
@@ -715,37 +789,6 @@
         svg-data (or image-data pattern-data)]
     (:xlink:href svg-data)))
 
-(defn add-library-refs
-  [props node]
-
-  (let [fill-color-ref-id     (get-meta node :fill-color-ref-id uuid/uuid)
-        fill-color-ref-file   (get-meta node :fill-color-ref-file uuid/uuid)
-        stroke-color-ref-id   (get-meta node :stroke-color-ref-id uuid/uuid)
-        stroke-color-ref-file (get-meta node :stroke-color-ref-file uuid/uuid)
-        component-id          (get-meta node :component-id uuid/uuid)
-        component-file        (get-meta node :component-file uuid/uuid)
-        shape-ref             (get-meta node :shape-ref uuid/uuid)
-        component-root?       (get-meta node :component-root str->bool)]
-
-    (cond-> props
-      (some? fill-color-ref-id)
-      (assoc :fill-color-ref-id fill-color-ref-id
-             :fill-color-ref-file fill-color-ref-file)
-
-      (some? stroke-color-ref-id)
-      (assoc :stroke-color-ref-id stroke-color-ref-id
-             :stroke-color-ref-file stroke-color-ref-file)
-
-      (some? component-id)
-      (assoc :component-id component-id
-             :component-file component-file)
-
-      component-root?
-      (assoc :component-root? component-root?)
-
-      (some? shape-ref)
-      (assoc :shape-ref shape-ref))))
-
 (defn parse-data
   [type node]
 
@@ -754,14 +797,16 @@
       (-> {}
           (add-common-data node)
           (add-position type node svg-data)
-          (add-fill node svg-data)
-          (add-stroke node svg-data)
+
           (add-layer-options svg-data)
           (add-shadows node)
           (add-blur node)
           (add-exports node)
           (add-svg-attrs node svg-data)
           (add-library-refs node)
+
+          (assoc :fills (parse-fills node svg-data))
+          (assoc :strokes (parse-strokes node svg-data))
 
           (cond-> (= :svg-raw type)
             (add-svg-content node))

@@ -6,12 +6,11 @@
 
 (ns app.common.data
   "Data manipulation and query helper functions."
-  (:refer-clojure :exclude [read-string hash-map merge name parse-double group-by])
+  (:refer-clojure :exclude [read-string hash-map merge name parse-double group-by iteration])
   #?(:cljs
      (:require-macros [app.common.data]))
   (:require
    [app.common.math :as mth]
-   [cljs.analyzer.api :as aapi]
    [clojure.set :as set]
    [cuerdas.core :as str]
    #?(:cljs [cljs.reader :as r]
@@ -37,6 +36,22 @@
   #?(:cljs (instance? lks/LinkedSet o)
      :clj (instance? LinkedSet o)))
 
+#?(:clj
+   (defmethod print-method clojure.lang.PersistentQueue [q, w]
+     ;; Overload the printer for queues so they look like fish
+     (print-method '<- w)
+     (print-method (seq q) w)
+     (print-method '-< w)))
+
+(defn queue
+  ([] #?(:clj clojure.lang.PersistentQueue/EMPTY :cljs #queue []))
+  ([a] (into (queue) [a]))
+  ([a & more] (into (queue) (cons a more))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Data Structures Manipulation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn deep-merge
   ([a b]
    (if (map? a)
@@ -44,10 +59,6 @@
      b))
   ([a b & rest]
    (reduce deep-merge a (cons b rest))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Data Structures Manipulation
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn dissoc-in
   [m [k & ks]]
@@ -151,7 +162,11 @@
   "Given a map, return a map removing key-value
   pairs when value is `nil`."
   [data]
-  (into {} (remove (comp nil? second) data)))
+  (into {} (remove (comp nil? second)) data))
+
+(defn without-qualified
+  [data]
+  (into {} (remove (comp qualified-keyword? first)) data))
 
 (defn without-keys
   "Return a map without the keys provided
@@ -400,45 +415,6 @@
    (if (or (not v)
            (not (mth/finite? v))
            (mth/nan? v)) default v)))
-
-
-(defmacro export
-  "A helper macro that allows reexport a var in a current namespace."
-  [v]
-  (if (boolean (:ns &env))
-
-    ;; Code for ClojureScript
-    (let [mdata    (aapi/resolve &env v)
-          arglists (second (get-in mdata [:meta :arglists]))
-          sym      (symbol (core/name v))
-          andsym   (symbol "&")
-          procarg  #(if (= % andsym) % (gensym "param"))]
-      (if (pos? (count arglists))
-        `(def
-           ~(with-meta sym (:meta mdata))
-           (fn ~@(for [args arglists]
-                   (let [args (map procarg args)]
-                     (if (some #(= andsym %) args)
-                       (let [[sargs dargs] (split-with #(not= andsym %) args)]
-                         `([~@sargs ~@dargs] (apply ~v ~@sargs ~@(rest dargs))))
-                       `([~@args] (~v ~@args)))))))
-        `(def ~(with-meta sym (:meta mdata)) ~v)))
-
-    ;; Code for Clojure
-    (let [vr (resolve v)
-          m  (meta vr)
-          n  (:name m)
-          n  (with-meta n
-               (cond-> {}
-                 (:dynamic m) (assoc :dynamic true)
-                 (:protocol m) (assoc :protocol (:protocol m))))]
-      `(let [m# (meta ~vr)]
-         (def ~n (deref ~vr))
-         (alter-meta! (var ~n) merge (dissoc m# :name))
-         ;; (when (:macro m#)
-         ;;   (.setMacro (var ~n)))
-         ~vr))))
-
 
 (defn any-key? [element & rest]
   (some #(contains? element %) rest))

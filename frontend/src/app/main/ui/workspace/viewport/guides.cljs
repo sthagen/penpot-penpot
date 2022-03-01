@@ -36,7 +36,7 @@
 
 (defn use-guide
   "Hooks to support drag/drop for existing guides and new guides"
-  [on-guide-change get-hover-frame zoom {:keys [position axis frame-id]}]
+  [on-guide-change get-hover-frame zoom {:keys [id position axis frame-id]}]
   (let [dragging-ref (mf/use-ref false)
         start-ref (mf/use-ref nil)
         start-pos-ref (mf/use-ref nil)
@@ -52,11 +52,13 @@
         on-pointer-enter
         (mf/use-callback
          (fn []
+           (st/emit! (dw/set-hover-guide id true))
            (swap! state assoc :hover true)))
 
         on-pointer-leave
         (mf/use-callback
          (fn []
+           (st/emit! (dw/set-hover-guide id false))
            (swap! state assoc :hover false)))
         
         on-pointer-down
@@ -194,13 +196,13 @@
 
     (if (= axis :x)
       {:rect-x      (- pos (/ guide-pill-width 2))
-       :rect-y      (+ (:y vbox) rules-pos (- (/ guide-pill-width 2)) (/ 2 zoom))
+       :rect-y      (+ (:y vbox) rules-pos (- (/ guide-pill-width 2)) (/ 3 zoom))
        :rect-width  guide-pill-width
        :rect-height guide-pill-height
        :text-x      pos
        :text-y      (+ (:y vbox) rules-pos (- (/ 3 zoom)))}
 
-      {:rect-x      (+ (:x vbox) rules-pos (- (/ guide-pill-height 2)) (- (/ 5 zoom)))
+      {:rect-x      (+ (:x vbox) rules-pos (- (/ guide-pill-height 2)) (- (/ 4 zoom)))
        :rect-y      (- pos (/ guide-pill-width 2))
        :rect-width  guide-pill-height
        :rect-height guide-pill-width
@@ -361,8 +363,8 @@
                     :text-anchor "middle"
                     :dominant-baseline "middle"
                     :transform (when (= axis :y) (str "rotate(-90 " text-x "," text-y ")"))
-                    :style {:font-size (/ 13 zoom)
-                            :font-family "sourcesanspro"
+                    :style {:font-size (/ rules/font-size zoom)
+                            :font-family rules/font-family
                             :fill colors/black}}
              (str (mth/round pos))]]))])))
 

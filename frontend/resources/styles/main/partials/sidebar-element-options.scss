@@ -355,6 +355,8 @@
 
   & li.checked-element {
     padding-left: 0;
+    display: flex;
+    justify-content: space-around;
 
     & span {
       margin: 0;
@@ -458,6 +460,12 @@
     &:hover {
       border: 1px solid $color-gray-40;
     }
+  }
+}
+
+.element-set-content .border-data {
+  &[draggable="true"] {
+    cursor: pointer;
   }
 }
 
@@ -954,11 +962,17 @@
   justify-content: center;
   align-items: center;
   cursor: pointer;
+
   svg {
     width: 12px;
     height: 12px;
     fill: $color-gray-20;
     stroke: $color-gray-20;
+  }
+
+  &.remove {
+    min-width: 20px;
+    min-height: 20px;
   }
 
   &:hover svg,

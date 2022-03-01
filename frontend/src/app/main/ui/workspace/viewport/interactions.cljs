@@ -8,6 +8,7 @@
   "Visually show shape interactions in workspace"
   (:require
    [app.common.data :as d]
+   [app.common.data.macros :as dm]
    [app.common.geom.shapes :as gsh]
    [app.common.pages.helpers :as cph]
    [app.common.spec.interactions :as cti]
@@ -17,7 +18,16 @@
    [app.main.ui.workspace.viewport.outline :refer [outline]]
    [app.util.dom :as dom]
    [cuerdas.core :as str]
+   [okulary.core :as l]
    [rumext.alpha :as mf]))
+
+(def interactions-ref
+  (l/derived #(dm/select-keys % [:editing-interaction-index
+                                 :draw-interaction-to
+                                 :draw-interaction-to-frame
+                                 :move-overlay-to
+                                 :move-overlay-index])
+             refs/workspace-local =))
 
 (defn- on-mouse-down
   [event index {:keys [id] :as shape}]
@@ -101,8 +111,8 @@
                                     :right "M 6.5 0 l -12 0 l 6 -6 m -6 6 l 6 6"
                                     nil)
 
-                     :open-url (str "M1 -5 L 3 -7 L 7 -3 L 1 3 L -1 1"
-                                    "M-1 5 L -3 7 L -7 3 L -1 -3 L 1 -1")
+                     :open-url (dm/str "M1 -5 L 3 -7 L 7 -3 L 1 3 L -1 1"
+                                       "M-1 5 L -3 7 L -7 3 L -1 -3 L 1 -1")
 
                      nil)
         inv-zoom (/ 1 zoom)]
@@ -222,14 +232,14 @@
                  :fill "var(--color-black)"
                  :fill-opacity 0.3
                  :stroke-width 1
-                 :d (str "M" marker-x " " marker-y " "
-                         "h " width " "
-                         "v " height " "
-                         "h -" width " z"
-                         "M" marker-x " " marker-y " "
-                         "l " width " " height " "
-                         "M" marker-x " " (+ marker-y height) " "
-                         "l " width " -" height " ")}]
+                 :d (dm/str "M" marker-x " " marker-y " "
+                            "h " width " "
+                            "v " height " "
+                            "h -" width " z"
+                            "M" marker-x " " marker-y " "
+                            "l " width " " height " "
+                            "M" marker-x " " (+ marker-y height) " "
+                            "l " width " -" height " ")}]
          [:circle {:cx (+ marker-x (/ width 2))
                    :cy (+ marker-y (/ height 2))
                    :r 8
@@ -251,7 +261,7 @@
                 draw-interaction-to
                 draw-interaction-to-frame
                 move-overlay-to
-                move-overlay-index]} (mf/deref refs/interactions-data)
+                move-overlay-index]} (mf/deref interactions-ref)
 
         first-selected (first selected-shapes)
 
@@ -269,7 +279,7 @@
                 selected? (contains? selected (:id shape))
                 level (calc-level index (:interactions shape))]
             (when-not selected?
-              [:& interaction-path {:key (str (:id shape) "-" index)
+              [:& interaction-path {:key (dm/str (:id shape) "-" index)
                                     :index index
                                     :level level
                                     :orig-shape shape
@@ -297,7 +307,7 @@
                                  (get objects (:destination interaction)))
                     level (calc-level index (:interactions shape))]
                 [:*
-                  [:& interaction-path {:key (str (:id shape) "-" index)
+                  [:& interaction-path {:key (dm/str (:id shape) "-" index)
                                         :index index
                                         :level level
                                         :orig-shape shape
@@ -311,14 +321,14 @@
                              (= (:overlay-pos-type interaction) :manual))
                     (if (and (some? move-overlay-to)
                              (= move-overlay-index index))
-                      [:& overlay-marker {:key (str "pos" (:id shape) "-" index)
+                      [:& overlay-marker {:key (dm/str "pos" (:id shape) "-" index)
                                           :index index
                                           :orig-shape shape
                                           :dest-shape dest-shape
                                           :position move-overlay-to
                                           :objects objects
                                           :hover-disabled? hover-disabled?}]
-                      [:& overlay-marker {:key (str "pos" (:id shape) "-" index)
+                      [:& overlay-marker {:key (dm/str "pos" (:id shape) "-" index)
                                           :index index
                                           :orig-shape shape
                                           :dest-shape dest-shape

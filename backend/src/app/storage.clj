@@ -8,6 +8,7 @@
   "Objects storage abstraction layer."
   (:require
    [app.common.data :as d]
+   [app.common.data.macros :as dm]
    [app.common.exceptions :as ex]
    [app.common.logging :as l]
    [app.common.spec :as us]
@@ -248,7 +249,7 @@
   (-> (assoc storage :conn (or conn pool))
       (delete-database-object (if (uuid? id-or-obj) id-or-obj (:id id-or-obj)))))
 
-(d/export impl/resolve-backend)
+(dm/export impl/resolve-backend)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Garbage Collection: Permanently delete objects
@@ -350,14 +351,15 @@
 
           (retrieve-touched-chunk [conn cursor]
             (let [rows (->> (db/exec! conn [sql:retrieve-touched-objects-chunk cursor])
-                            (mapv #(d/update-when % :metadata db/decode-transit-pgobject)))]
+                            (mapv #(d/update-when % :metadata db/decode-transit-pgobject)))
+                  kw   (fn [o] (if (keyword? o) o (keyword o)))]
               (when (seq rows)
                 [(-> rows peek :created-at)
                  ;; NOTE: we use the :file-media-object as default value for backward compatibility because when we
                  ;; deploy it we can have old backend instances running in the same time as the new one and we can
                  ;; still have storage-objects created without reference value.  And we know that if it does not
                  ;; have value, it means :file-media-object.
-                 (d/group-by' #(or (-> % :metadata :reference) :file-media-object) :id rows)])))
+                 (d/group-by' #(or (some-> % :metadata :reference kw) :file-media-object) :id rows)])))
 
           (retrieve-touched [conn]
             (->> (d/iteration (fn [cursor]
@@ -391,7 +393,9 @@
             (let [[f d] (case reference
                           :file-media-object (process-objects! conn has-file-media-object-nrefs? ids)
                           :team-font-variant (process-objects! conn has-team-font-variant-nrefs? ids)
-                          (ex/raise :type :internal :code :unexpected-unknown-reference))]
+                          (ex/raise :type :internal
+                                    :code :unexpected-unknown-reference
+                                    :hint (format "unknown reference %s" (pr-str reference))))]
               (recur (+ to-freeze f)
                      (+ to-delete d)
                      (rest groups)))

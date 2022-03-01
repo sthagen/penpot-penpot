@@ -300,3 +300,58 @@
             (update page :objects #(d/mapm update-object %)))]
 
     (update data :pages-index #(d/mapm update-page %))))
+
+(defn set-fills
+  [shape]
+  (let [attrs {:fill-color (:fill-color shape)
+               :fill-color-gradient (:fill-color-gradient shape)
+               :fill-color-ref-file (:fill-color-ref-file shape)
+               :fill-color-ref-id (:fill-color-ref-id shape)
+               :fill-opacity (:fill-opacity shape)}
+
+        clean-attrs (d/without-nils attrs)]
+    (cond-> shape
+      (d/not-empty? clean-attrs)
+      (assoc :fills [clean-attrs]))))
+
+;; Add fills to shapes
+(defmethod migrate 14
+  [data]
+  (letfn [(update-object [_ object]
+            (cond-> object
+              (and (not (= :text (:type object))) (nil? (:fills object)))
+              (set-fills)))
+
+          (update-page [_ page]
+            (update page :objects #(d/mapm update-object %)))]
+    (update data :pages-index #(d/mapm update-page %))))
+
+(defn set-strokes
+  [shape]
+  (let [attrs {:stroke-style (:stroke-style shape)
+               :stroke-alignment (:stroke-alignment shape)
+               :stroke-width (:stroke-width shape)
+               :stroke-color (:stroke-color shape)
+               :stroke-color-ref-id (:stroke-color-ref-id shape)
+               :stroke-color-ref-file (:stroke-color-ref-file shape)
+               :stroke-opacity (:stroke-opacity shape)
+               :stroke-color-gradient (:stroke-color-gradient shape)
+               :stroke-cap-start (:stroke-cap-start shape)
+               :stroke-cap-end (:stroke-cap-end shape)}
+
+        clean-attrs (d/without-nils attrs)]
+    (cond-> shape
+      (d/not-empty? clean-attrs)
+      (assoc :strokes [clean-attrs]))))
+
+;; Add strokes to shapes
+(defmethod migrate 15
+  [data]
+  (letfn [(update-object [_ object]
+            (cond-> object
+              (and (not (= :text (:type object))) (nil? (:strokes object)))
+              (set-strokes)))
+
+          (update-page [_ page]
+            (update page :objects #(d/mapm update-object %)))]
+    (update data :pages-index #(d/mapm update-page %))))

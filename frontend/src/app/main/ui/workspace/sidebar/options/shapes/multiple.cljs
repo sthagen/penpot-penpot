@@ -8,6 +8,8 @@
   (:require
    [app.common.attrs :as attrs]
    [app.common.data :as d]
+   [app.common.geom.shapes :as gsh]
+   [app.common.pages.common :as cpc]
    [app.common.text :as txt]
    [app.main.ui.hooks :as hooks]
    [app.main.ui.workspace.sidebar.options.menus.blur :refer [blur-attrs blur-menu]]
@@ -20,8 +22,11 @@
    [app.main.ui.workspace.sidebar.options.menus.text :as ot]
    [rumext.alpha :as mf]))
 
-;; We define a map that goes from type to
-;; attribute and how to handle them
+;; Define how to read each kind of attribute depending on the shape type:
+;;   - shape: read the attribute directly from the shape.
+;;   - children: read it from all the children, and then merging it.
+;;   - ignore: do not read this attribute from this shape.
+;;   - text: read it from all the content nodes, and then merging it.
 (def type->props
   {:frame
    {:measure    :shape
@@ -30,7 +35,7 @@
     :fill       :shape
     :shadow     :children
     :blur       :children
-    :stroke     :children
+    :stroke     :shape
     :text       :children}
 
    :group
@@ -60,7 +65,7 @@
     :fill       :text
     :shadow     :shape
     :blur       :shape
-    :stroke     :ignore
+    :stroke     :shape
     :text       :text}
 
    :image
@@ -151,9 +156,6 @@
   [v]
   (when v (select-keys v blur-keys)))
 
-(defn empty-map [keys]
-  (into {} (map #(hash-map % nil)) keys))
-
 (defn get-attrs*
   "Given a `type` of options that we want to extract and the shapes to extract them from
   returns a list of tuples [id, values] with the extracted properties for the shapes that
@@ -172,10 +174,9 @@
           (let [props (get-in type->props [type attr-type])]
             (case props
               :ignore   [ids values]
-              :shape    [(conj ids id)
-                         (merge-attrs values (merge
-                                              (empty-map attrs)
-                                              (select-keys shape attrs)))]
+              :shape    (let [editable-attrs (filter (get cpc/editable-attrs (:type shape)) attrs)]
+                          [(conj ids id)
+                           (merge-attrs values (select-keys shape editable-attrs))])
               :text     [(conj ids id)
                          (-> values
                              (merge-attrs (select-keys shape attrs))
@@ -205,6 +206,7 @@
   (let [shapes (unchecked-get props "shapes")
         shapes-with-children (unchecked-get props "shapes-with-children")
         objects (->> shapes-with-children (group-by :id) (d/mapm (fn [_ v] (first v))))
+        show-caps (some #(and (= :path (:type %)) (gsh/open-path? %)) shapes)
 
         ;; Selrect/points only used for measures and it's the one that changes the most. We separate it
         ;; so we can memoize it
@@ -249,14 +251,14 @@
      (when-not (empty? fill-ids)
        [:& fill-menu {:type type :ids fill-ids :values fill-values}])
 
+     (when-not (empty? stroke-ids)
+       [:& stroke-menu {:type type :ids stroke-ids :show-caps show-caps :values stroke-values}])
+
      (when-not (empty? shadow-ids)
        [:& shadow-menu {:type type :ids shadow-ids :values shadow-values}])
 
      (when-not (empty? blur-ids)
        [:& blur-menu {:type type :ids blur-ids :values blur-values}])
-
-     (when-not (empty? stroke-ids)
-       [:& stroke-menu {:type type :ids stroke-ids :show-caps true :values stroke-values}])
 
      (when-not (empty? text-ids)
        [:& ot/text-menu {:type type :ids text-ids :values text-values}])]))

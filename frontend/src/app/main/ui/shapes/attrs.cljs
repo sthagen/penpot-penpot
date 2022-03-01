@@ -6,6 +6,7 @@
 
 (ns app.main.ui.shapes.attrs
   (:require
+   [app.common.data :as d]
    [app.common.spec.radius :as ctr]
    [app.common.spec.shape :refer [stroke-caps-line stroke-caps-marker]]
    [app.main.ui.context :as muc]
@@ -79,37 +80,42 @@
                                      "z")}))
     attrs))
 
-(defn add-fill [attrs shape render-id]
-  (let [fill-attrs (cond
-                     (contains? shape :fill-image)
-                     (let [fill-image-id (str "fill-image-" render-id)]
-                       {:fill (str/format "url(#%s)" fill-image-id)})
+(defn add-fill
+  ([attrs shape render-id]
+   (add-fill attrs shape render-id nil))
 
-                     (contains? shape :fill-color-gradient)
-                     (let [fill-color-gradient-id (str "fill-color-gradient_" render-id)]
-                       {:fill (str/format "url(#%s)" fill-color-gradient-id)})
+  ([attrs shape render-id index]
+   (let [fill-attrs
+         (cond
+           (contains? shape :fill-image)
+           (let [fill-image-id (str "fill-image-" render-id)]
+             {:fill (str "url(#" fill-image-id ")")})
 
-                     (contains? shape :fill-color)
-                     {:fill (:fill-color shape)}
+           (contains? shape :fill-color-gradient)
+           (let [fill-color-gradient-id (str "fill-color-gradient_" render-id (if index (str "_" index) ""))]
+             {:fill (str "url(#" fill-color-gradient-id ")")})
 
-                     ;; If contains svg-attrs the origin is svg. If it's not svg origin
-                     ;; we setup the default fill as transparent (instead of black)
-                     (and (not (contains? shape :svg-attrs))
-                          (not (#{:svg-raw :group} (:type shape))))
-                     {:fill "none"}
+           (contains? shape :fill-color)
+           {:fill (:fill-color shape)}
 
-                     :else
-                     {})
+           ;; If contains svg-attrs the origin is svg. If it's not svg origin
+           ;; we setup the default fill as transparent (instead of black)
+           (and (not (contains? shape :svg-attrs))
+                (not (#{:svg-raw :group} (:type shape))))
+           {:fill "none"}
 
-        fill-attrs (cond-> fill-attrs
-                     (contains? shape :fill-opacity)
-                     (assoc :fillOpacity (:fill-opacity shape)))]
+           :else
+           {})
 
-    (obj/merge! attrs (clj->js fill-attrs))))
+         fill-attrs (cond-> fill-attrs
+                      (contains? shape :fill-opacity)
+                      (assoc :fillOpacity (:fill-opacity shape)))]
 
-(defn add-stroke [attrs shape render-id]
+     (obj/merge! attrs (clj->js fill-attrs)))))
+
+(defn add-stroke [attrs shape render-id index]
   (let [stroke-style (:stroke-style shape :none)
-        stroke-color-gradient-id (str "stroke-color-gradient_" render-id)
+        stroke-color-gradient-id (str "stroke-color-gradient_" render-id "_" index)
         stroke-width (:stroke-width shape 1)]
     (if (not= stroke-style :none)
       (let [stroke-attrs
@@ -187,15 +193,27 @@
    (let [svg-defs  (:svg-defs shape {})
          svg-attrs (:svg-attrs shape {})
 
-         [svg-attrs svg-styles] (mf/use-memo
-                                 (mf/deps render-id svg-defs svg-attrs)
-                                 #(extract-svg-attrs render-id svg-defs svg-attrs))
+         [svg-attrs svg-styles]
+         (extract-svg-attrs render-id svg-defs svg-attrs)
 
          styles (-> (obj/get props "style" (obj/new))
                     (obj/merge! svg-styles)
-                    (add-fill shape render-id)
-                    (add-stroke shape render-id)
-                    (add-layer-props shape))]
+                    (add-layer-props shape))
+
+         styles (cond (or (some? (:fill-image shape))
+                          (= :image (:type shape))
+                          (> (count (:fills shape)) 1)
+                          (some #(some? (:fill-color-gradient %)) (:fills shape)))
+                      (obj/set! styles "fill" (str "url(#fill-0-" render-id ")"))
+
+                      ;; imported svgs can have fill and fill-opacity attributes
+                      (obj/contains? svg-styles "fill")
+                      (-> styles
+                          (obj/set! "fill" (obj/get svg-styles "fill"))
+                          (obj/set! "fillOpacity" (obj/get svg-styles "fillOpacity")))
+
+                      :else
+                      (add-fill styles (d/without-nils (get-in shape [:fills 0])) render-id 0))]
 
      (-> props
          (obj/merge! svg-attrs)
@@ -208,14 +226,20 @@
       (add-style-attrs shape)))
 
 (defn extract-fill-attrs
-  [shape]
-  (let [render-id (mf/use-ctx muc/render-ctx)
-        fill-styles (-> (obj/get shape "style" (obj/new))
-                        (add-fill shape render-id))]
+  [shape render-id index]
+  (let [fill-styles (-> (obj/get shape "style" (obj/new))
+                        (add-fill shape render-id index))]
     (-> (obj/new)
         (obj/set! "style" fill-styles))))
 
+(defn extract-stroke-attrs
+  [shape index render-id]
+  (let [stroke-styles (-> (obj/get shape "style" (obj/new))
+                          (add-stroke shape render-id index))]
+    (-> (obj/new)
+        (obj/set! "style" stroke-styles))))
+
 (defn extract-border-radius-attrs
   [shape]
-   (-> (obj/new)
-       (add-border-radius shape)))
+  (-> (obj/new)
+      (add-border-radius shape)))

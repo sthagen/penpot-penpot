@@ -186,19 +186,23 @@
 
        (st/emit! (ms/->MouseEvent :double-click ctrl? shift? alt?))
 
-       (when (and (not drawing-path?) shape)
-         (cond frame?
-               (st/emit! (dw/select-shape id shift?))
+       ;; Emit asynchronously so the double click to exit shapes won't break
+       (timers/schedule
+        #(when (and (not drawing-path?) shape)
+           (cond
+             frame?
+             (st/emit! (dw/select-shape id shift?))
 
-               (and group? (> (count @hover-ids) 1))
-               (let [selected (get objects (second @hover-ids))]
-                 (reset! hover selected)
-                 (reset! hover-ids (into [] (rest @hover-ids)))
-                 (st/emit! (dw/select-shape (:id selected))))
+             (and group? (> (count @hover-ids) 1))
+             (let [selected (get objects (second @hover-ids))]
+               (reset! hover selected)
+               (reset! hover-ids (into [] (rest @hover-ids)))
 
-               (not= id edition)
-               (st/emit! (dw/select-shape id)
-                         (dw/start-editing-selected))))))))
+               (st/emit! (dw/select-shape (:id selected))))
+
+             (not= id edition)
+             (st/emit! (dw/select-shape id)
+                       (dw/start-editing-selected)))))))))
 
 (defn on-context-menu
   [hover hover-ids]
@@ -346,14 +350,13 @@
                                       (kbd/shift? event)
                                       (kbd/alt? event))))))))
 
-(defn on-pointer-move [viewport-ref raw-position-ref zoom move-stream]
+(defn on-pointer-move [viewport-ref zoom move-stream]
   (mf/use-callback
    (mf/deps zoom move-stream)
    (fn [event]
      (let [raw-pt (dom/get-client-position event)
            viewport (mf/ref-val viewport-ref)
            pt     (utils/translate-point-to-viewport viewport zoom raw-pt)]
-       (mf/set-ref-val! raw-position-ref raw-pt)
        (rx/push! move-stream pt)))))
 
 (defn on-mouse-wheel [viewport-ref zoom]

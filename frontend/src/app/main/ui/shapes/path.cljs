@@ -8,12 +8,10 @@
   (:require
    [app.common.logging :as log]
    [app.main.ui.shapes.attrs :as attrs]
-   [app.main.ui.shapes.custom-stroke :refer [shape-custom-stroke]]
+   [app.main.ui.shapes.custom-stroke :refer [shape-custom-strokes]]
    [app.util.object :as obj]
    [app.util.path.format :as upf]
    [rumext.alpha :as mf]))
-
-;; --- Path Shape
 
 (mf/defc path-shape
   {::mf/wrap-props false}
@@ -33,5 +31,5 @@
         props   (-> (attrs/extract-style-attrs shape)
                     (obj/set! "d" pdata))]
 
-    [:& shape-custom-stroke {:shape shape}
+    [:& shape-custom-strokes {:shape shape}
      [:> :path props]]))

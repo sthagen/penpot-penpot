@@ -107,6 +107,30 @@
 (s/def ::shapes
   (s/every uuid? :kind vector?))
 
+(s/def ::fill
+  (s/keys :opt-un [::fill-color
+                   ::fill-opacity
+                   ::fill-color-gradient
+                   ::fill-color-ref-file
+                   ::fill-color-ref-id]))
+
+(s/def ::fills
+  (s/coll-of ::fill :kind vector?))
+
+(s/def ::stroke
+  (s/keys :opt-un [::stroke-color
+                   ::stroke-color-ref-file
+                   ::stroke-color-ref-id
+                   ::stroke-opacity
+                   ::stroke-style
+                   ::stroke-width
+                   ::stroke-alignment
+                   ::stroke-cap-start
+                   ::stroke-cap-end]))
+
+(s/def ::strokes
+  (s/coll-of ::stroke :kind vector?))
+
 (s/def ::transform ::gmt/matrix)
 (s/def ::transform-inverse ::gmt/matrix)
 (s/def ::opacity ::us/safe-number)
@@ -140,6 +164,7 @@
                    ::points
                    ::blocked
                    ::collapsed
+                   ::fills
                    ::fill-color
                    ::fill-opacity
                    ::fill-color-gradient
@@ -169,6 +194,7 @@
                    ::y
                    ::exports
                    ::shapes
+                   ::strokes
                    ::stroke-color
                    ::stroke-color-ref-file
                    ::stroke-color-ref-id
@@ -202,11 +228,51 @@
 (s/def :internal.shape.text/content
   (s/nilable
    (s/or :text-container
-         (s/keys :req-un [:internal.shape.text/type
-                          :internal.shape.text/children]
-                 :opt-un [:internal.shape.text/key])
+         (s/keys :req-un [:internal.shape.text/type]
+                 :opt-un [:internal.shape.text/key
+                          :internal.shape.text/children])
          :text-content
          (s/keys :req-un [:internal.shape.text/text]))))
+
+(s/def :internal.shape.text/position-data
+  (s/coll-of :internal.shape.text/position-data-element
+             :kind vector?
+             :min-count 1))
+
+(s/def :internal.shape.text/position-data-element
+  (s/keys :req-un [:internal.shape.text.position-data/x
+                   :internal.shape.text.position-data/y
+                   :internal.shape.text.position-data/width
+                   :internal.shape.text.position-data/height]
+          :opt-un [:internal.shape.text.position-data/fill-color
+                   :internal.shape.text.position-data/fill-opacity
+                   :internal.shape.text.position-data/font-family
+                   :internal.shape.text.position-data/font-size
+                   :internal.shape.text.position-data/font-style
+                   :internal.shape.text.position-data/font-weight
+                   :internal.shape.text.position-data/rtl
+                   :internal.shape.text.position-data/text
+                   :internal.shape.text.position-data/text-decoration
+                   :internal.shape.text.position-data/text-transform]
+          ))
+
+(s/def :internal.shape.text.position-data/x ::us/safe-number)
+(s/def :internal.shape.text.position-data/y ::us/safe-number)
+(s/def :internal.shape.text.position-data/width ::us/safe-number)
+(s/def :internal.shape.text.position-data/height ::us/safe-number)
+
+(s/def :internal.shape.text.position-data/fill-color ::fill-color)
+(s/def :internal.shape.text.position-data/fill-opacity ::fill-opacity)
+(s/def :internal.shape.text.position-data/fill-color-gradient ::fill-color-gradient)
+
+(s/def :internal.shape.text.position-data/font-family string?)
+(s/def :internal.shape.text.position-data/font-size string?)
+(s/def :internal.shape.text.position-data/font-style string?)
+(s/def :internal.shape.text.position-data/font-weight string?)
+(s/def :internal.shape.text.position-data/rtl boolean?)
+(s/def :internal.shape.text.position-data/text string?)
+(s/def :internal.shape.text.position-data/text-decoration string?)
+(s/def :internal.shape.text.position-data/text-transform string?)
 
 (s/def :internal.shape.path/command keyword?)
 (s/def :internal.shape.path/params
@@ -226,7 +292,8 @@
 
 (defmethod shape-spec :text [_]
   (s/and ::shape-attrs
-         (s/keys :opt-un [:internal.shape.text/content])))
+         (s/keys :opt-un [:internal.shape.text/content
+                          :internal.shape.text/position-data])))
 
 (defmethod shape-spec :path [_]
   (s/and ::shape-attrs

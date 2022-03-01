@@ -19,7 +19,7 @@ $height-palette-max: 80px;
   width: 100vw;
   height: 100vh;
   user-select: none;
-
+  background-color: $color-canvas;
   display: grid;
   grid-template-areas:
     "header header header header"
@@ -63,7 +63,6 @@ $height-palette-max: 80px;
 
   .color-palette {
     grid-area: color-palette;
-    min-height: $height-palette-min;
     max-height: $height-palette-max;
     height: var(--height, $height-palette);
   }
