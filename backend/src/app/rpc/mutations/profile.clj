@@ -24,7 +24,9 @@
    [app.util.time :as dt]
    [buddy.hashers :as hashers]
    [clojure.spec.alpha :as s]
-   [cuerdas.core :as str]))
+   [cuerdas.core :as str]
+   [promesa.core :as p]
+   [promesa.exec :as px]))
 
 ;; --- Helpers & Specs
 
@@ -345,12 +347,12 @@
         (profile/decode-profile-row)
         (profile/strip-private-attrs))))
 
+
 (s/def ::update-profile
   (s/keys :req-un [::id ::fullname]
           :opt-un [::lang ::theme]))
 
 (sv/defmethod ::update-profile
-  {::async/dispatch :default}
   [{:keys [pool] :as cfg} params]
   (db/with-atomic [conn pool]
     (let [profile (update-profile conn params)]
@@ -411,33 +413,37 @@
 (s/def ::update-profile-photo
   (s/keys :req-un [::profile-id ::file]))
 
-(sv/defmethod ::update-profile-photo
-  {::rlimit/permits (cf/get :rlimit-image)}
-  [{:keys [pool storage] :as cfg} {:keys [profile-id file] :as params}]
-  (db/with-atomic [conn pool]
-    (media/validate-media-type (:content-type file) #{"image/jpeg" "image/png" "image/webp"})
-    (media/run {:cmd :info :input {:path (:tempfile file)
-                                   :mtype (:content-type file)}})
+;; TODO: properly handle resource usage, transactions and storage
 
-    (let [profile (db/get-by-id conn :profile profile-id)
-          storage (media/configure-assets-storage storage conn)
-          cfg     (assoc cfg :storage storage)
-          photo   (teams/upload-photo cfg params)]
+(sv/defmethod ::update-profile-photo
+  [cfg {:keys [file] :as params}]
+  ;; Validate incoming mime type
+  (media/validate-media-type! (:content-type file) #{"image/jpeg" "image/png" "image/webp"})
+  (let [cfg (update cfg :storage media/configure-assets-storage)]
+    (update-profile-photo cfg params)))
+
+(defn update-profile-photo
+  [{:keys [pool storage executors] :as cfg} {:keys [profile-id file] :as params}]
+  (p/do
+    ;; Perform file validation, this operation executes some
+    ;; comandline helpers for true check of the image file. And it
+    ;; raises an exception if somethig is wrong with the file.
+    (px/with-dispatch (:blocking executors)
+      (media/run {:cmd :info :input {:path (:tempfile file) :mtype (:content-type file)}}))
+
+    (p/let [profile (px/with-dispatch (:default executors)
+                      (db/get-by-id pool :profile profile-id))
+            photo   (teams/upload-photo cfg params)]
 
       ;; Schedule deletion of old photo
       (when-let [id (:photo-id profile)]
-        (sto/del-object storage id))
+        (sto/touch-object! storage id))
 
       ;; Save new photo
-      (update-profile-photo conn profile-id photo))))
-
-(defn- update-profile-photo
-  [conn profile-id sobj]
-  (db/update! conn :profile
-              {:photo-id (:id sobj)}
-              {:id profile-id})
-  nil)
-
+      (db/update! pool :profile
+                  {:photo-id (:id photo)}
+                  {:id profile-id})
+      nil)))
 
 ;; --- MUTATION: Request Email Change
 

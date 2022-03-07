@@ -84,7 +84,7 @@
                         :fn #(st/emit! (dw/increase-zoom nil))}
 
    :decrease-zoom      {:tooltip "-"
-                        :command "-"
+                        :command ["-" "_"]
                         :fn #(st/emit! (dw/decrease-zoom nil))}
 
    :group              {:tooltip (ds/meta "G")
@@ -352,11 +352,13 @@
                                     :command (ds/c-mod "alt+g")
                                     :fn #(st/emit! (dw/create-artboard-from-selection))}
 
-   :hide-ui {:tooltip "\\"
-             :command "\\"
-             :fn #(st/emit! (dw/toggle-layout-flags :hide-ui))}
+   :hide-ui              {:tooltip "\\"
+                          :command "\\"
+                          :fn #(st/emit! (dw/toggle-layout-flags :hide-ui))}
 
-   })
+   :toggle-focus-mode    {:command "f"
+                          :tooltip "F"
+                          :fn #(st/emit! (dw/toggle-focus-mode))}})
 
 (def opacity-shortcuts
   (into {} (->>

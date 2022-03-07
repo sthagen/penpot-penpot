@@ -36,12 +36,12 @@
        (reduce-kv #(.with ^MapMessage %1 (name %2) %3) message m))))
 
 #?(:clj
-  (def logger-context
-    (LogManager/getContext false)))
+   (def logger-context
+     (LogManager/getContext false)))
 
 #?(:clj
-  (def logging-agent
-    (agent nil :error-mode :continue)))
+   (def logging-agent
+     (agent nil :error-mode :continue)))
 
 (defn- simple-prune
   ([s] (simple-prune s (* 1024 1024)))
@@ -78,12 +78,6 @@
                         [(stringify-data key)
                          (stringify-data val)])))
            data)))
-
-#?(:clj
-   (defn set-context!
-     [data]
-     (ThreadContext/putAll (data->context-map data))
-     nil))
 
 #?(:clj
    (defmacro with-context
@@ -173,12 +167,11 @@
              ~level-sym  (get-level ~level)]
          (when (enabled? ~logger-sym ~level-sym)
            ~(if async
-              `(->> (ThreadContext/getImmutableContext)
-                    (send-off logging-agent
-                              (fn [_# cdata#]
-                                (with-context (-> {:id (uuid/next)} (into cdata#) (into ~context))
-                                  (->> (or ~raw (build-map-message ~props))
-                                       (write-log! ~logger-sym ~level-sym ~cause))))))
+              `(send-off logging-agent
+                         (fn [_#]
+                           (with-context (into {:id (uuid/next)} ~context)
+                            (->> (or ~raw (build-map-message ~props))
+                                 (write-log! ~logger-sym ~level-sym ~cause)))))
 
               `(let [message# (or ~raw (build-map-message ~props))]
                  (write-log! ~logger-sym ~level-sym ~cause message#))))))))

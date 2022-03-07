@@ -5,6 +5,8 @@
 ### :boom: Breaking changes
 ### :sparkles: New features
 
+- Add border radius to our artboars [Taiga #2056](https://tree.taiga.io/project/penpot/us/2056)
+- Allow send multiple team invitations at once [Taiga #2798](https://tree.taiga.io/project/penpot/us/2798)
 - Persist color palette and color picker across refresh [Taiga #1660](https://tree.taiga.io/project/penpot/issue/1660)
 - Ability to add multiple strokes to a shape [Taiga #2778](https://tree.taiga.io/project/penpot/us/2778)
 - Scroll to selected size in font size selector [Taiga #2825](https://tree.taiga.io/project/penpot/us/2825)
@@ -12,6 +14,7 @@
 - Add new invitations section [Taiga #2797](https://tree.taiga.io/project/penpot/us/2797)
 - Ability to add multiple fills to a shape [Taiga #1394](https://tree.taiga.io/project/penpot/us/1394)
 - Team members redesign [Taiga #2283](https://tree.taiga.io/project/penpot/us/2283)
+- New focus mode in workspace [Taiga #2748](https://tree.taiga.io/project/penpot/us/2748)
 - Changed text shapes to be displayed as natives SVG text elements [Taiga #2759](https://tree.taiga.io/project/penpot/us/2759)
 - Texts now can have strokes, multiple fills and can be used as masks
 
@@ -23,6 +26,18 @@
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
 
+
+## 1.12.1-beta
+### :boom: Breaking changes
+
+### :sparkles: New features
+
+### :bug: Bugs fixed
+
+- Fix length of names in sidebar [Taiga #2962](https://tree.taiga.io/project/penpot/issue/2962)
+- Fix issues on loki integration
+
+### :heart: Community contributions by (Thank you!)
 
 ## 1.12.0-beta
 

@@ -467,7 +467,7 @@ msgstr "Cambiar contraseña"
 
 #: src/app/main/ui/dashboard/project_menu.cljs
 msgid "dashboard.pin-unpin"
-msgstr "Fijar/Desfijar"
+msgstr "Anclar/Desanclar"
 
 #: src/app/main/ui/dashboard/projects.cljs
 msgid "dashboard.projects-title"
@@ -619,6 +619,9 @@ msgstr "No puedes usar tu email como password"
 #: src/app/main/ui/auth/register.cljs, src/app/main/ui/auth/recovery_request.cljs, src/app/main/ui/settings/change_email.cljs, src/app/main/ui/dashboard/team.cljs
 msgid "errors.email-has-permanent-bounces"
 msgstr "El email «%s» tiene varios reportes de rebote permanente."
+
+msgid "errors.email-spam-or-permanent-bounces"
+msgstr "El email «%s» tiene reportes de spam o de rebote permanente."
 
 #: src/app/main/ui/settings/change_email.cljs
 msgid "errors.email-invalid-confirmation"
@@ -1552,6 +1555,9 @@ msgstr "¿Seguro que quieres eliminar este integrante del equipo?"
 #: src/app/main/ui/dashboard/team.cljs
 msgid "modals.delete-team-member-confirm.title"
 msgstr "Eliminar integrante del equipo"
+
+msgid "modals.invite-member.emails"
+msgstr "Emails, separados por coma"
 
 #: src/app/main/ui/dashboard/team.cljs
 msgid "modals.invite-member-confirm.accept"
@@ -3557,3 +3563,15 @@ msgstr "Actualizar"
 
 msgid "workspace.viewport.click-to-close-path"
 msgstr "Pulsar para cerrar la ruta"
+
+msgid "workspace.focus.selection"
+msgstr "Selección"
+
+msgid "workspace.focus.focus-mode"
+msgstr "Modo foco"
+
+msgid "workspace.focus.focus-on"
+msgstr "Activar modo foco"
+
+msgid "workspace.focus.focus-off"
+msgstr "Desactivar modo foco"
