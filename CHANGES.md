@@ -5,6 +5,8 @@
 ### :boom: Breaking changes
 ### :sparkles: New features
 
+- Set an artboard as the file thumbnail [Taiga #1526](https://tree.taiga.io/project/penpot/us/1526)
+- Social login redesign [Taiga #2974](https://tree.taiga.io/project/penpot/task/2974)
 - Add border radius to our artboars [Taiga #2056](https://tree.taiga.io/project/penpot/us/2056)
 - Allow send multiple team invitations at once [Taiga #2798](https://tree.taiga.io/project/penpot/us/2798)
 - Persist color palette and color picker across refresh [Taiga #1660](https://tree.taiga.io/project/penpot/issue/1660)
@@ -17,27 +19,34 @@
 - New focus mode in workspace [Taiga #2748](https://tree.taiga.io/project/penpot/us/2748)
 - Changed text shapes to be displayed as natives SVG text elements [Taiga #2759](https://tree.taiga.io/project/penpot/us/2759)
 - Texts now can have strokes, multiple fills and can be used as masks
+- Add the ability to specify the attr for retrieve the email on OIDC integration [#1460](https://github.com/penpot/penpot/issues/1460)
+- Allow registration with invitation token when registration is disabled
+- Add the ability to disable standard, password login [Taiga #2999](https://tree.taiga.io/project/penpot/us/2999)
 
 ### :bug: Bugs fixed
 
+- Fix ellipsis in long page names [Taiga #2962](https://tree.taiga.io/project/penpot/issue/2962)
 - Fix color palette animation [Taiga #2852](https://tree.taiga.io/project/penpot/issue/2852)
 - Fix display code icon on preview hover [Taiga #2838](https://tree.taiga.io/project/penpot/us/2838)
 
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
 
+## 1.12.2-beta
+
+### :bug: Bugs fixed
+
+- Fix issue with guides over shape handlers [Taiga #3032](https://tree.taiga.io/project/penpot/issue/3032)
+- Fix problem with shift+ctrl+click to select [#1671](https://github.com/penpot/penpot/issues/1671)
+- Fix ellipsis in long page names [Taiga #2962](https://tree.taiga.io/project/penpot/issue/2962)
 
 ## 1.12.1-beta
-### :boom: Breaking changes
-
-### :sparkles: New features
 
 ### :bug: Bugs fixed
 
 - Fix length of names in sidebar [Taiga #2962](https://tree.taiga.io/project/penpot/issue/2962)
 - Fix issues on loki integration
 
-### :heart: Community contributions by (Thank you!)
 
 ## 1.12.0-beta
 

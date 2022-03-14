@@ -9,6 +9,7 @@
   (:require
    [app.common.data :as d]
    [app.common.spec.page :as csp]
+   [app.main.data.events :as ev]
    [app.main.data.modal :as modal]
    [app.main.data.workspace :as dw]
    [app.main.data.workspace.interactions :as dwi]
@@ -163,6 +164,22 @@
                      :shortcut (sc/get-tooltip :flip-horizontal)
                      :on-click do-flip-horizontal}]
      [:& menu-separator]]))
+
+(mf/defc context-menu-thumbnail
+  [{:keys [shapes]}]
+  (let [single?   (= (count shapes) 1)
+        has-frame? (->> shapes (d/seek #(= :frame (:type %))))
+        is-frame? (and single? has-frame?)
+        do-toggle-thumbnail (st/emitf (dw/toggle-file-thumbnail-selected))]
+    (when is-frame?
+      [:*
+       (if (every? :file-thumbnail shapes)
+         [:& menu-entry {:title (tr "workspace.shape.menu.thumbnail-remove")
+                         :on-click do-toggle-thumbnail}]
+         [:& menu-entry {:title (tr "workspace.shape.menu.thumbnail-set")
+                         :shortcut (sc/get-tooltip :thumbnail-set)
+                         :on-click do-toggle-thumbnail}])
+       [:& menu-separator]])))
 
 (mf/defc context-menu-group
   [{:keys [shapes]}]
@@ -436,6 +453,7 @@
        [:> context-menu-edit props]
        [:> context-menu-layer-position props]
        [:> context-menu-flip props]
+       [:> context-menu-thumbnail props]
        [:> context-menu-group props]
        [:> context-focus-mode-menu props]
        [:> context-menu-path props]
@@ -446,10 +464,10 @@
 
 (mf/defc viewport-context-menu
   []
-  (let [focus (mf/deref refs/workspace-focus-selected)
-
-        do-paste (st/emitf dw/paste)
-        do-hide-ui (st/emitf (dw/toggle-layout-flags :hide-ui))
+  (let [focus      (mf/deref refs/workspace-focus-selected)
+        do-paste   #(st/emit! dw/paste)
+        do-hide-ui #(st/emit! (-> (dw/toggle-layout-flag :hide-ui)
+                                  (vary-meta assoc ::ev/origin "workspace-context-menu")))
         do-toggle-focus-mode #(st/emit! (dw/toggle-focus-mode))]
     [:*
      [:& menu-entry {:title (tr "workspace.shape.menu.paste")

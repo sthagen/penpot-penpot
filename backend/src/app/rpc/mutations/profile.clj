@@ -19,7 +19,6 @@
    [app.rpc.queries.profile :as profile]
    [app.rpc.rlimit :as rlimit]
    [app.storage :as sto]
-   [app.util.async :as async]
    [app.util.services :as sv]
    [app.util.time :as dt]
    [buddy.hashers :as hashers]
@@ -101,8 +100,14 @@
 (sv/defmethod ::prepare-register-profile {:auth false}
   [{:keys [pool tokens] :as cfg} params]
   (when-not (contains? cf/flags :registration)
-    (ex/raise :type :restriction
-              :code :registration-disabled))
+    (if-not (contains? params :invitation-token)
+      (ex/raise :type :restriction
+                :code :registration-disabled)
+      (let [invitation (tokens :verify {:token (:invitation-token params) :iss :team-invitation})]
+        (when-not (= (:email params) (:member-email invitation))
+          (ex/raise :type :restriction
+                    :code :email-does-not-match-invitation
+                    :hint "email should match the invitation")))))
 
   (when-let [domains (cf/get :registration-domain-whitelist)]
     (when-not (email-domain-in-whitelist? domains (:email params))
@@ -129,6 +134,7 @@
                 :backend "penpot"
                 :iss :prepared-register
                 :exp (dt/in-future "48h")}
+
         token  (tokens :generate params)]
     {:token token}))
 
@@ -149,7 +155,6 @@
   [{:keys [conn tokens session] :as cfg} {:keys [token] :as params}]
   (let [claims    (tokens :verify {:token token :iss :prepared-register})
         params    (merge params claims)]
-
     (check-profile-existence! conn params)
 
     (let [is-active  (or (:is-active params)
@@ -158,10 +163,8 @@
                           (create-profile conn)
                           (create-profile-relations conn)
                           (decode-profile-row))
-
           invitation (when-let [token (:invitation-token params)]
                        (tokens :verify {:token token :iss :team-invitation}))]
-
       (cond
         ;; If invitation token comes in params, this is because the user comes from team-invitation process;
         ;; in this case, regenerate token and send back to the user a new invitation token (and mark current
@@ -280,10 +283,14 @@
           :opt-un [::scope ::invitation-token]))
 
 (sv/defmethod ::login
-  {:auth false
-   ::async/dispatch :default
-   ::rlimit/permits (cf/get :rlimit-password)}
+  {:auth false ::rlimit/permits (cf/get :rlimit-password)}
   [{:keys [pool session tokens] :as cfg} {:keys [email password] :as params}]
+
+  (when-not (contains? cf/flags :login)
+    (ex/raise :type :restriction
+              :code :login-disabled
+              :hint "login is disabled in this instance"))
+
   (letfn [(check-password [profile password]
             (when (= (:password profile) "!")
               (ex/raise :type :validation
@@ -407,43 +414,32 @@
 
 (declare update-profile-photo)
 
-(s/def ::content-type ::media/image-content-type)
-(s/def ::file (s/and ::media/upload (s/keys :req-un [::content-type])))
-
+(s/def ::file ::media/upload)
 (s/def ::update-profile-photo
   (s/keys :req-un [::profile-id ::file]))
-
-;; TODO: properly handle resource usage, transactions and storage
 
 (sv/defmethod ::update-profile-photo
   [cfg {:keys [file] :as params}]
   ;; Validate incoming mime type
-  (media/validate-media-type! (:content-type file) #{"image/jpeg" "image/png" "image/webp"})
+  (media/validate-media-type! file #{"image/jpeg" "image/png" "image/webp"})
   (let [cfg (update cfg :storage media/configure-assets-storage)]
     (update-profile-photo cfg params)))
 
 (defn update-profile-photo
-  [{:keys [pool storage executors] :as cfg} {:keys [profile-id file] :as params}]
-  (p/do
-    ;; Perform file validation, this operation executes some
-    ;; comandline helpers for true check of the image file. And it
-    ;; raises an exception if somethig is wrong with the file.
-    (px/with-dispatch (:blocking executors)
-      (media/run {:cmd :info :input {:path (:tempfile file) :mtype (:content-type file)}}))
+  [{:keys [pool storage executors] :as cfg} {:keys [profile-id] :as params}]
+  (p/let [profile (px/with-dispatch (:default executors)
+                    (db/get-by-id pool :profile profile-id))
+          photo   (teams/upload-photo cfg params)]
 
-    (p/let [profile (px/with-dispatch (:default executors)
-                      (db/get-by-id pool :profile profile-id))
-            photo   (teams/upload-photo cfg params)]
+    ;; Schedule deletion of old photo
+    (when-let [id (:photo-id profile)]
+      (sto/touch-object! storage id))
 
-      ;; Schedule deletion of old photo
-      (when-let [id (:photo-id profile)]
-        (sto/touch-object! storage id))
-
-      ;; Save new photo
-      (db/update! pool :profile
-                  {:photo-id (:id photo)}
-                  {:id profile-id})
-      nil)))
+    ;; Save new photo
+    (db/update! pool :profile
+                {:photo-id (:id photo)}
+                {:id profile-id})
+    nil))
 
 ;; --- MUTATION: Request Email Change
 
@@ -608,7 +604,8 @@
       (db/update! conn :profile
                   {:props (db/tjson props)}
                   {:id profile-id})
-      nil)))
+
+      (profile/filter-profile-props props))))
 
 
 ;; --- MUTATION: Delete Profile

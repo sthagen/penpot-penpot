@@ -83,6 +83,9 @@
    {:executor (ig/ref [::default :app.worker/executor])}
 
    :app.http/session
+   {:store (ig/ref :app.http.session/store)}
+
+   :app.http.session/store
    {:pool     (ig/ref :app.db/pool)
     :tokens   (ig/ref :app.tokens/tokens)
     :executor (ig/ref [::default :app.worker/executor])}
@@ -111,13 +114,12 @@
     :router      (ig/ref :app.http/router)
     :metrics     (ig/ref :app.metrics/metrics)
     :executor    (ig/ref [::default :app.worker/executor])
-    :session     (ig/ref :app.http/session)
-    :max-threads (cf/get :http-server-max-threads)
-    :min-threads (cf/get :http-server-min-threads)}
+    :io-threads  (cf/get :http-server-io-threads)}
 
    :app.http/router
    {:assets        (ig/ref :app.http.assets/handlers)
     :feedback      (ig/ref :app.http.feedback/handler)
+    :session       (ig/ref :app.http/session)
     :awsns-handler (ig/ref :app.http.awsns/handler)
     :oauth         (ig/ref :app.http.oauth/handler)
     :debug         (ig/ref :app.http.debug/handlers)
@@ -313,9 +315,9 @@
     :pool     (ig/ref :app.db/pool)}
 
    :app.loggers.loki/reporter
-   {:uri      (cf/get :loggers-loki-uri)
-    :receiver (ig/ref :app.loggers.zmq/receiver)
-    :executor (ig/ref [::worker :app.worker/executor])}
+   {:uri         (cf/get :loggers-loki-uri)
+    :receiver    (ig/ref :app.loggers.zmq/receiver)
+    :http-client (ig/ref :app.http/client)}
 
    :app.loggers.mattermost/reporter
    {:uri         (cf/get :error-report-webhook)
