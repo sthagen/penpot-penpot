@@ -59,15 +59,14 @@
 (defn- calculate-dimensions
   [{:keys [objects] :as data} vport]
   (let [shapes    (cph/get-immediate-children objects)
-        to-finite (fn [val fallback] (if (not (mth/finite? val)) fallback val))
         rect      (cond->> (gsh/selection-rect shapes)
                     (some? vport)
                     (gal/adjust-to-viewport vport))]
     (-> rect
-        (update :x to-finite 0)
-        (update :y to-finite 0)
-        (update :width to-finite 100000)
-        (update :height to-finite 100000))))
+        (update :x mth/finite 0)
+        (update :y mth/finite 0)
+        (update :width mth/finite 100000)
+        (update :height mth/finite 100000))))
 
 (declare shape-wrapper-factory)
 
@@ -214,31 +213,6 @@
              :else
              [:& shape-wrapper {:shape item
                                 :key (:id item)}])))]]]))
-
-(mf/defc file-thumbnail-svg
-  {::mf/wrap [mf/memo]}
-  [{:keys [data embed? include-metadata?] :as props
-    :or {embed? false include-metadata? false}}]
-  (let [data (assoc data :x 0 :y 0)
-        vbox   (format-viewbox {:width (:width data 0) :height (:height data 0)})
-        background-color (get-in data [:options :background] default-color)]
-
-    [:& (mf/provider embed/context) {:value embed?}
-     [:& (mf/provider export/include-metadata-ctx) {:value include-metadata?}
-      [:svg {:view-box vbox
-             :version "1.1"
-             :xmlns "http://www.w3.org/2000/svg"
-             :xmlnsXlink "http://www.w3.org/1999/xlink"
-             :xmlns:penpot (when include-metadata? "https://penpot.app/xmlns")
-             :style {:width "100%"
-                     :height "100%"
-                     :background background-color}}
-
-       (when include-metadata?
-         [:& export/export-page {:options (:options data)}])
-
-       [:> shape-container {:shape data}
-        [:& frame/frame-thumbnail {:shape data}]]]]]))
 
 (mf/defc frame-svg
   {::mf/wrap [mf/memo]}

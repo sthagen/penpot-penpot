@@ -110,7 +110,10 @@
                (rx/dedupe)
                (rx/map #(select-shapes-by-current-selrect preserve? ignore-groups?))))
 
-         (rx/of (update-selrect nil)))))))
+         (->> (rx/of (update-selrect nil))
+              ;; We need the async so the current event finishes before updating the selrect
+              ;; otherwise the `on-click` event will trigger with a `nil` selrect
+              (rx/observe-on :async)))))))
 
 ;; --- Toggle shape's selection status (selected or deselected)
 
@@ -123,13 +126,7 @@
    (ptk/reify ::select-shape
      ptk/UpdateEvent
      (update [_ state]
-       (update-in state [:workspace-local :selected]
-                  (fn [selected]
-                    (if-not toggle?
-                      (conj (d/ordered-set) id)
-                      (if (contains? selected id)
-                        (disj selected id)
-                        (conj selected id))))))
+       (update-in state [:workspace-local :selected] d/toggle-selection id toggle?))
 
      ptk/WatchEvent
      (watch [_ state _]
@@ -284,15 +281,27 @@
   (let [shapes         (map (d/getf all-objects) ids)
         unames         (volatile! (dwc/retrieve-used-names (:objects page)))
         update-unames! (fn [new-name] (vswap! unames conj new-name))
-        all-ids        (reduce #(into %1 (cons %2 (cph/get-children-ids all-objects %2))) #{} ids)
-        ids-map        (into {} (map #(vector % (uuid/next))) all-ids)]
-    (-> (reduce (fn [changes shape]
-                  (prepare-duplicate-change changes all-objects page unames update-unames! ids-map shape delta))
-                (-> (pcb/empty-changes it)
-                    (pcb/with-page page)
-                    (pcb/with-objects all-objects))
-                shapes)
-        (prepare-duplicate-flows shapes page ids-map))))
+        all-ids        (reduce #(into %1 (cons %2 (cph/get-children-ids all-objects %2))) (d/ordered-set) ids)
+        ids-map        (into {} (map #(vector % (uuid/next))) all-ids)
+
+        init-changes
+        (-> (pcb/empty-changes it)
+            (pcb/with-page page)
+            (pcb/with-objects all-objects))
+
+        changes
+        (->> shapes
+             (reduce #(prepare-duplicate-change %1
+                                                all-objects
+                                                page
+                                                unames
+                                                update-unames!
+                                                ids-map
+                                                %2
+                                                delta)
+                     init-changes))]
+
+    (prepare-duplicate-flows changes shapes page ids-map)))
 
 (defn- prepare-duplicate-change
   [changes objects page unames update-unames! ids-map shape delta]
@@ -314,7 +323,7 @@
                        (geom/move delta)
                        (d/update-when :interactions #(cti/remap-interactions % ids-map objects)))
 
-        changes (-> (pcb/add-obj changes new-frame)
+        changes (-> (pcb/add-object changes new-frame)
                     (pcb/amend-last-change #(assoc % :old-id (:id obj))))
 
         changes (reduce (fn [changes child]
@@ -349,8 +358,7 @@
                           (geom/move delta)
                           (d/update-when :interactions #(cti/remap-interactions % ids-map objects)))
 
-          changes (pcb/add-obj changes new-obj {:ignore-touched true})
-          changes (-> (pcb/add-obj changes new-obj {:ignore-touched true})
+          changes (-> (pcb/add-object changes new-obj {:ignore-touched true})
                       (pcb/amend-last-change #(assoc % :old-id (:id obj))))]
 
           (reduce (fn [changes child]
@@ -475,29 +483,30 @@
       (when (or (not move-delta?) (nil? (get-in state [:workspace-local :transform])))
         (let [page     (wsh/lookup-page state)
               objects  (:objects page)
-              selected (wsh/lookup-selected state)
-              delta    (if (and move-delta? (= (count selected) 1))
-                         (let [obj (get objects (first selected))]
-                           (calc-duplicate-delta obj state objects))
-                         (gpt/point 0 0))
+              selected (wsh/lookup-selected state)]
+          (when (seq selected)
+            (let [obj             (get objects (first selected))
+                  delta           (if move-delta?
+                                    (calc-duplicate-delta obj state objects)
+                                    (gpt/point 0 0))
 
-              changes (->> (prepare-duplicate-changes objects page selected delta it)
-                           (duplicate-changes-update-indices objects selected))
+                  changes         (->> (prepare-duplicate-changes objects page selected delta it)
+                                       (duplicate-changes-update-indices objects selected))
 
-              id-original (when (= (count selected) 1) (first selected))
+                  id-original     (first selected)
 
-              selected (->> changes
-                            :redo-changes
-                            (filter #(= (:type %) :add-obj))
-                            (filter #(selected (:old-id %)))
-                            (map #(get-in % [:obj :id]))
-                            (into (d/ordered-set)))
+                  selected        (->> changes
+                                       :redo-changes
+                                       (filter #(= (:type %) :add-obj))
+                                       (filter #(selected (:old-id %)))
+                                       (map #(get-in % [:obj :id]))
+                                       (into (d/ordered-set)))
 
-              id-duplicated (when (= (count selected) 1) (first selected))]
-
-          (rx/of (dch/commit-changes changes)
-                 (select-shapes selected)
-                 (memorize-duplicated id-original id-duplicated)))))))
+                  id-duplicated   (first selected)]
+               ;; Warning: This order is important for the focus mode.
+              (rx/of (dch/commit-changes changes)
+                     (select-shapes selected)
+                     (memorize-duplicated id-original id-duplicated)))))))))
 
 (defn change-hover-state
   [id value]

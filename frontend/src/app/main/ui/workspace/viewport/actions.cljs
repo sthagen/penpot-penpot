@@ -7,6 +7,7 @@
 (ns app.main.ui.workspace.viewport.actions
   (:require
    [app.common.geom.point :as gpt]
+   [app.common.math :as mth]
    [app.common.uuid :as uuid]
    [app.config :as cfg]
    [app.main.data.workspace :as dw]
@@ -40,8 +41,10 @@
 
        (let [event  (.-nativeEvent bevent)
              ctrl?  (kbd/ctrl? event)
+             meta?  (kbd/meta? event)
              shift? (kbd/shift? event)
              alt?   (kbd/alt? event)
+             mod?   (kbd/mod? event)
 
              left-click?   (and (not panning) (= 1 (.-which event)))
              middle-click? (and (not panning) (= 2 (.-which event)))
@@ -53,7 +56,7 @@
            middle-click?
            (do
              (dom/prevent-default bevent)
-             (if ctrl?
+             (if mod?
                (let [raw-pt   (dom/get-client-position event)
                      viewport (mf/ref-val viewport-ref)
                      pt       (utils/translate-point-to-viewport viewport zoom raw-pt)]
@@ -63,7 +66,7 @@
 
            left-click?
            (do
-             (st/emit! (ms/->MouseEvent :down ctrl? shift? alt?))
+             (st/emit! (ms/->MouseEvent :down ctrl? shift? alt? meta?))
 
              (when (and (not= edition id) text-editing?)
                (st/emit! dw/clear-edition-mode))
@@ -78,7 +81,7 @@
                  ;; Handle path node area selection
                  (st/emit! (dwdp/handle-area-selection shift?))
 
-                 (and @space? ctrl?)
+                 (and @space? mod?)
                  (let [raw-pt   (dom/get-client-position event)
                        viewport (mf/ref-val viewport-ref)
                        pt       (utils/translate-point-to-viewport viewport zoom raw-pt)]
@@ -90,13 +93,11 @@
                  drawing-tool
                  (st/emit! (dd/start-drawing drawing-tool))
 
-                 (or (not id) (and frame? (not selected?)) ctrl?)
-                 (st/emit! (dw/handle-area-selection shift? ctrl?))
+                 (or (not id) (and frame? (not selected?)) mod?)
+                 (st/emit! (dw/handle-area-selection shift? mod?))
 
                  (not drawing-tool)
-                 (st/emit! (when (or shift? (not selected?))
-                             (dw/select-shape id shift?))
-                           (dw/start-move-selected)))))))))))
+                 (st/emit! (dw/start-move-selected id shift?)))))))))))
 
 (defn on-move-selected
   [hover hover-ids selected space?]
@@ -105,11 +106,11 @@
    (fn [bevent]
      (let [event (.-nativeEvent bevent)
            shift? (kbd/shift? event)
-           ctrl?  (kbd/ctrl? event)
+           mod?   (kbd/mod? event)
            left-click?   (= 1 (.-which event))]
 
        (when (and left-click?
-                  (not ctrl?)
+                  (not mod?)
                   (not shift?)
                   (not @space?)
                   (or (not @hover)
@@ -144,25 +145,25 @@
      (reset! frame-hover nil))))
 
 (defn on-click
-  [hover selected edition drawing-path? drawing-tool space?]
+  [hover selected edition drawing-path? drawing-tool space? selrect]
   (mf/use-callback
-   (mf/deps @hover selected edition drawing-path? drawing-tool @space?)
+   (mf/deps @hover selected edition drawing-path? drawing-tool @space? selrect)
    (fn [event]
-     (when (or (dom/class? (dom/get-target event) "viewport-controls")
-               (dom/class? (dom/get-target event) "viewport-selrect"))
+     (when (and (nil? selrect)
+                (or (dom/class? (dom/get-target event) "viewport-controls")
+                    (dom/class? (dom/get-target event) "viewport-selrect")))
        (let [ctrl? (kbd/ctrl? event)
              shift? (kbd/shift? event)
              alt? (kbd/alt? event)
-
+             meta? (kbd/meta? event)
+             mod? (kbd/mod? event)
              hovering? (some? @hover)
-             frame? (= :frame (:type @hover))
-             selected? (contains? selected (:id @hover))]
-         (st/emit! (ms/->MouseEvent :click ctrl? shift? alt?))
+             frame? (= :frame (:type @hover))]
+         (st/emit! (ms/->MouseEvent :click ctrl? shift? alt? meta?))
 
          (when (and hovering?
-                    (or (not frame?) ctrl?)
+                    (or (not frame?) mod?)
                     (not @space?)
-                    (not selected?)
                     (not edition)
                     (not drawing-path?)
                     (not drawing-tool))
@@ -177,13 +178,14 @@
      (let [ctrl? (kbd/ctrl? event)
            shift? (kbd/shift? event)
            alt? (kbd/alt? event)
+           meta? (kbd/meta? event)
 
            {:keys [id type] :as shape} @hover
 
            frame? (= :frame type)
            group? (= :group type)]
 
-       (st/emit! (ms/->MouseEvent :double-click ctrl? shift? alt?))
+       (st/emit! (ms/->MouseEvent :double-click ctrl? shift? alt? meta?))
 
        ;; Emit asynchronously so the double click to exit shapes won't break
        (timers/schedule
@@ -242,12 +244,13 @@
            ctrl? (kbd/ctrl? event)
            shift? (kbd/shift? event)
            alt? (kbd/alt? event)
+           meta? (kbd/meta? event)
 
            left-click? (= 1 (.-which event))
            middle-click? (= 2 (.-which event))]
 
        (when left-click?
-         (st/emit! (ms/->MouseEvent :up ctrl? shift? alt?)))
+         (st/emit! (ms/->MouseEvent :up ctrl? shift? alt? meta?)))
 
        (when middle-click?
          (dom/prevent-default event)
@@ -343,11 +346,13 @@
          (st/emit! (ms/->PointerEvent :delta delta
                                       (kbd/ctrl? event)
                                       (kbd/shift? event)
-                                      (kbd/alt? event)))
+                                      (kbd/alt? event)
+                                      (kbd/meta? event)))
          (st/emit! (ms/->PointerEvent :viewport pt
                                       (kbd/ctrl? event)
                                       (kbd/shift? event)
-                                      (kbd/alt? event))))))))
+                                      (kbd/alt? event)
+                                      (kbd/meta? event))))))))
 
 (defn on-pointer-move [viewport-ref zoom move-stream]
   (mf/use-callback
@@ -358,31 +363,24 @@
            pt     (utils/translate-point-to-viewport viewport zoom raw-pt)]
        (rx/push! move-stream pt)))))
 
-(defn on-mouse-wheel [viewport-ref zoom]
+(defn on-mouse-wheel [viewport-ref overlays-ref zoom]
   (mf/use-callback
    (mf/deps zoom)
    (fn [event]
-     (let [event (.getBrowserEvent ^js event)
-           raw-pt (dom/get-client-position event)
-           viewport (mf/ref-val viewport-ref)
-           pt    (utils/translate-point-to-viewport viewport zoom raw-pt)
+     (let [viewport (mf/ref-val viewport-ref)
+           overlays (mf/ref-val overlays-ref)
+           event  (.getBrowserEvent ^js event)
+           target (dom/get-target event)
+           mod? (kbd/mod? event)]
 
-           ctrl? (kbd/ctrl? event)
-           meta? (kbd/meta? event)
-           target (dom/get-target event)]
-       (cond
-         (or ctrl? meta?)
-         (do
-           (dom/prevent-default event)
-           (dom/stop-propagation event)
-           (let [delta (+ (.-deltaY ^js event)
-                          (.-deltaX ^js event))]
-             (if (pos? delta)
-               (st/emit! (dw/decrease-zoom pt))
-               (st/emit! (dw/increase-zoom pt)))))
+       (when (or (dom/is-child? viewport target)
+                 (dom/is-child? overlays target))
+         (dom/prevent-default event)
+         (dom/stop-propagation event)
+         (let [pt     (->> (dom/get-client-position event)
+                           (utils/translate-point-to-viewport viewport zoom))
 
-         (.contains ^js viewport target)
-         (let [delta-mode (.-deltaMode ^js event)
+               delta-mode (.-deltaMode ^js event)
 
                unit (cond
                       (= delta-mode WheelEvent.DeltaMode.PIXEL) 1
@@ -396,13 +394,16 @@
                delta-x (-> (.-deltaX ^js event)
                            (* unit)
                            (/ zoom))]
-           (dom/prevent-default event)
-           (dom/stop-propagation event)
-           (if (and (not (cfg/check-platform? :macos)) ;; macos sends delta-x automatically, don't need to do it
-                    (kbd/shift? event))
-             (st/emit! (dw/update-viewport-position {:x #(+ % delta-y)}))
-             (st/emit! (dw/update-viewport-position {:x #(+ % delta-x)
-                                                     :y #(+ % delta-y)})))))))))
+           (if mod?
+             (let [delta (* -1 (+ (.-deltaY ^js event) (.-deltaX ^js event)))
+                   scale (-> (+ 1 (/ delta 100)) (mth/clamp 0.77 1.3))]
+               (st/emit! (dw/set-zoom pt scale)))
+             (if (and (not (cfg/check-platform? :macos))
+                      ;; macos sends delta-x automatically, don't need to do it
+                      (kbd/shift? event))
+               (st/emit! (dw/update-viewport-position {:x #(+ % delta-y)}))
+               (st/emit! (dw/update-viewport-position {:x #(+ % delta-x)
+                                                       :y #(+ % delta-y)}))))))))))
 
 (defn on-drag-enter []
   (mf/use-callback

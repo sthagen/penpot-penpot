@@ -58,8 +58,9 @@
          (db/insert! conn :file-profile-rel))))
 
 (defn create-file
-  [conn {:keys [id name project-id is-shared data deleted-at]
+  [conn {:keys [id name project-id is-shared data deleted-at revn]
          :or {is-shared false
+              revn 0
               deleted-at nil}
          :as params}]
   (let [id   (or id (:id data) (uuid/next))
@@ -68,6 +69,7 @@
                          {:id id
                           :project-id project-id
                           :name name
+                          :revn revn
                           :is-shared is-shared
                           :data (blob/encode data)
                           :deleted-at deleted-at})]
@@ -273,7 +275,7 @@
          (contains? o :changes-with-metadata)))))
 
 (sv/defmethod ::update-file
-  {::rlimit/permits 20}
+  {::rlimit/permits (cf/get :rlimit-file-update)}
   [{:keys [pool] :as cfg} {:keys [id profile-id] :as params}]
   (db/with-atomic [conn pool]
     (db/xact-lock! conn id)
@@ -320,7 +322,7 @@
         _       (mtx/run! metrics {:id :update-file-changes :inc (count changes)})
 
         ts      (dt/now)
-        file    (-> (files/retrieve-data cfg file)
+        file    (-> file
                     (update :revn inc)
                     (update :data (fn [data]
                                     ;; Trace the length of bytes of processed data
@@ -386,31 +388,33 @@
                                (assoc :changes []))))))))
 
 (defn- send-notifications
-  [{:keys [msgbus conn] :as cfg} {:keys [file changes session-id] :as params}]
-  (let [lchanges (filter library-change? changes)]
+  [{:keys [conn] :as cfg} {:keys [file changes session-id] :as params}]
+  (let [lchanges  (filter library-change? changes)
+        msgbus-fn (:msgbus cfg)]
+
 
     ;; Asynchronously publish message to the msgbus
-    (msgbus :pub {:topic (:id file)
-                  :message
-                  {:type :file-change
-                   :profile-id (:profile-id params)
-                   :file-id (:id file)
-                   :session-id (:session-id params)
-                   :revn (:revn file)
-                   :changes changes}})
+    (msgbus-fn :cmd :pub
+               :topic (:id file)
+               :message {:type :file-change
+                         :profile-id (:profile-id params)
+                         :file-id (:id file)
+                         :session-id (:session-id params)
+                         :revn (:revn file)
+                         :changes changes})
 
     (when (and (:is-shared file) (seq lchanges))
       (let [team-id (retrieve-team-id conn (:project-id file))]
         ;; Asynchronously publish message to the msgbus
-        (msgbus :pub {:topic team-id
-                      :message
-                      {:type :library-change
-                       :profile-id (:profile-id params)
-                       :file-id (:id file)
-                       :session-id session-id
-                       :revn (:revn file)
-                       :modified-at (dt/now)
-                       :changes lchanges}})))))
+        (msgbus-fn :cmd :pub
+                   :topic team-id
+                   :message {:type :library-change
+                             :profile-id (:profile-id params)
+                             :file-id (:id file)
+                             :session-id session-id
+                             :revn (:revn file)
+                             :modified-at (dt/now)
+                             :changes lchanges})))))
 
 (defn- retrieve-team-id
   [conn project-id]
@@ -485,14 +489,34 @@
           update set data = ?;")
 
 (s/def ::data ::us/string)
-(s/def ::upsert-frame-thumbnail
+(s/def ::upsert-file-frame-thumbnail
   (s/keys :req-un [::profile-id ::file-id ::frame-id ::data]))
 
-(sv/defmethod ::upsert-frame-thumbnail
+(sv/defmethod ::upsert-file-frame-thumbnail
   [{:keys [pool] :as cfg} {:keys [profile-id file-id frame-id data]}]
   (db/with-atomic [conn pool]
     (files/check-edition-permissions! conn profile-id file-id)
     (db/exec-one! conn [sql:upsert-frame-thumbnail file-id frame-id data data])
     nil))
 
+;; --- Mutation: Upsert file thumbnail
 
+(def sql:upsert-file-thumbnail
+  "insert into file_thumbnail (file_id, revn, data, props)
+   values (?, ?, ?, ?::jsonb)
+       on conflict(file_id, revn) do
+          update set data = ?, props=?, updated_at=now();")
+
+(s/def ::revn ::us/integer)
+(s/def ::props map?)
+(s/def ::upsert-file-thumbnail
+  (s/keys :req-un [::profile-id ::file-id ::revn ::data ::props]))
+
+(sv/defmethod ::upsert-file-thumbnail
+  [{:keys [pool] :as cfg} {:keys [profile-id file-id revn data props]}]
+  (db/with-atomic [conn pool]
+    (files/check-edition-permissions! conn profile-id file-id)
+    (let [props (db/tjson (or props {}))]
+      (db/exec-one! conn [sql:upsert-file-thumbnail
+                          file-id revn data props data props])
+      nil)))

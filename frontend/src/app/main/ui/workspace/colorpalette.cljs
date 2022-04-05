@@ -6,7 +6,6 @@
 
 (ns app.main.ui.workspace.colorpalette
   (:require
-   [app.common.math :as mth]
    [app.main.data.workspace.colors :as mdc]
    [app.main.refs :as refs]
    [app.main.store :as st]
@@ -14,7 +13,6 @@
    [app.main.ui.components.dropdown :refer [dropdown]]
    [app.main.ui.hooks.resize :refer [use-resize-hook]]
    [app.main.ui.icons :as i]
-   [app.util.color :as uc]
    [app.util.dom :as dom]
    [app.util.i18n :refer [tr]]
    [app.util.keyboard :as kbd]
@@ -41,12 +39,9 @@
 ;; --- Components
 (mf/defc palette-item
   [{:keys [color]}]
-  (let [ids-with-children (map :id (mf/deref refs/selected-shapes-with-children))
-        select-color
+  (let [select-color
         (fn [event]
-          (if (kbd/alt? event)
-              (st/emit! (mdc/change-stroke ids-with-children (merge uc/empty-color color) 0))
-              (st/emit! (mdc/change-fill ids-with-children (merge uc/empty-color color) 0))))]
+          (st/emit! (mdc/apply-color-from-palette color (kbd/alt? event))))]
 
     [:div.color-cell {:on-click select-color}
      [:& cb/color-bullet {:color color}]
@@ -57,7 +52,7 @@
   (let [state      (mf/use-state {:show-menu false})
 
         width      (:width @state 0)
-        visible    (mth/round (/ width 66))
+        visible    (/ width 66)
 
         offset     (:offset @state 0)
         max-offset (- (count current-colors)
@@ -75,7 +70,7 @@
            (swap! state update :offset
                   (fn [offset]
                     (if (pos? offset)
-                      (max (- offset (mth/round (/ visible 2))) 0)
+                      (max (- offset (/ visible 2)) 0)
                       offset)))))
 
         on-right-arrow-click
@@ -85,7 +80,7 @@
            (swap! state update :offset
                   (fn [offset]
                     (if (< offset max-offset)
-                      (min max-offset (+ offset (mth/round (/ visible 2))))
+                      (min max-offset (+ offset (/ visible 2)))
                       offset)))))
 
         on-scroll

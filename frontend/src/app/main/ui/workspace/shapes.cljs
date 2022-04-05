@@ -41,7 +41,8 @@
 
 (mf/defc root-shape
   "Draws the root shape of the viewport and recursively all the shapes"
-  {::mf/wrap-props false}
+  {::mf/wrap [mf/memo]
+   ::mf/wrap-props false}
   [props]
   (let [objects       (obj/get props "objects")
         active-frames (obj/get props "active-frames")
@@ -69,31 +70,24 @@
    ::mf/wrap-props false}
   [props]
   (let [shape  (obj/get props "shape")
-        opts  #js {:shape shape}
-
-        svg-element? (and (= (:type shape) :svg-raw)
-                          (not= :svg (get-in shape [:content :tag])))]
+        opts  #js {:shape shape}]
 
     (when (and (some? shape) (not (:hidden shape)))
       [:*
-       (if-not svg-element?
-         (case (:type shape)
-           :path    [:> path/path-wrapper opts]
-           :text    [:> text/text-wrapper opts]
-           :group   [:> group-wrapper opts]
-           :rect    [:> rect-wrapper opts]
-           :image   [:> image-wrapper opts]
-           :circle  [:> circle-wrapper opts]
-           :svg-raw [:> svg-raw-wrapper opts]
-           :bool    [:> bool-wrapper opts]
+       (case (:type shape)
+         :path    [:> path/path-wrapper opts]
+         :text    [:> text/text-wrapper opts]
+         :group   [:> group-wrapper opts]
+         :rect    [:> rect-wrapper opts]
+         :image   [:> image-wrapper opts]
+         :circle  [:> circle-wrapper opts]
+         :svg-raw [:> svg-raw-wrapper opts]
+         :bool    [:> bool-wrapper opts]
 
-           ;; Only used when drawing a new frame.
-           :frame [:> frame-wrapper opts]
+         ;; Only used when drawing a new frame.
+         :frame [:> frame-wrapper opts]
 
-           nil)
-
-         ;; Don't wrap svg elements inside a <g> otherwise some can break
-         [:> svg-raw-wrapper opts])
+         nil)
 
        (when (debug? :bounding-boxes)
          [:> bounding-box opts])])))

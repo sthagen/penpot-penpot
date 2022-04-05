@@ -6,7 +6,8 @@
 
 (ns app.common.data
   "Data manipulation and query helper functions."
-  (:refer-clojure :exclude [read-string hash-map merge name parse-double group-by iteration])
+  (:refer-clojure :exclude [read-string hash-map merge name update-vals
+                            parse-double group-by iteration])
   #?(:cljs
      (:require-macros [app.common.data]))
   (:require
@@ -100,7 +101,7 @@
 
 (defn preconj
   [coll elem]
-  (assert (vector? coll))
+  (assert (or (vector? coll) (nil? coll)))
   (into [elem] coll))
 
 (defn enumerate
@@ -128,9 +129,10 @@
 (defn index-by
   "Return a indexed map of the collection keyed by the result of
   executing the getter over each element of the collection."
-  [getter coll]
-  (persistent!
-   (reduce #(assoc! %1 (getter %2) %2) (transient {}) coll)))
+  ([kf coll] (index-by kf identity coll))
+  ([kf vf coll]
+   (persistent!
+    (reduce #(assoc! %1 (kf %2) (vf %2)) (transient {}) coll))))
 
 (defn index-of-pred
   [coll pred]
@@ -196,6 +198,23 @@
    (map (fn [[key val]] [key (mfn key val)])))
   ([mfn coll]
    (into {} (mapm mfn) coll)))
+
+;; TEMPORARY COPY of clojure.core/update-vals until we migrate to clojure 1.11
+
+(defn update-vals
+  "m f => {k (f v) ...}
+  Given a map m and a function f of 1-argument, returns a new map where the keys of m
+  are mapped to result of applying f to the corresponding values of m."
+  [m f]
+  (with-meta
+    (persistent!
+     (reduce-kv (fn [acc k v] (assoc! acc k (f v)))
+                (if #?(:clj (instance? clojure.lang.IEditableCollection m)
+                       :cljs (implements? core/IEditableCollection m))
+                  (transient m)
+                  (transient {}))
+                m))
+    (meta m)))
 
 (defn removev
   "Returns a vector of the items in coll for which (fn item) returns logical false"
@@ -406,15 +425,24 @@
   [v default]
   (if (some? v) v default))
 
+(defn num?
+  "Checks if a value `val` is a number but not an Infinite or NaN"
+  ([val]
+   (and (number? val)
+        (mth/finite? val)
+        (not (mth/nan? val))))
+
+  ([val & vals]
+   (and (num? val)
+        (->> vals (every? num?)))))
+
 (defn check-num
   "Function that checks if a number is nil or nan. Will return 0 when not
   valid and the number otherwise."
   ([v]
    (check-num v 0))
   ([v default]
-   (if (or (not v)
-           (not (mth/finite? v))
-           (mth/nan? v)) default v)))
+   (if (num? v) v default)))
 
 (defn any-key? [element & rest]
   (some #(contains? element %) rest))
@@ -588,19 +616,10 @@
 
 
 (defn group-by
-  ([kf coll] (group-by kf identity coll))
-  ([kf vf coll]
-   (let [conj (fnil conj [])]
-     (reduce (fn [result item]
-               (update result (kf item) conj (vf item)))
-             {}
-             coll))))
-
-(defn group-by'
-  "A variant of group-by that uses a set for collecting results."
-  ([kf coll] (group-by kf identity coll))
-  ([kf vf coll]
-   (let [conj (fnil conj #{})]
+  ([kf coll] (group-by kf identity [] coll))
+  ([kf vf coll] (group-by kf vf [] coll))
+  ([kf vf iv coll]
+   (let [conj (fnil conj iv)]
      (reduce (fn [result item]
                (update result (kf item) conj (vf item)))
              {}
@@ -652,3 +671,13 @@
                    (recur acc (step k))
                    acc)))
              acc))))))
+(defn toggle-selection
+  ([set value]
+   (toggle-selection set value false))
+
+  ([set value toggle?]
+   (if-not toggle?
+     (conj (ordered-set) value)
+     (if (contains? set value)
+       (disj set value)
+       (conj set value)))))

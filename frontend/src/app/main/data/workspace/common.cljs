@@ -325,7 +325,7 @@
                      selected)
 
              changes  (-> (pcb/empty-changes it page-id)
-                          (pcb/add-obj shape))]
+                          (pcb/add-object shape {:index (when (= :frame (:type shape)) 0)}))]
 
          (rx/concat
           (rx/of (dch/commit-changes changes)
@@ -480,7 +480,7 @@
                       (merge data)
                       (merge {:x x :y y})
                       (assoc :frame-id frame-id)
-                      (gsh/setup-selrect))]
+                      (cp/setup-rect-selrect))]
         (rx/of (add-shape shape))))))
 
 (defn image-uploaded

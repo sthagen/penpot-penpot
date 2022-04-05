@@ -6,13 +6,12 @@
 
 (ns app.main.ui.viewer.handoff.attributes.common
   (:require
-   [app.common.math :as mth]
    [app.main.store :as st]
    [app.main.ui.components.color-bullet :refer [color-bullet color-name]]
    [app.main.ui.components.copy-button :refer [copy-button]]
    [app.util.color :as uc]
    [app.util.dom :as dom]
-   [app.util.i18n :refer [t] :as i18n]
+   [app.util.i18n :refer [tr]]
    [cuerdas.core :as str]
    [okulary.core :as l]
    [rumext.alpha :as mf]))
@@ -28,9 +27,7 @@
     #(l/derived get-library st/state)))
 
 (mf/defc color-row [{:keys [color format copy-data on-change-format]}]
-  (let [locale (mf/deref i18n/locale)
-
-        colors-library-ref (mf/use-memo
+  (let [colors-library-ref (mf/use-memo
                             (mf/deps (:file-id color))
                             (make-colors-library-ref (:file-id color)))
         colors-library (mf/deref colors-library-ref)
@@ -50,9 +47,9 @@
       (if (:gradient color)
         [:& color-name {:color color}]
         (case format
-          :rgba (let [[r g b a] (->> (uc/hex->rgba (:color color) (:opacity color)) (map #(mth/precision % 2)))]
+          :rgba (let [[r g b a] (uc/hex->rgba (:color color) (:opacity color))]
                   [:div (str/fmt "%s, %s, %s, %s" r g b a)])
-          :hsla (let [[h s l a] (->> (uc/hex->hsla (:color color) (:opacity color)) (map #(mth/precision % 2)))]
+          :hsla (let [[h s l a] (uc/hex->hsla (:color color) (:opacity color))]
                   [:div (str/fmt "%s, %s, %s, %s" h s l a)])
           [:*
            [:& color-name {:color color}]
@@ -61,13 +58,13 @@
       (when-not (and on-change-format (:gradient color))
         [:select {:on-change #(-> (dom/get-target-val %) keyword on-change-format)}
          [:option {:value "hex"}
-          (t locale "handoff.attributes.color.hex")]
+          (tr "handoff.attributes.color.hex")]
 
          [:option {:value "rgba"}
-          (t locale "handoff.attributes.color.rgba")]
+          (tr "handoff.attributes.color.rgba")]
 
          [:option {:value "hsla"}
-          (t locale "handoff.attributes.color.hsla")]])]
+          (tr "handoff.attributes.color.hsla")]])]
      (when copy-data
        [:& copy-button {:data copy-data}])]))
 

@@ -7,10 +7,9 @@
 (ns app.main.ui.workspace.header
   (:require
    [app.common.data :as d]
-   [app.common.math :as mth]
    [app.config :as cf]
    [app.main.data.events :as ev]
-   [app.main.data.messages :as dm]
+   [app.main.data.exports :as de]
    [app.main.data.modal :as modal]
    [app.main.data.workspace :as dw]
    [app.main.data.workspace.shortcuts :as sc]
@@ -18,6 +17,8 @@
    [app.main.repo :as rp]
    [app.main.store :as st]
    [app.main.ui.components.dropdown :refer [dropdown]]
+   [app.main.ui.export :refer [export-progress-widget]]
+   [app.main.ui.formats :as fmt]
    [app.main.ui.hooks.resize :as r]
    [app.main.ui.icons :as i]
    [app.main.ui.workspace.presence :refer [active-sessions]]
@@ -30,10 +31,11 @@
    [potok.core :as ptk]
    [rumext.alpha :as mf]))
 
-;; --- Zoom Widget
 
 (def workspace-persistence-ref
   (l/derived :workspace-persistence st/state))
+
+;; --- Persistence state Widget
 
 (mf/defc persistence-state-widget
   {::mf/wrap [mf/memo]}
@@ -60,6 +62,8 @@
         [:span.icon i/msg-warning]
         [:span.label (tr "workspace.header.save-error")]])]))
 
+;; --- Zoom Widget
+
 (mf/defc zoom-widget-workspace
   {::mf/wrap [mf/memo]}
   [{:keys [zoom
@@ -71,7 +75,7 @@
     :as props}]
   (let [show-dropdown? (mf/use-state false)]
     [:div.zoom-widget {:on-click #(reset! show-dropdown? true)}
-     [:span.label {} (str (mth/round (* 100 zoom)) "%")]
+     [:span.label (fmt/format-percent zoom {:precision 0})]
      [:span.icon i/arrow-down]
      [:& dropdown {:show @show-dropdown?
                    :on-close #(reset! show-dropdown? false)}
@@ -82,7 +86,7 @@
                                (dom/stop-propagation event)
                                (dom/prevent-default event)
                                (on-decrease))} "-"]
-         [:p.zoom-size {} (str (mth/round (* 100 zoom)) "%")]
+         [:p.zoom-size {} (fmt/format-percent zoom {:precision 0})]
          [:button {:on-click (fn [event]
                                (dom/stop-propagation event)
                                (dom/prevent-default event)
@@ -99,7 +103,7 @@
 ;; --- Header Users
 
 (mf/defc menu
-  [{:keys [layout project file team-id page-id] :as props}]
+  [{:keys [layout project file team-id] :as props}]
   (let [show-menu?     (mf/use-state false)
         show-sub-menu? (mf/use-state false)
         editing?       (mf/use-state false)
@@ -150,6 +154,11 @@
                              (dom/prevent-default event)
                              (reset! editing? true))
 
+        on-export-shapes
+        (mf/use-callback
+         (fn [_]
+           (st/emit! (de/show-workspace-export-dialog))))
+
         on-export-file
         (mf/use-callback
          (mf/deps file team-id)
@@ -177,22 +186,7 @@
         (mf/use-callback
          (mf/deps file frames)
          (fn [_]
-           (when (seq frames)
-             (let [filename  (str (:name file) ".pdf")
-                   frame-ids (mapv :id frames)]
-               (st/emit! (dm/info (tr "workspace.options.exporting-object")
-                                  {:timeout nil}))
-               (->> (rp/query! :export-frames
-                               {:name     (:name file)
-                                :file-id  (:id file)
-                                :page-id   page-id
-                                :frame-ids frame-ids})
-                    (rx/subs
-                     (fn [body]
-                       (dom/trigger-download filename body))
-                     (fn [_error]
-                       (st/emit! (dm/error (tr "errors.unexpected-error"))))
-                     (st/emitf dm/hide)))))))
+           (st/emit! (de/show-workspace-export-frames-dialog (reverse frames)))))
 
         on-item-hover
         (mf/use-callback
@@ -269,6 +263,9 @@
           [:span (tr "dashboard.remove-shared")]]
          [:li {:on-click on-add-shared}
           [:span (tr "dashboard.add-shared")]])
+       [:li.export-file {:on-click on-export-shapes}
+        [:span (tr "dashboard.export-shapes")]
+        [:span.shortcut (sc/get-tooltip :export-shapes)]]
        [:li.export-file {:on-click on-export-file}
         [:span (tr "dashboard.export-single")]]
        (when (seq frames)
@@ -346,6 +343,13 @@
            (tr "workspace.header.menu.hide-artboard-names")
            (tr "workspace.header.menu.show-artboard-names"))]]
 
+       [:li {:on-click #(st/emit! (toggle-flag :show-pixel-grid))}
+        [:span
+         (if (contains? layout :show-pixel-grid)
+           (tr "workspace.header.menu.hide-pixel-grid")
+           (tr "workspace.header.menu.show-pixel-grid"))]
+        [:span.shortcut (sc/get-tooltip :show-pixel-grid)]]
+
        [:li {:on-click #(st/emit! (-> (toggle-flag :hide-ui)
                                       (vary-meta assoc ::ev/origin "workspace-menu")))}
         [:span
@@ -376,6 +380,13 @@
            (tr "workspace.header.menu.enable-dynamic-alignment"))]
         [:span.shortcut (sc/get-tooltip :toggle-alignment)]]
 
+       [:li {:on-click #(st/emit! (toggle-flag :snap-pixel-grid))}
+        [:span
+         (if (contains? layout :snap-pixel-grid)
+           (tr "workspace.header.menu.disable-snap-pixel-grid")
+           (tr "workspace.header.menu.enable-snap-pixel-grid"))]
+        [:span.shortcut (sc/get-tooltip :snap-pixel-grid)]]
+
        [:li {:on-click #(st/emit! (modal/show {:type :nudge-option}))}
         [:span (tr "modals.nudge-title")]]]]]))
 
@@ -383,9 +394,9 @@
 
 (mf/defc header
   [{:keys [file layout project page-id] :as props}]
-  (let [team-id  (:team-id project)
-        zoom     (mf/deref refs/selected-zoom)
-        params   {:page-id page-id :file-id (:id file) :section "interactions"}
+  (let [team-id             (:team-id project)
+        zoom                (mf/deref refs/selected-zoom)
+        params              {:page-id page-id :file-id (:id file) :section "interactions"}
 
         go-back
         (mf/use-callback
@@ -415,6 +426,7 @@
      [:div.right-area
       [:div.options-section
        [:& persistence-state-widget]
+       [:& export-progress-widget]
        [:button.document-history
         {:alt (tr "workspace.sidebar.history" (sc/get-tooltip :toggle-history))
          :class (when (contains? layout :document-history) "selected")

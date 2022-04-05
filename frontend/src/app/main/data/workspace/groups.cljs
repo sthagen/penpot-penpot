@@ -76,7 +76,7 @@
 
         selrect   (gsh/selection-rect shapes)
         group     (-> (cp/make-minimal-group frame-id selrect gname)
-                      (gsh/setup selrect)
+                      (cp/setup-shape selrect)
                       (assoc :shapes (mapv :id shapes)
                              :parent-id parent-id
                              :frame-id frame-id
@@ -88,7 +88,7 @@
 
         changes   (-> (pcb/empty-changes it page-id)
                       (pcb/with-objects objects)
-                      (pcb/add-obj group)
+                      (pcb/add-object group)
                       (pcb/change-parent (:id group) shapes)
                       (pcb/remove-objects ids-to-delete))]
 

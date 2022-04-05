@@ -13,6 +13,7 @@
    [app.config :as cf]
    [app.main.data.events :as ev]
    [app.main.data.media :as di]
+   [app.main.data.websocket :as ws]
    [app.main.repo :as rp]
    [app.util.i18n :as i18n]
    [app.util.router :as rt]
@@ -167,7 +168,8 @@
         (when (is-authenticated? profile)
           (->> (rx/of (profile-fetched profile)
                       (fetch-teams)
-                      (get-redirect-event))
+                      (get-redirect-event)
+                      (ws/initialize))
                (rx/observe-on :async)))))))
 
 (s/def ::invitation-token ::us/not-empty-string)
@@ -268,10 +270,12 @@
 
      ptk/WatchEvent
      (watch [_ _ _]
-       ;; NOTE: We need the `effect` of the current event to be
-       ;; executed before the redirect.
-       (->> (rx/of (rt/nav :auth-login))
-            (rx/observe-on :async)))
+       (rx/merge
+        ;; NOTE: We need the `effect` of the current event to be
+        ;; executed before the redirect.
+        (->> (rx/of (rt/nav :auth-login))
+             (rx/observe-on :async))
+        (rx/of (ws/finalize))))
 
      ptk/EffectEvent
      (effect [_ _ _]
@@ -289,29 +293,6 @@
             (rx/catch (constantly (rx/of 1)))
             (rx/map #(logged-out params)))))))
 
-;; --- EVENT: register
-
-(s/def ::register
-  (s/keys :req-un [::fullname ::password ::email]))
-
-(defn register
-  "Create a register event instance."
-  [data]
-  (s/assert ::register data)
-  (ptk/reify ::register
-    ptk/WatchEvent
-    (watch [_ _ _]
-      (let [{:keys [on-error on-success]
-             :or {on-error identity
-                  on-success identity}} (meta data)]
-        (->> (rp/mutation :register-profile data)
-             (rx/tap on-success)
-             (rx/catch on-error))))
-
-    ptk/EffectEvent
-    (effect [_ _ _]
-      (swap! storage dissoc ::redirect-to))))
-
 ;; --- Update Profile
 
 (defn update-profile
@@ -322,8 +303,8 @@
     (watch [_ _ stream]
       (let [mdata      (meta data)
             on-success (:on-success mdata identity)
-            on-error   (:on-error mdata #(rx/throw %))]
-        (->> (rp/mutation :update-profile data)
+            on-error   (:on-error mdata rx/throw)]
+        (->> (rp/mutation :update-profile (dissoc data :props))
              (rx/catch on-error)
              (rx/mapcat
               (fn [_]
@@ -410,7 +391,6 @@
                       :release-notes-viewed version}]
          (->> (rp/mutation :update-profile-props {:props props})
               (rx/map (constantly (fetch-profile)))))))))
-
 
 (defn mark-questions-as-answered
   []

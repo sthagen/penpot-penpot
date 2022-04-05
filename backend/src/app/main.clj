@@ -65,6 +65,7 @@
 
    :app.msgbus/msgbus
    {:backend   (cf/get :msgbus-backend :redis)
+    :executor  (ig/ref [::default :app.worker/executor])
     :redis-uri (cf/get :redis-uri)}
 
    :app.tokens/tokens
@@ -188,7 +189,7 @@
     :pool       (ig/ref :app.db/pool)
     :entries
     [{:cron #app/cron "0 0 0 * * ?" ;; daily
-      :task :file-media-gc}
+      :task :file-gc}
 
      {:cron #app/cron "0 0 * * * ?"  ;; hourly
       :task :file-xlog-gc}
@@ -208,6 +209,9 @@
      {:cron #app/cron "0 0 0 * * ?"  ;; daily
       :task :tasks-gc}
 
+     {:cron #app/cron "0 30 */3,23 * * ?"
+      :task :telemetry}
+
      (when (cf/get :fdata-storage-backed)
        {:cron #app/cron "0 0 * * * ?"  ;; hourly
         :task :file-offload})
@@ -218,19 +222,14 @@
 
      (when (contains? cf/flags :audit-log-gc)
        {:cron #app/cron "0 0 0 * * ?" ;; daily
-        :task :audit-log-gc})
-
-     (when (or (contains? cf/flags :telemetry)
-               (cf/get :telemetry-enabled))
-       {:cron #app/cron "0 30 */3,23 * * ?"
-        :task :telemetry})]}
+        :task :audit-log-gc})]}
 
    :app.worker/registry
    {:metrics (ig/ref :app.metrics/metrics)
     :tasks
     {:sendmail           (ig/ref :app.emails/sendmail-handler)
      :objects-gc         (ig/ref :app.tasks.objects-gc/handler)
-     :file-media-gc      (ig/ref :app.tasks.file-media-gc/handler)
+     :file-gc            (ig/ref :app.tasks.file-gc/handler)
      :file-xlog-gc       (ig/ref :app.tasks.file-xlog-gc/handler)
      :storage-deleted-gc (ig/ref :app.storage/gc-deleted-task)
      :storage-touched-gc (ig/ref :app.storage/gc-touched-task)
@@ -261,7 +260,7 @@
     :storage (ig/ref :app.storage/storage)
     :max-age cf/deletion-delay}
 
-   :app.tasks.file-media-gc/handler
+   :app.tasks.file-gc/handler
    {:pool    (ig/ref :app.db/pool)
     :max-age cf/deletion-delay}
 

@@ -6,13 +6,13 @@
 
 (ns app.rpc.mutations.profile
   (:require
+   [app.common.data :as d]
    [app.common.exceptions :as ex]
    [app.common.spec :as us]
    [app.common.uuid :as uuid]
    [app.config :as cf]
    [app.db :as db]
    [app.emails :as eml]
-   [app.http.oauth :refer [extract-utm-props]]
    [app.loggers.audit :as audit]
    [app.media :as media]
    [app.rpc.mutations.teams :as teams]
@@ -31,7 +31,7 @@
 
 (s/def ::email ::us/email)
 (s/def ::fullname ::us/not-empty-string)
-(s/def ::lang (s/nilable ::us/not-empty-string))
+(s/def ::lang ::us/string)
 (s/def ::path ::us/string)
 (s/def ::profile-id ::us/uuid)
 (s/def ::password ::us/not-empty-string)
@@ -130,6 +130,7 @@
               :hint "you can't use your email as password"))
 
   (let [params {:email (:email params)
+                :password (:password params)
                 :invitation-token (:invitation-token params)
                 :backend "penpot"
                 :iss :prepared-register
@@ -156,7 +157,6 @@
   (let [claims    (tokens :verify {:token token :iss :prepared-register})
         params    (merge params claims)]
     (check-profile-existence! conn params)
-
     (let [is-active  (or (:is-active params)
                          (contains? cf/flags :insecure-register))
           profile    (->> (assoc params :is-active is-active)
@@ -223,7 +223,7 @@
   [conn params]
   (let [id        (or (:id params) (uuid/next))
 
-        props     (-> (extract-utm-props params)
+        props     (-> (audit/extract-utm-params params)
                       (merge (:props params))
                       (db/tjson))
 
@@ -343,27 +343,41 @@
 
 ;; --- MUTATION: Update Profile (own)
 
-(defn- update-profile
-  [conn {:keys [id fullname lang theme] :as params}]
-  (let [profile (db/update! conn :profile
-                            {:fullname fullname
-                             :lang lang
-                             :theme theme}
-                            {:id id})]
-    (-> profile
-        (profile/decode-profile-row)
-        (profile/strip-private-attrs))))
-
-
+(s/def ::newsletter-subscribed ::us/boolean)
 (s/def ::update-profile
-  (s/keys :req-un [::id ::fullname]
-          :opt-un [::lang ::theme]))
+  (s/keys :req-un [::fullname ::profile-id]
+          :opt-un [::lang ::theme ::newsletter-subscribed]))
 
 (sv/defmethod ::update-profile
-  [{:keys [pool] :as cfg} params]
+  [{:keys [pool] :as cfg} {:keys [profile-id fullname lang theme newsletter-subscribed] :as params}]
   (db/with-atomic [conn pool]
-    (let [profile (update-profile conn params)]
-      (with-meta profile
+    ;; NOTE: we need to retrieve the profile independently if we use
+    ;; it or not for explicit locking and avoid concurrent updates of
+    ;; the same row/object.
+    (let [profile (-> (db/get-by-id conn :profile profile-id {:for-update true})
+                      (profile/decode-profile-row))
+
+          ;; Update the profile map with direct params
+          profile (-> profile
+                      (assoc :fullname fullname)
+                      (assoc :lang lang)
+                      (assoc :theme theme))
+
+          ;; Update profile props if the indirect prop is coming in
+          ;; the params map and update the profile props data
+          ;; acordingly.
+          profile (cond-> profile
+                    (some? newsletter-subscribed)
+                    (update :props assoc :newsletter-subscribed newsletter-subscribed))]
+
+      (db/update! conn :profile
+                  {:fullname fullname
+                   :lang lang
+                   :theme theme
+                   :props (db/tjson (:props profile))}
+                  {:id profile-id})
+
+      (with-meta (-> profile profile/strip-private-attrs d/without-nils)
         {::audit/props (audit/profile->props profile)}))))
 
 ;; --- MUTATION: Update Password
@@ -419,6 +433,7 @@
   (s/keys :req-un [::profile-id ::file]))
 
 (sv/defmethod ::update-profile-photo
+  {::rlimit/permits (cf/get :rlimit-image)}
   [cfg {:keys [file] :as params}]
   ;; Validate incoming mime type
   (media/validate-media-type! file #{"image/jpeg" "image/png" "image/webp"})

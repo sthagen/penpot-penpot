@@ -386,7 +386,6 @@
        {:min -200
         :max 200
         :step 0.1
-        :precision 2
         :value (attr->string line-height)
         :placeholder (tr "settings.multiple")
         :on-change #(handle-change % :line-height)
@@ -400,7 +399,6 @@
        {:min -200
         :max 200
         :step 0.1
-        :precision 2
         :value (attr->string letter-spacing)
         :placeholder (tr "settings.multiple")
         :on-change #(handle-change % :letter-spacing)
@@ -463,7 +461,7 @@
         name-input-ref (mf/use-ref)
         on-change-ref  (mf/use-ref nil)
 
-        name-ref (mf/use-ref (:name typography))
+        name-ref       (mf/use-ref (:name typography))
 
         on-name-blur
         (mf/use-callback
@@ -473,12 +471,6 @@
              (when-not (str/blank? content)
                (let [[path name] (cph/parse-path-name content)]
                  (on-change {:name name :path path}))))))
-
-        handle-go-to-edit
-        (fn []
-          (let [pparams {:project-id (:project-id file)
-                         :file-id (:id file)}]
-            (st/emit! (rt/nav :workspace pparams))))
 
         on-name-change
         (mf/use-callback
@@ -576,9 +568,11 @@
           [:span.label (tr "workspace.assets.typography.text-transform")]
           [:span (:text-transform typography)]]
 
-         [:div.go-to-lib-button
-          {:on-click handle-go-to-edit}
-          (tr "workspace.assets.typography.go-to-edit")]]
+         [:div.row-flex
+          [:a.go-to-lib-button {:on-click (st/emitf (rt/nav-new-window* {:rname :workspace
+                                                                         :path-params {:project-id (:project-id file) :file-id (:id file)}
+                                                                         :query-params {:page-id (get-in file [:data :pages 0])}}))}
+           (tr "workspace.assets.typography.go-to-edit")]]]
 
         [:*
          [:div.element-set-content

@@ -7,6 +7,7 @@
 (ns app.main.ui.render
   (:require
    [app.common.data :as d]
+   [app.common.data.macros :as dm]
    [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
@@ -32,10 +33,10 @@
   (let [xf-get-bounds (comp (map #(get objects %)) (map #(calc-bounds % objects)))
         padding       (filters/calculate-padding object)
         obj-bounds    (-> (filters/get-filters-bounds object)
-                          (update :x - padding)
-                          (update :y - padding)
-                          (update :width + (* 2 padding))
-                          (update :height + (* 2 padding)))]
+                          (update :x - (:horizontal padding))
+                          (update :y - (:vertical padding))
+                          (update :width + (* 2 (:horizontal padding)))
+                          (update :height + (* 2 (:vertical padding))))]
 
     (cond
       (and (= :group (:type object))
@@ -52,7 +53,9 @@
 
 (mf/defc object-svg
   {::mf/wrap [mf/memo]}
-  [{:keys [objects object-id zoom render-texts?] :or {zoom 1} :as props}]
+  [{:keys [objects object-id zoom render-texts? embed?]
+    :or {zoom 1 embed? false}
+    :as props}]
   (let [object   (get objects object-id)
         frame-id (if (= :frame (:type object))
                    (:id object)
@@ -70,9 +73,9 @@
         objects  (reduce updt-fn objects mod-ids)
         object   (get objects object-id)
 
-        object (cond-> object
-                 (:hide-fill-on-export object)
-                 (assoc :fills []))
+        object   (cond-> object
+                   (:hide-fill-on-export object)
+                   (assoc :fills []))
 
         all-children (cph/get-children objects object-id)
 
@@ -100,10 +103,11 @@
         render-texts? (and render-texts? (d/seek (comp nil? :position-data) text-shapes))]
 
     (mf/with-effect [width height]
-      (dom/set-page-style {:size (str (mth/ceil width) "px "
-                                      (mth/ceil height) "px")}))
+      (dom/set-page-style!
+       {:size (dm/str (mth/ceil width) "px "
+                      (mth/ceil height) "px")}))
 
-    [:& (mf/provider embed/context) {:value false}
+    [:& (mf/provider embed/context) {:value embed?}
      [:svg {:id "screenshot"
             :view-box vbox
             :width width
@@ -149,7 +153,7 @@
     objects))
 
 (mf/defc render-object
-  [{:keys [file-id page-id object-id render-texts?] :as props}]
+  [{:keys [file-id page-id object-id render-texts? embed?] :as props}]
   (let [objects (mf/use-state nil)]
 
     (mf/with-effect [file-id page-id object-id]
@@ -168,6 +172,7 @@
     (when @objects
       [:& object-svg {:objects @objects
                       :object-id object-id
+                      :embed? embed?
                       :render-texts? render-texts?
                       :zoom 1}])))
 

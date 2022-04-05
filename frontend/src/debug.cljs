@@ -7,12 +7,15 @@
 (ns debug
   (:require
    [app.common.data :as d]
-   [app.common.math :as mth]
    [app.common.pages.helpers :as cph]
    [app.common.transit :as t]
    [app.common.uuid :as uuid]
+   [app.main.data.dashboard.shortcuts]
+   [app.main.data.viewer.shortcuts]
    [app.main.data.workspace :as dw]
    [app.main.data.workspace.changes :as dwc]
+   [app.main.data.workspace.path.shortcuts]
+   [app.main.data.workspace.shortcuts]
    [app.main.store :as st]
    [app.util.object :as obj]
    [app.util.timers :as timers]
@@ -32,11 +35,8 @@
     ;; Displays in the console log the events through the application
     :events
 
-    ;; Display the boxes that represent the rotation handlers
-    :rotation-handler
-
-    ;; Display the boxes that represent the resize handlers
-    :resize-handler
+    ;; Display the boxes that represent the rotation and resize handlers
+    :handlers
 
     ;; Displays the center of a selection
     :selection-center
@@ -50,6 +50,9 @@
 
     ;; When active we can check in the browser the export values
     :show-export-metadata
+
+    ;; Show text fragments outlines
+    :text-outline
     })
 
 ;; These events are excluded when we activate the :events flag
@@ -130,7 +133,7 @@
                             ts (/ 1000 (* (- cur @last)))
                             val (+ @avg (* (- ts @avg) 0.1))]
 
-                        (obj/set! node "innerText" (mth/precision val 0))
+                        (obj/set! node "innerText" val)
                         (vreset! last cur)
                         (vreset! avg val)
                         (do-thing)))))]
@@ -152,36 +155,51 @@
     (clj->js (get-in @st/state path)))
   nil)
 
-(defn ^:export dump-objects []
-  (let [page-id (get @st/state :current-page-id)
-        objects (get-in @st/state [:workspace-data :pages-index page-id :objects])]
+(defn dump-objects'
+  [state]
+  (let [page-id (get state :current-page-id)
+        objects (get-in state [:workspace-data :pages-index page-id :objects])]
     (logjs "objects" objects)
     nil))
 
-(defn ^:export dump-object [name]
-  (let [page-id (get @st/state :current-page-id)
-        objects (get-in @st/state [:workspace-data :pages-index page-id :objects])
+(defn ^:export dump-objects
+  []
+  (dump-objects' @st/state))
+
+(defn dump-object'
+  [state name]
+  (let [page-id (get state :current-page-id)
+        objects (get-in state [:workspace-data :pages-index page-id :objects])
         result  (or (d/seek (fn [[_ shape]] (= name (:name shape))) objects)
                     (get objects (uuid/uuid name)))]
     (logjs name result)
     nil))
 
-(defn ^:export dump-selected []
-  (let [page-id (get @st/state :current-page-id)
-        objects (get-in @st/state [:workspace-data :pages-index page-id :objects])
-        selected (get-in @st/state [:workspace-local :selected])
+(defn ^:export dump-object
+  [name]
+  (dump-object' @st/state name))
+
+(defn dump-selected'
+  [state]
+  (let [page-id (get state :current-page-id)
+        objects (get-in state [:workspace-data :pages-index page-id :objects])
+        selected (get-in state [:workspace-local :selected])
         result (->> selected (map (d/getf objects)))]
     (logjs "selected" result)
     nil))
 
-(defn ^:export dump-tree
-  ([] (dump-tree false false))
-  ([show-ids] (dump-tree show-ids false))
-  ([show-ids show-touched]
-   (let [page-id    (get @st/state :current-page-id)
-         objects    (get-in @st/state [:workspace-data :pages-index page-id :objects])
-         components (get-in @st/state [:workspace-data :components])
-         libraries  (get @st/state :workspace-libraries)
+(defn ^:export dump-selected
+  []
+  (dump-selected' @st/state))
+
+(defn dump-tree'
+  ([state ] (dump-tree' state false false))
+  ([state show-ids] (dump-tree' state show-ids false))
+  ([state show-ids show-touched]
+   (let [page-id    (get state :current-page-id)
+         objects    (get-in state [:workspace-data :pages-index page-id :objects])
+         components (get-in state [:workspace-data :components])
+         libraries  (get state :workspace-libraries)
          root (d/seek #(nil? (:parent-id %)) (vals objects))]
 
      (letfn [(show-shape [shape-id level objects]
@@ -247,6 +265,11 @@
                   (println (str/format "[%s]" (:name component)))
                   (show-shape (:id component) 0 (:objects component)))))))))
 
+(defn ^:export dump-tree
+  ([] (dump-tree' @st/state))
+  ([show-ids] (dump-tree' @st/state show-ids))
+  ([show-ids show-touched] (dump-tree' @st/state show-ids show-touched)))
+
 (when *assert*
   (defonce debug-subscription
     (->> st/stream
@@ -278,8 +301,35 @@
    dw/reset-zoom
    (dw/update-viewport-position {:x (constantly 0) :y (constantly 0)})))
 
-
 (defn ^:export hide-ui
   []
   (st/emit!
    (dw/toggle-layout-flag :hide-ui)))
+
+
+(defn ^:export shortcuts
+  []
+
+  (letfn [(print-shortcuts [shortcuts]
+            (.table js/console
+                    (->> shortcuts
+                         (map (fn [[key {:keys [command]}]]
+                                [(d/name key)
+                                 (if (vector? command)
+                                   (str/join " | " command)
+                                   command)]))
+                         (into {})
+                         (clj->js))))]
+    (let [style "font-weight: bold; font-size: 1.25rem;"]
+      (.log js/console "%c Dashboard" style)
+      (print-shortcuts app.main.data.dashboard.shortcuts/shortcuts)
+
+      (.log js/console "%c Workspace" style)
+      (print-shortcuts app.main.data.workspace.shortcuts/shortcuts)
+
+      (.log js/console "%c Path" style)
+      (print-shortcuts app.main.data.workspace.path.shortcuts/shortcuts)
+
+      (.log js/console "%c Viewer" style)
+      (print-shortcuts app.main.data.viewer.shortcuts/shortcuts)))
+  nil)

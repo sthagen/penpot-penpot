@@ -12,8 +12,8 @@
    [app.config :as cf]
    [app.main.data.messages :as msg]
    [app.main.data.users :as du]
-   [app.main.sentry :as sentry]
    [app.main.store :as st]
+   [app.util.globals :as glob]
    [app.util.i18n :refer [tr]]
    [app.util.router :as rt]
    [app.util.timers :as ts]
@@ -26,7 +26,7 @@
   [error]
   (cond
     (instance? ExceptionInfo error)
-    (-> error sentry/capture-exception ex-data ptk/handle-error)
+    (-> error ex-data ptk/handle-error)
 
     (map? error)
     (ptk/handle-error error)
@@ -34,7 +34,6 @@
     :else
     (let [hint (ex-message error)
           msg  (dm/str "Internal Error: " hint)]
-      (sentry/capture-exception error)
       (ts/schedule (st/emitf (rt/assign-exception error)))
 
       (js/console.group msg)
@@ -53,22 +52,11 @@
     (st/emit! (du/logout {:capture-redirect true}))
     (ts/schedule 500 (st/emitf (msg/warn msg)))))
 
-
-;; That are special case server-errors that should be treated
-;; differently.
-(derive :not-found ::exceptional-state)
-(derive :bad-gateway ::exceptional-state)
-(derive :service-unavailable ::exceptional-state)
-
-(defmethod ptk/handle-error ::exceptional-state
-  [error]
-  (ts/schedule
-   (st/emitf (rt/assign-exception error))))
-
 ;; Error that happens on an active business model validation does not
 ;; passes an validation (example: profile can't leave a team). From
 ;; the user perspective a error flash message should be visualized but
-;; user can continue operate on the application.
+;; user can continue operate on the application. Can happen in backend
+;; and frontend.
 (defmethod ptk/handle-error :validation
   [error]
   (ts/schedule
@@ -92,6 +80,7 @@
 
 
 ;; Error on parsing an SVG
+;; TODO: looks unused and deprecated
 (defmethod ptk/handle-error :svg-parser
   [_]
   (ts/schedule
@@ -100,6 +89,7 @@
               :type :error
               :timeout 3000}))))
 
+;; TODO: should be handled in the event and not as general error handler
 (defmethod ptk/handle-error :comment-error
   [_]
   (ts/schedule
@@ -132,9 +122,22 @@
     (js/console.error (with-out-str (expound/printer error)))
     (js/console.groupEnd message)))
 
+;; That are special case server-errors that should be treated
+;; differently.
+
+(derive :not-found ::exceptional-state)
+(derive :bad-gateway ::exceptional-state)
+(derive :service-unavailable ::exceptional-state)
+
+(defmethod ptk/handle-error ::exceptional-state
+  [error]
+  (ts/schedule
+   (st/emitf (rt/assign-exception error))))
+
 ;; This happens when the backed server fails to process the
 ;; request. This can be caused by an internal assertion or any other
 ;; uncontrolled error.
+
 (defmethod ptk/handle-error :server-error
   [{:keys [data hint] :as error}]
   (let [hint (or hint (:hint data) (:message data))
@@ -144,8 +147,8 @@
     (ts/schedule
      #(st/emit!
        (msg/show {:content "Something wrong has happened (on backend)."
-                 :type :error
-                 :timeout 3000})))
+                  :type :error
+                  :timeout 3000})))
 
     (js/console.group msg)
     (js/console.info info)
@@ -160,10 +163,9 @@
 (defn on-unhandled-error
   [error]
   (if (instance? ExceptionInfo error)
-    (-> error sentry/capture-exception ex-data ptk/handle-error)
+    (-> error ex-data ptk/handle-error)
     (let [hint (ex-message error)
           msg  (dm/str "Unhandled Internal Error: " hint)]
-      (sentry/capture-exception error)
       (ts/schedule (st/emitf (rt/assign-exception error)))
       (js/console.group msg)
       (ex/ignoring (js/console.error error))
@@ -174,6 +176,6 @@
             (.preventDefault ^js event)
             (some-> (unchecked-get event "error")
                     (on-unhandled-error)))]
-    (.addEventListener js/window "error" on-error)
+    (.addEventListener glob/window "error" on-error)
     (fn []
-      (.removeEventListener js/window "error" on-error))))
+      (.removeEventListener glob/window "error" on-error))))

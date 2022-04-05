@@ -1,5 +1,6 @@
 {:deps
  {penpot/common {:local/root "../common"}
+  org.clojure/clojure {:mvn/version "1.10.3"}
   org.clojure/core.async {:mvn/version "1.5.648"}
 
   ;; Logging
@@ -19,7 +20,7 @@
   io.lettuce/lettuce-core {:mvn/version "6.1.6.RELEASE"}
   java-http-clj/java-http-clj {:mvn/version "0.4.3"}
 
-  funcool/yetti {:git/tag "v6.0" :git/sha "4c8690e"
+  funcool/yetti {:git/tag "v9.0" :git/sha "e09e46c"
                  :git/url "https://github.com/funcool/yetti.git"
                  :exclusions [org.slf4j/slf4j-api]}
 

@@ -5,9 +5,29 @@
 ### :boom: Breaking changes
 ### :sparkles: New features
 
+- Added selected colors widget in right sidebar [Taiga #2485](https://tree.taiga.io/project/penpot/us/2485)
+
+### :bug: Bugs fixed
+### :arrow_up: Deps updates
+### :heart: Community contributions by (Thank you!)
+
+
+## 1.13.0-beta
+
+### :boom: Breaking changes
+
+- We've changed the behaviour of the border-radius so it works as CSS that [has some limits](https://www.w3.org/TR/css-backgrounds-3/#corner-overlap).
+
+### :sparkles: New features
+
+- Constraints are not well assigned when default and multiselection [Taiga #3069](https://tree.taiga.io/project/penpot/issue/3069)
+- Exporting big files flow [Taiga #2218](https://tree.taiga.io/project/penpot/us/2218)
+- Multiexport from main menu [Taiga #520](https://tree.taiga.io/project/penpot/us/28541)
+- Multiexport assets (aka bulk export) [Taiga #520](https://tree.taiga.io/project/penpot/us/520)
+- Set the artboard layer fixed at the top side of the layers [Taiga #2636](https://tree.taiga.io/project/penpot/us/2636)
 - Set an artboard as the file thumbnail [Taiga #1526](https://tree.taiga.io/project/penpot/us/1526)
 - Social login redesign [Taiga #2974](https://tree.taiga.io/project/penpot/task/2974)
-- Add border radius to our artboars [Taiga #2056](https://tree.taiga.io/project/penpot/us/2056)
+- Add border radius to our artboards [Taiga #2056](https://tree.taiga.io/project/penpot/us/2056)
 - Allow send multiple team invitations at once [Taiga #2798](https://tree.taiga.io/project/penpot/us/2798)
 - Persist color palette and color picker across refresh [Taiga #1660](https://tree.taiga.io/project/penpot/issue/1660)
 - Ability to add multiple strokes to a shape [Taiga #2778](https://tree.taiga.io/project/penpot/us/2778)
@@ -22,15 +42,56 @@
 - Add the ability to specify the attr for retrieve the email on OIDC integration [#1460](https://github.com/penpot/penpot/issues/1460)
 - Allow registration with invitation token when registration is disabled
 - Add the ability to disable standard, password login [Taiga #2999](https://tree.taiga.io/project/penpot/us/2999)
+- Don't stop SVG import when an image cannot be imported [#1531](https://github.com/penpot/penpot/issues/1531)
+- Fix paste shapes while editing text [Taiga #2396](https://tree.taiga.io/project/penpot/issue/2396)
 
 ### :bug: Bugs fixed
 
+- Fix send to back several shapes at a time [Taiga #3077](https://tree.taiga.io/project/penpot/issue/3077)
+- Fix duplicate multi selected elements [Taiga #3155](https://tree.taiga.io/project/penpot/issue/3155)
+- Fix add fills to artboard modify children [Taiga #3151](https://tree.taiga.io/project/penpot/issue/3151)
+- Avoid numeric inputs to allow big numbers [Taiga #2858](https://tree.taiga.io/project/penpot/issue/2858)
+- Fix component contex menu size [Taiga #2480](https://tree.taiga.io/project/penpot/issue/2480)
+- Add shadow to artboard make it lose the fill [Taiga #3139](https://tree.taiga.io/project/penpot/issue/3139)
+- Avoid numeric inputs to change its value without focusing them [Taiga #3140](https://tree.taiga.io/project/penpot/issue/3140)
+- Fix comments modal when changing pages [Taiga #2597](https://tree.taiga.io/project/penpot/issue/2508)
+- Copy paste inside a text layer leaves pasted text transparent [Taiga #3096](https://tree.taiga.io/project/penpot/issue/3096)
+- On dashboard enter on empty search refresh the page [Taiga #2597](https://tree.taiga.io/project/penpot/issue/2597)
+- Pencil cursor changes when activated [Taiga #2276](https://tree.taiga.io/project/penpot/issue/2276)
+- Fix icon placement in Mixed message [Taiga #3037](https://tree.taiga.io/project/penpot/issue/3037)
+- Fix scroll in comment section [Taiga #3068](https://tree.taiga.io/project/penpot/issue/3068)
+- Remove a decimal sets value to 0 [Taiga #3059](https://tree.taiga.io/project/penpot/issue/3054)
+- Go to style library file to edit in a new tab [Taiga #2639](https://tree.taiga.io/project/penpot/issue/2639)
+- Inner shadow with border not working properly [Taiga #2883](https://tree.taiga.io/project/penpot/issue/2883)
 - Fix ellipsis in long page names [Taiga #2962](https://tree.taiga.io/project/penpot/issue/2962)
 - Fix color palette animation [Taiga #2852](https://tree.taiga.io/project/penpot/issue/2852)
 - Fix display code icon on preview hover [Taiga #2838](https://tree.taiga.io/project/penpot/us/2838)
+- Fix crash on iOS when displaying viewer [#1522](https://github.com/penpot/penpot/issues/1522)
+- Fix problem when importing a SVG with text [#1532](https://github.com/penpot/penpot/issues/1532)
+- Fix problem when adding shadows to imported text [#Taiga 3057](https://tree.taiga.io/project/penpot/issue/3057)
+- Fix problem when importing SVG's with uses with overriding properties [#Taiga 2884](https://tree.taiga.io/project/penpot/issue/2884)
+- Fix inconsistency with radius in SVG an CSS [#1587](https://github.com/penpot/penpot/issues/1587)
+- Fix clickable area in layers [#1680](https://github.com/penpot/penpot/issues/1680)
+- Fix problems with trackpad zoom and scroll in MacOS [#1161](https://github.com/penpot/penpot/issues/1161)
+- Fix problem with copy/paste in Safari [#1209](https://github.com/penpot/penpot/issues/1209)
+- Fix paste ordering for frames not being respected [Taiga #3097](https://tree.taiga.io/project/penpot/issue/3097)
+- Improved command support for MacOS [Taiga #2789](https://tree.taiga.io/project/penpot/issue/2789)
+- Fix shift+2 shortcut in MacOS with non-english keyboards [Taiga #3038](https://tree.taiga.io/project/penpot/issue/3038)
+- Some fixes to SVG imports [Taiga #3122](https://tree.taiga.io/project/penpot/issue/3122) [#1720](https://github.com/penpot/penpot/issues/1720) [Taiga #2884](https://tree.taiga.io/project/penpot/issue/2884)
+- Fix drag guides to delete target area [#1679](https://github.com/penpot/penpot/issues/1679)
+- Fix undo when rotating groups [Taiga #3136](https://tree.taiga.io/project/penpot/issue/3136)
+- Fix component name in sidebar widget [Taiga #3144](https://tree.taiga.io/project/penpot/issue/3144)
 
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
+
+## 1.12.3-beta
+
+### :bug: Bugs fixed
+
+- Fix issue with shift+select to deselect shapes [Taiga #3154](https://tree.taiga.io/project/penpot/issue/3154)
+- Fix issue with drag-select shapes  [Taiga #3165](https://tree.taiga.io/project/penpot/issue/3165)
+- Fix issue on password persistence after registration process on private instances
 
 ## 1.12.2-beta
 

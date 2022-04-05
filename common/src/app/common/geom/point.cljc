@@ -21,7 +21,7 @@
 
 (defn s [{:keys [x y]}] (str "(" x "," y ")"))
 
-(defn ^boolean point?
+(defn point?
   "Return true if `v` is Point instance."
   [v]
   (or (instance? Point v)
@@ -33,8 +33,7 @@
 (s/def ::point
   (s/and (s/keys :req-un [::x ::y]) point?))
 
-
-(defn ^boolean point-like?
+(defn point-like?
   [{:keys [x y] :as v}]
   (and (map? v)
        (not (nil? x))
@@ -60,6 +59,11 @@
      (throw (ex-info "Invalid arguments" {:v v}))))
   ([x y]
    (Point. x y)))
+
+(defn close?
+  [p1 p2]
+  (and (mth/close? (:x p1) (:x p2))
+       (mth/close? (:y p1) (:y p2))))
 
 (defn angle->point [{:keys [x y]} angle distance]
   (point
@@ -132,9 +136,8 @@
   (assert (point? other))
   (let [dx (- x ox)
         dy (- y oy)]
-    (-> (mth/sqrt (+ (mth/pow dx 2)
-                     (mth/pow dy 2)))
-        (mth/precision 6))))
+    (mth/sqrt (+ (mth/pow dx 2)
+                 (mth/pow dy 2)))))
 
 (defn length
   [{x :x y :y :as p}]
@@ -168,8 +171,7 @@
                     (* y oy))
                  (* length-p length-other))
             a (mth/acos (if (< a -1) -1 (if (> a 1) 1 a)))
-            d (-> (mth/degrees a)
-                  (mth/precision 6))]
+            d (mth/degrees a)]
         (if (mth/nan? d) 0 d)))))
 
 (defn angle-sign [v1 v2]
@@ -194,13 +196,22 @@
     (if (>= y 0) 2 3)))
 
 (defn round
-  "Change the precision of the point coordinates."
-  ([point] (round point 0))
+  "Round the coordinates of the point to a precision"
+  ([point]
+   (round point 0))
+
   ([{:keys [x y] :as p} decimals]
    (assert (point? p))
    (assert (number? decimals))
    (Point. (mth/precision x decimals)
            (mth/precision y decimals))))
+
+(defn half-round
+  "Round the coordinates to the closest half-point"
+  [{:keys [x y] :as p}]
+  (assert (point? p))
+  (Point. (mth/half-round x)
+          (mth/half-round y)))
 
 (defn transform
   "Transform a point applying a matrix transformation."

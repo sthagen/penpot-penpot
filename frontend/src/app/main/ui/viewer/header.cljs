@@ -6,18 +6,19 @@
 
 (ns app.main.ui.viewer.header
   (:require
-   [app.common.math :as mth]
    [app.main.data.modal :as modal]
    [app.main.data.viewer :as dv]
    [app.main.data.viewer.shortcuts :as sc]
    [app.main.refs :as refs]
    [app.main.store :as st]
    [app.main.ui.components.dropdown :refer [dropdown]]
+   [app.main.ui.export :refer [export-progress-widget]]
+   [app.main.ui.formats :as fmt]
    [app.main.ui.icons :as i]
    [app.main.ui.viewer.comments :refer [comments-menu]]
    [app.main.ui.viewer.interactions :refer [flows-menu interactions-menu]]
    [app.util.dom :as dom]
-   [app.util.i18n :as i18n :refer [tr]]
+   [app.util.i18n :refer [tr]]
    [rumext.alpha :as mf]))
 
 (mf/defc zoom-widget
@@ -32,7 +33,7 @@
     :as props}]
   (let [show-dropdown? (mf/use-state false)]
     [:div.zoom-widget {:on-click #(reset! show-dropdown? true)}
-     [:span.label {} (str (mth/round (* 100 zoom)) "%")]
+     [:span.label (fmt/format-percent zoom)]
      [:span.icon i/arrow-down]
      [:& dropdown {:show @show-dropdown?
                    :on-close #(reset! show-dropdown? false)}
@@ -43,7 +44,7 @@
                                (dom/stop-propagation event)
                                (dom/prevent-default event)
                                (on-decrease))} "-"]
-         [:p.zoom-size {} (str (mth/round (* 100 zoom)) "%")]
+         [:p.zoom-size (fmt/format-percent zoom)]
          [:button {:on-click (fn [event]
                                (dom/stop-propagation event)
                                (dom/prevent-default event)
@@ -88,6 +89,7 @@
 
        [:div.view-options])
 
+     [:& export-progress-widget]
      [:& zoom-widget
       {:zoom zoom
        :on-increase (st/emitf dv/increase-zoom)

@@ -16,6 +16,7 @@
    [app.main.store :as st]
    [app.main.streams :as ms]
    [app.main.ui.cursors :as cur]
+   [app.main.ui.formats :as fmt]
    [app.main.ui.workspace.viewport.rules :as rules]
    [app.util.dom :as dom]
    [rumext.alpha :as mf]))
@@ -48,6 +49,8 @@
 
         frame-ref (mf/use-memo (mf/deps frame-id) #(refs/object-by-id frame-id))
         frame (mf/deref frame-ref)
+
+        snap-pixel? (mf/deref refs/snap-pixel?)
 
         on-pointer-enter
         (mf/use-callback
@@ -89,7 +92,7 @@
 
         on-mouse-move
         (mf/use-callback
-         (mf/deps position zoom)
+         (mf/deps position zoom snap-pixel?)
          (fn [event]
            
            (when-let [_ (mf/ref-val dragging-ref)]
@@ -101,8 +104,10 @@
                                   (+ position delta)
                                   (+ start-pos delta))
 
-                   ;; TODO: Change when pixel-grid flag exists
-                   new-position (mth/round new-position)
+                   new-position (if snap-pixel?
+                                  (mth/round new-position)
+                                  new-position)
+
                    new-frame-id (:id (get-hover-frame))]
                (swap! state assoc
                       :new-position new-position
@@ -210,18 +215,19 @@
        :text-y      pos})))
 
 (defn guide-inside-vbox?
-  ([vbox]
-   (partial guide-inside-vbox? vbox))
+  ([zoom vbox]
+   (partial guide-inside-vbox? zoom vbox))
 
-  ([{:keys [x y width height]} {:keys [axis position]}]
-   (let [x1 x
+  ([zoom {:keys [x y width height]} {:keys [axis position]}]
+   (let [rule-area-size (/ rules/rule-area-size zoom)
+         x1 x
          x2 (+ x width)
          y1 y
          y2 (+ y height)]
      (if (= axis :x)
-       (and (>= position x1)
+       (and (>= position (+ x1 rule-area-size))
             (<= position x2))
-       (and (>= position y1)
+       (and (>= position (+ y1 rule-area-size))
             (<= position y2))))))
 
 (defn guide-creation-area
@@ -366,7 +372,7 @@
                     :style {:font-size (/ rules/font-size zoom)
                             :font-family rules/font-family
                             :fill colors/black}}
-             (str (mth/round pos))]]))])))
+             (fmt/format-number pos)]]))])))
 
 (mf/defc new-guide-area
   [{:keys [vbox zoom axis get-hover-frame disabled-guides?]}]
@@ -378,7 +384,7 @@
            (let [guide (-> guide
                            (assoc :id (uuid/next)
                                   :axis axis))]
-             (when (guide-inside-vbox? vbox guide)
+             (when (guide-inside-vbox? zoom vbox guide)
                (st/emit! (dw/update-guides guide))))))
 
         {:keys [on-pointer-enter
@@ -426,7 +432,7 @@
                 (mf/deps page vbox)
                 #(->> (get-in page [:options :guides] {})
                       (vals)
-                      (filter (guide-inside-vbox? vbox))))
+                      (filter (guide-inside-vbox? zoom vbox))))
 
         focus (mf/deref refs/workspace-focus-selected)
 
@@ -443,7 +449,7 @@
         (mf/use-callback
          (mf/deps vbox)
          (fn [guide]
-           (if (guide-inside-vbox? vbox guide)
+           (if (guide-inside-vbox? zoom vbox guide)
              (st/emit! (dw/update-guides guide))
              (st/emit! (dw/remove-guide guide)))))]
 

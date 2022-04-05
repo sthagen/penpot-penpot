@@ -102,14 +102,11 @@
             (us/assert ::spec.change/changes redo-changes)
             (us/assert ::spec.change/changes undo-changes)
 
-            ;; (prn "====== commit-changes ======" path)
-            ;; (cljs.pprint/pprint redo-changes)
-            ;; (cljs.pprint/pprint undo-changes)
-
             (update-in state path cp/process-changes redo-changes false)
 
-            (catch :default e
-              (vreset! error e)
+            (catch :default err
+              (log/error :js/error err)
+              (vreset! error err)
               state))))
 
       ptk/WatchEvent
