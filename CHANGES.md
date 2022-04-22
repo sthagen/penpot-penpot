@@ -6,6 +6,7 @@
 ### :sparkles: New features
 
 - Added selected colors widget in right sidebar [Taiga #2485](https://tree.taiga.io/project/penpot/us/2485)
+- Fix elements when scrolling [Taiga #1533](https://tree.taiga.io/project/penpot/us/1533)
 
 ### :bug: Bugs fixed
 ### :arrow_up: Deps updates
@@ -20,6 +21,7 @@
 
 ### :sparkles: New features
 
+- Group assets by drag and drop [Taiga #2831](https://tree.taiga.io/project/penpot/us/2831)
 - Constraints are not well assigned when default and multiselection [Taiga #3069](https://tree.taiga.io/project/penpot/issue/3069)
 - Exporting big files flow [Taiga #2218](https://tree.taiga.io/project/penpot/us/2218)
 - Multiexport from main menu [Taiga #520](https://tree.taiga.io/project/penpot/us/28541)
@@ -44,9 +46,19 @@
 - Add the ability to disable standard, password login [Taiga #2999](https://tree.taiga.io/project/penpot/us/2999)
 - Don't stop SVG import when an image cannot be imported [#1531](https://github.com/penpot/penpot/issues/1531)
 - Fix paste shapes while editing text [Taiga #2396](https://tree.taiga.io/project/penpot/issue/2396)
+- Show Penpot color in Safari tab bar [#1803](https://github.com/penpot/penpot/issues/1803)
 
 ### :bug: Bugs fixed
 
+- Round the size values on handoff to two decimals [Taiga #3227](https://tree.taiga.io/project/penpot/issue/3227)
+- Fix internal error when hoverin over shape [Taiga #3237](https://tree.taiga.io/project/penpot/issue/3237)
+- Fix different behaviour during image drag [Taiga #2279](https://tree.taiga.io/project/penpot/issue/2279)
+- Fix hidden file name on import [Taiga #3172](https://tree.taiga.io/project/penpot/issue/3172)
+- Fix unneccessary scrollbars at the color list [Taiga #3211](https://tree.taiga.io/project/penpot/issue/3211)
+- "Show in exports" is showing in multiselections [Taiga #3194](https://tree.taiga.io/project/penpot/issue/3194)
+- Edit file name navigates to the file workspace [Taiga #3183](https://tree.taiga.io/project/penpot/issue/3183)
+- Fix scroll into view behind fixed element [Taiga #3170](https://tree.taiga.io/project/penpot/issue/3170)
+- Fix sidebar icon in viewer mode [Taiga #3184](https://tree.taiga.io/project/penpot/issue/3184)
 - Fix send to back several shapes at a time [Taiga #3077](https://tree.taiga.io/project/penpot/issue/3077)
 - Fix duplicate multi selected elements [Taiga #3155](https://tree.taiga.io/project/penpot/issue/3155)
 - Fix add fills to artboard modify children [Taiga #3151](https://tree.taiga.io/project/penpot/issue/3151)
@@ -81,9 +93,21 @@
 - Fix drag guides to delete target area [#1679](https://github.com/penpot/penpot/issues/1679)
 - Fix undo when rotating groups [Taiga #3136](https://tree.taiga.io/project/penpot/issue/3136)
 - Fix component name in sidebar widget [Taiga #3144](https://tree.taiga.io/project/penpot/issue/3144)
+- Fix resize rotated shape with top&down constraints [Taiga #3167](https://tree.taiga.io/project/penpot/issue/3167)
+- Fix multi user not working [Taiga #3195](https://tree.taiga.io/project/penpot/issue/3195)
 
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
+
+## 1.12.4-beta
+
+### :bug: Bugs fixed
+
+- Fix crash on iOS when displaying viewer [#1522](https://github.com/penpot/penpot/issues/1522)
+- Fix problems with trackpad zoom and scroll in MacOS [#1161](https://github.com/penpot/penpot/issues/1161)
+- Fix problem with copy/paste in Safari [#1209](https://github.com/penpot/penpot/issues/1209)
+- Improved command support for MacOS [Taiga #2789](https://tree.taiga.io/project/penpot/issue/2789)
+- Fix shift+2 shortcut in MacOS with non-english keyboards [Taiga #3038](https://tree.taiga.io/project/penpot/issue/3038)
 
 ## 1.12.3-beta
 

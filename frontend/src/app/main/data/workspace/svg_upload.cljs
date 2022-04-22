@@ -74,6 +74,7 @@
     ;; Color present as attribute
     (uc/color? (str/trim (get-in shape [:svg-attrs :fill])))
     (-> (update :svg-attrs dissoc :fill)
+        (update-in [:svg-attrs :style] dissoc :fill)
         (assoc-in [:fills 0 :fill-color] (-> (get-in shape [:svg-attrs :fill])
                                              (str/trim)
                                              (uc/parse-color))))
@@ -81,17 +82,20 @@
     ;; Color present as style
     (uc/color? (str/trim (get-in shape [:svg-attrs :style :fill])))
     (-> (update-in [:svg-attrs :style] dissoc :fill)
+        (update :svg-attrs dissoc :fill)
         (assoc-in [:fills 0 :fill-color] (-> (get-in shape [:svg-attrs :style :fill])
                                              (str/trim)
                                              (uc/parse-color))))
 
     (get-in shape [:svg-attrs :fill-opacity])
     (-> (update :svg-attrs dissoc :fill-opacity)
+        (update-in [:svg-attrs :style] dissoc :fill-opacity)
         (assoc-in [:fills 0 :fill-opacity] (-> (get-in shape [:svg-attrs :fill-opacity])
                                                (d/parse-double))))
 
     (get-in shape [:svg-attrs :style :fill-opacity])
     (-> (update-in [:svg-attrs :style] dissoc :fill-opacity)
+        (update :svg-attrs dissoc :fill-opacity)
         (assoc-in [:fills 0 :fill-opacity] (-> (get-in shape [:svg-attrs :style :fill-opacity])
                                                (d/parse-double))))))
 
@@ -437,15 +441,14 @@
       ;; all shapes.
       (->> (rx/from (usvg/collect-images svg-data))
            (rx/map (fn [uri]
-                     (d/merge
+                     (merge
                       {:file-id file-id
-                       :is-local true
-                       :url uri}
-
+                       :is-local true}
                       (if (str/starts-with? uri "data:")
                         {:name "image"
                          :content (uu/data-uri->blob uri)}
-                        {:name (uu/uri-name uri)}))))
+                        {:name (uu/uri-name uri)
+                         :url uri}))))
            (rx/mapcat (fn [uri-data]
                         (->> (rp/mutation! (if (contains? uri-data :content)
                                              :upload-file-media-object

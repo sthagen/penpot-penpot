@@ -18,7 +18,6 @@
    [app.main.ui.shapes.rect :as rect]
    [app.main.ui.shapes.text.fontfaces :as ff]
    [app.main.ui.workspace.shapes.bool :as bool]
-   [app.main.ui.workspace.shapes.bounding-box :refer [bounding-box]]
    [app.main.ui.workspace.shapes.common :as common]
    [app.main.ui.workspace.shapes.frame :as frame]
    [app.main.ui.workspace.shapes.group :as group]
@@ -26,7 +25,6 @@
    [app.main.ui.workspace.shapes.svg-raw :as svg-raw]
    [app.main.ui.workspace.shapes.text :as text]
    [app.util.object :as obj]
-   [debug :refer [debug?]]
    [rumext.alpha :as mf]))
 
 (declare shape-wrapper)
@@ -46,7 +44,14 @@
   [props]
   (let [objects       (obj/get props "objects")
         active-frames (obj/get props "active-frames")
-        shapes        (cph/get-immediate-children objects)]
+        shapes        (cph/get-immediate-children objects)
+
+        ;; We group the objects together per frame-id so if an object of a different
+        ;; frame changes won't affect the rendering frame
+        frame-objects
+        (mf/use-memo
+         (mf/deps objects)
+         #(cph/objects-by-frame objects))]
     [:*
      ;; Render font faces only for shapes that are part of the root
      ;; frame but don't belongs to any other frame.
@@ -59,7 +64,7 @@
        (if (cph/frame-shape? item)
          [:& frame-wrapper {:shape item
                             :key (:id item)
-                            :objects objects
+                            :objects (get frame-objects (:id item))
                             :thumbnail? (not (get active-frames (:id item) false))}]
 
          [:& shape-wrapper {:shape item
@@ -69,9 +74,8 @@
   {::mf/wrap [#(mf/memo' % (mf/check-props ["shape"]))]
    ::mf/wrap-props false}
   [props]
-  (let [shape  (obj/get props "shape")
+  (let [shape (obj/get props "shape")
         opts  #js {:shape shape}]
-
     (when (and (some? shape) (not (:hidden shape)))
       [:*
        (case (:type shape)
@@ -87,10 +91,7 @@
          ;; Only used when drawing a new frame.
          :frame [:> frame-wrapper opts]
 
-         nil)
-
-       (when (debug? :bounding-boxes)
-         [:> bounding-box opts])])))
+         nil)])))
 
 (def group-wrapper (group/group-wrapper-factory shape-wrapper))
 (def svg-raw-wrapper (svg-raw/svg-raw-wrapper-factory shape-wrapper))

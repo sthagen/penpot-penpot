@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"PO-Revision-Date: 2022-03-22 11:53+0000\n"
+"PO-Revision-Date: 2022-04-01 07:10+0000\n"
 "Last-Translator: bingling_sama <bingling_sama@qq.com>\n"
 "Language-Team: Chinese (Simplified) "
 "<https://hosted.weblate.org/projects/penpot/frontend/zh_Hans/>\n"
@@ -77,7 +77,7 @@ msgstr "使用LDAP登录"
 
 #: src/app/main/ui/auth/login.cljs
 msgid "auth.login-with-oidc-submit"
-msgstr "使用OpenID (SSO)登录"
+msgstr "使用OpenID登录"
 
 #: src/app/main/ui/auth/recovery.cljs
 msgid "auth.new-password"
@@ -253,8 +253,28 @@ msgstr "现在尚无文件。如果你想尝试一些模板，请点击[库和�
 msgid "dashboard.export-frames"
 msgstr "导出画板到PDF..."
 
+#: src/app/main/ui/export.cljs
+msgid "dashboard.export-frames.title"
+msgstr "导出为PDF"
+
 msgid "dashboard.export-multi"
 msgstr "导出 %s 个文件"
+
+#: src/app/main/ui/export.cljs
+msgid "dashboard.export-shapes.how-to"
+msgstr "你可以在设计选项中为元素添加导出设置（位于右侧边栏底部）"
+
+#: src/app/main/ui/export.cljs
+msgid "dashboard.export-shapes.how-to-link"
+msgstr "如何使用Penpot导出"
+
+#: src/app/main/ui/export.cljs
+msgid "dashboard.export-shapes.no-elements"
+msgstr "导出设置中无任何元素"
+
+#: src/app/main/ui/export.cljs
+msgid "dashboard.export-shapes.title"
+msgstr "导出已选中"
 
 msgid "dashboard.export-single"
 msgstr "导出文件"
@@ -262,9 +282,8 @@ msgstr "导出文件"
 msgid "dashboard.export.detail"
 msgstr "* 可能包含组件、图形、颜色和/或排版。"
 
-#, fuzzy
 msgid "dashboard.export.explain"
-msgstr "你想导出的一个或多个文件用到了共享库。你想怎么处理它们的涉及资产？"
+msgstr "你想导出的一个或多个文件用到了共享库。你想怎么处理它们的素材？"
 
 msgid "dashboard.export.options.all.message"
 msgstr "使用了共享库的文件将会在导出时保持引用"
@@ -272,8 +291,14 @@ msgstr "使用了共享库的文件将会在导出时保持引用"
 msgid "dashboard.export.options.all.title"
 msgstr "导出共享库"
 
+msgid "dashboard.export.options.detach.message"
+msgstr "导出文件中将不包含共享库，素材也不会被添加到库中。 "
+
 msgid "dashboard.export.options.detach.title"
 msgstr "将共享库素材作为基本对象"
+
+msgid "dashboard.export.options.merge.message"
+msgstr "导出您的文件时所有的外部素材将会被合并到库中。"
 
 msgid "dashboard.export.options.merge.title"
 msgstr "将共享库素材加入文件库"
@@ -283,6 +308,10 @@ msgstr "导出文档"
 
 msgid "dashboard.fonts.deleted-placeholder"
 msgstr "字体已删除"
+
+#: src/app/main/ui/dashboard/fonts.cljs
+msgid "dashboard.fonts.dismiss-all"
+msgstr "全部取消"
 
 msgid "dashboard.fonts.empty-placeholder"
 msgstr "您仍然没有已安装的字体。"
@@ -332,6 +361,9 @@ msgstr "处理组件中"
 
 msgid "dashboard.import.progress.process-media"
 msgstr "处理视频中"
+
+msgid "dashboard.import.progress.process-page"
+msgstr "处理页面中：%s"
 
 msgid "dashboard.import.progress.process-typographies"
 msgstr "处理字体中"
@@ -557,7 +589,6 @@ msgid "ds.confirm-title"
 msgstr "你确定？"
 
 #: src/app/main/ui/dashboard/grid.cljs
-#, fuzzy
 msgid "ds.updated-at"
 msgstr "最后更新：%s"
 
@@ -586,6 +617,9 @@ msgstr "电子邮件“%s”收到了非常多的永久退信报告。"
 #: src/app/main/ui/settings/change_email.cljs
 msgid "errors.email-invalid-confirmation"
 msgstr "确认电子邮件必须保持一致"
+
+msgid "errors.email-spam-or-permanent-bounces"
+msgstr "此邮箱[%s]已被标记为垃圾邮件或已被永久拉黑。"
 
 #: src/app/main/ui/auth/verify_token.cljs, src/app/main/ui/settings/feedback.cljs, src/app/main/ui/dashboard/team.cljs
 msgid "errors.generic"
@@ -640,6 +674,15 @@ msgstr "你设置了邮件免打扰（报告垃圾邮件或者多次退信）。
 #: src/app/main/ui/auth/register.cljs
 msgid "errors.registration-disabled"
 msgstr "当前禁止注册。"
+
+msgid "errors.team-leave.insufficient-members"
+msgstr "离开团队后成员不足，您是否要将其删除？"
+
+msgid "errors.team-leave.member-does-not-exists"
+msgstr "您尝试分配的成员不存在。"
+
+msgid "errors.team-leave.owner-cant-leave"
+msgstr "所有者不能离开团队，您必须转让所有者角色。"
 
 msgid "errors.terms-privacy-agreement-invalid"
 msgstr "你必须接受我们的使用条例和隐私政策。"
@@ -884,6 +927,9 @@ msgstr "码"
 msgid "handoff.tabs.code.selected.circle"
 msgstr "圆"
 
+msgid "handoff.tabs.code.selected.component"
+msgstr "组件"
+
 msgid "handoff.tabs.code.selected.curve"
 msgstr "曲线"
 
@@ -895,6 +941,9 @@ msgstr "编组"
 
 msgid "handoff.tabs.code.selected.image"
 msgstr "图片"
+
+msgid "handoff.tabs.code.selected.mask"
+msgstr "蒙版"
 
 #: src/app/main/ui/handoff/right_sidebar.cljs
 msgid "handoff.tabs.code.selected.multiple"
@@ -918,6 +967,10 @@ msgstr "信息"
 
 msgid "history.alert-message"
 msgstr "你正在查看%s版本"
+
+#: src/app/main/ui/dashboard/sidebar.cljs
+msgid "labels.about-penpot"
+msgstr "关于 Penpot"
 
 msgid "labels.accept"
 msgstr "接受"
@@ -948,6 +1001,9 @@ msgstr "取消"
 msgid "labels.centered"
 msgstr "中心"
 
+msgid "labels.close"
+msgstr "关闭"
+
 #: src/app/main/ui/dashboard/comments.cljs
 msgid "labels.comments"
 msgstr "评论"
@@ -958,6 +1014,12 @@ msgstr "确认密码"
 
 msgid "labels.content"
 msgstr "内容"
+
+msgid "labels.continue"
+msgstr "继续"
+
+msgid "labels.continue-with"
+msgstr "继续"
 
 #: src/app/main/ui/workspace/sidebar/assets.cljs
 msgid "labels.create"
@@ -978,6 +1040,9 @@ msgstr "自定义字体"
 msgid "labels.dashboard"
 msgstr "面板"
 
+msgid "labels.default"
+msgstr "默认"
+
 #: src/app/main/ui/dashboard/project_menu.cljs, src/app/main/ui/dashboard/file_menu.cljs
 msgid "labels.delete"
 msgstr "删除"
@@ -989,6 +1054,10 @@ msgstr "删除该评论"
 #: src/app/main/ui/comments.cljs
 msgid "labels.delete-comment-thread"
 msgstr "删除该讨论串"
+
+#: src/app/main/ui/dashboard/team.cljs
+msgid "labels.delete-invitation"
+msgstr "删除邀请"
 
 #: src/app/main/ui/dashboard/file_menu.cljs
 msgid "labels.delete-multi-files"
@@ -1002,6 +1071,9 @@ msgstr "草稿"
 msgid "labels.edit"
 msgstr "编辑"
 
+msgid "labels.edit-file"
+msgstr "编辑文档"
+
 #: src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/team.cljs
 msgid "labels.editor"
 msgstr "编辑者"
@@ -1009,6 +1081,13 @@ msgstr "编辑者"
 #: src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/team.cljs
 msgid "labels.email"
 msgstr "电子邮件"
+
+#: src/app/main/ui/dashboard/team.cljs
+msgid "labels.expired-invitation"
+msgstr "已到期"
+
+msgid "labels.export"
+msgstr "导出"
 
 #: src/app/main/ui/settings/feedback.cljs
 msgid "labels.feedback-disabled"
@@ -1037,6 +1116,10 @@ msgstr "提交反馈"
 msgid "labels.go-back"
 msgstr "返回"
 
+#: src/app/main/ui/dashboard/sidebar.cljs
+msgid "labels.help-center"
+msgstr "帮助中心"
+
 #: src/app/main/ui/workspace/comments.cljs, src/app/main/ui/viewer/header.cljs
 msgid "labels.hide-resolved-comments"
 msgstr "隐藏已决定的评论"
@@ -1058,9 +1141,20 @@ msgstr "发生了一些不妙的事。请尝试重新操作。如果问题仍然
 msgid "labels.internal-error.main-message"
 msgstr "内部错误"
 
+#: src/app/main/ui/settings/sidebar.cljs, src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/sidebar.cljs
+msgid "labels.invitations"
+msgstr "邀请"
+
 #: src/app/main/ui/settings/options.cljs
 msgid "labels.language"
 msgstr "语言"
+
+#: src/app/main/ui/dashboard/sidebar.cljs
+msgid "labels.libraries-and-templates"
+msgstr "库&模板"
+
+msgid "labels.link"
+msgstr "链接"
 
 #: src/app/main/ui/settings.cljs, src/app/main/ui/dashboard/sidebar.cljs
 msgid "labels.logout"
@@ -1068,6 +1162,10 @@ msgstr "登出"
 
 msgid "labels.manage-fonts"
 msgstr "管理字体"
+
+#: src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/sidebar.cljs
+msgid "labels.member"
+msgstr "成员"
 
 #: src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/sidebar.cljs
 msgid "labels.members"
@@ -1081,9 +1179,20 @@ msgstr "名字"
 msgid "labels.new-password"
 msgstr "新密码"
 
+msgid "labels.next"
+msgstr "下一个"
+
 #: src/app/main/ui/workspace/comments.cljs, src/app/main/ui/dashboard/comments.cljs
 msgid "labels.no-comments-available"
 msgstr "没有待表决的评论通知"
+
+#: src/app/main/ui/dashboard/team.cljs
+msgid "labels.no-invitations"
+msgstr "没有邀请。"
+
+#: src/app/main/ui/dashboard/team.cljs
+msgid "labels.no-invitations-hint"
+msgstr "点击\"邀请加入团队\"，邀请更多成员加入这个团队。"
 
 #: src/app/main/ui/static.cljs
 msgid "labels.not-found.auth-info"
@@ -1134,6 +1243,10 @@ msgid "labels.password"
 msgstr "密码"
 
 #: src/app/main/ui/dashboard/team.cljs
+msgid "labels.pending-invitation"
+msgstr "待办"
+
+#: src/app/main/ui/dashboard/team.cljs
 msgid "labels.permissions"
 msgstr "许可"
 
@@ -1156,6 +1269,10 @@ msgstr "發行說明"
 msgid "labels.remove"
 msgstr "移除"
 
+#: src/app/main/ui/dashboard/team.cljs
+msgid "labels.remove-member"
+msgstr "删除成员"
+
 #: src/app/main/ui/dashboard/sidebar.cljs, src/app/main/ui/dashboard/project_menu.cljs, src/app/main/ui/dashboard/file_menu.cljs
 msgid "labels.rename"
 msgstr "重命名"
@@ -1163,6 +1280,10 @@ msgstr "重命名"
 #: src/app/main/ui/dashboard/team_form.cljs
 msgid "labels.rename-team"
 msgstr "重命名团队"
+
+#: src/app/main/ui/dashboard/team.cljs
+msgid "labels.resend-invitation"
+msgstr "重新发送邀请"
 
 #: src/app/main/ui/static.cljs, src/app/main/ui/static.cljs, src/app/main/ui/static.cljs
 msgid "labels.retry"
@@ -1217,6 +1338,16 @@ msgstr "只显示你的评论"
 msgid "labels.sign-out"
 msgstr "登出"
 
+msgid "labels.skip"
+msgstr "跳过"
+
+msgid "labels.start"
+msgstr "开始"
+
+#: src/app/main/ui/dashboard/team.cljs
+msgid "labels.status"
+msgstr "状态"
+
 #: src/app/main/ui/settings/profile.cljs
 msgid "labels.update"
 msgstr "更新"
@@ -1238,9 +1369,20 @@ msgstr "正在上传…"
 msgid "labels.viewer"
 msgstr "查看者"
 
+msgid "labels.workspace"
+msgstr "工作区"
+
 #: src/app/main/ui/comments.cljs
 msgid "labels.write-new-comment"
 msgstr "写一条新评论"
+
+#: src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/team.cljs, src/app/main/ui/dashboard/sidebar.cljs
+msgid "labels.you"
+msgstr "(你)"
+
+#: src/app/main/ui/dashboard/sidebar.cljs
+msgid "labels.your-account"
+msgstr "你的账户"
 
 #: src/app/main/data/workspace/persistence.cljs, src/app/main/data/workspace/persistence.cljs, src/app/main/data/media.cljs
 msgid "media.loading"
@@ -1277,6 +1419,10 @@ msgstr "修改电子邮件"
 #: src/app/main/ui/settings/change_email.cljs
 msgid "modals.change-email.title"
 msgstr "修改你的电子邮件"
+
+#: src/app/main/ui/dashboard/sidebar.cljs
+msgid "modals.change-owner-and-leave-confirm.message"
+msgstr "你是此团队的所有者。在你离开团队之前，请选择其他成员晋升为所有者。"
 
 #: src/app/main/ui/settings/delete_account.cljs
 msgid "modals.delete-account.cancel"
@@ -1390,16 +1536,27 @@ msgstr "删除团队成员"
 msgid "modals.invite-member-confirm.accept"
 msgstr "发送邀请"
 
+msgid "modals.invite-member.emails"
+msgstr "电子邮件，以逗号分隔"
+
 #: src/app/main/ui/dashboard/team.cljs
 msgid "modals.invite-member.title"
 msgstr "邀请加入团队"
+
+#: src/app/main/ui/dashboard/sidebar.cljs
+msgid "modals.leave-and-close-confirm.hint"
+msgstr "由于你是这个团队的唯一成员，这个团队将连同其项目和文件一起被删除。"
+
+#: src/app/main/ui/dashboard/sidebar.cljs
+msgid "modals.leave-and-close-confirm.message"
+msgstr "您确定要离开 %s 团队吗？"
 
 msgid "modals.leave-and-reassign.forbiden"
 msgstr "如果不能推选另一个成员作为团队所有者，你就无法离开团队。你或许想要删除该团队。"
 
 #: src/app/main/ui/dashboard/sidebar.cljs
 msgid "modals.leave-and-reassign.hint1"
-msgstr "你是%s的所有者。"
+msgstr "你是此团队的所有者。在你离开团队之前，请选择其他成员晋升为所有者。"
 
 #: src/app/main/ui/dashboard/sidebar.cljs
 msgid "modals.leave-and-reassign.hint2"
@@ -1415,7 +1572,7 @@ msgstr "选择一位成员晋升"
 
 #: src/app/main/ui/dashboard/sidebar.cljs
 msgid "modals.leave-and-reassign.title"
-msgstr "选择一位成员晋升"
+msgstr "在你离开之前"
 
 #: src/app/main/ui/dashboard/sidebar.cljs
 msgid "modals.leave-confirm.accept"
@@ -1431,15 +1588,19 @@ msgstr "正在退出团队"
 
 #: src/app/main/ui/dashboard/team.cljs
 msgid "modals.promote-owner-confirm.accept"
-msgstr "晋升"
+msgstr "转让所有权"
+
+#: src/app/main/ui/dashboard/team.cljs
+msgid "modals.promote-owner-confirm.hint"
+msgstr "如果你转移所有权，你的角色将变为管理员，失去对这个团队的一些权限。 "
 
 #: src/app/main/ui/dashboard/team.cljs
 msgid "modals.promote-owner-confirm.message"
-msgstr "你确定想要晋升该用户为所有者？"
+msgstr "您是此团队的所有者，你确定想要将所有者转让给该成员？"
 
 #: src/app/main/ui/dashboard/team.cljs
 msgid "modals.promote-owner-confirm.title"
-msgstr "晋升为所有者"
+msgstr "新增团队所有者"
 
 #: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
 msgid "modals.remove-shared-confirm.accept"
@@ -1452,6 +1613,14 @@ msgstr "一旦不再作为共享库，该文档库就不能继续用于你的其
 #: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
 msgid "modals.remove-shared-confirm.message"
 msgstr "不再将“%s”作为共享库"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/component.cljs, src/app/main/ui/workspace/context_menu.cljs
+msgid "modals.update-remote-component-in-bulk.hint"
+msgstr "你即将更新共享库中的组件，这可能会影响使用这些组件的其他文档"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/component.cljs, src/app/main/ui/workspace/context_menu.cljs
+msgid "modals.update-remote-component-in-bulk.message"
+msgstr "更新共享库组件"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/component.cljs, src/app/main/ui/workspace/context_menu.cljs
 msgid "modals.update-remote-component.accept"
@@ -1484,6 +1653,106 @@ msgstr "个人资料保存成功！"
 #: src/app/main/ui/settings/change_email.cljs
 msgid "notifications.validation-email-sent"
 msgstr "验证邮件已发至%s。请检查电子邮箱！"
+
+msgid "onboarding.choice.desc"
+msgstr "想要如何开始？"
+
+msgid "onboarding.choice.fly-solo"
+msgstr "单飞"
+
+msgid "onboarding.choice.fly-solo-desc"
+msgstr "跳转到Penpot并开始进行您自己的设计。"
+
+msgid "onboarding.choice.team-up"
+msgstr "组建团队"
+
+msgid "onboarding.choice.team-up-desc"
+msgstr "你在和别人合作吗？创建一个团队，邀请成员参与合作，共享设计素材。"
+
+msgid "onboarding.choice.title"
+msgstr "欢迎来到Penpot"
+
+msgid "onboarding.contrib.alt"
+msgstr "开源"
+
+msgid "onboarding.contrib.desc1"
+msgstr "Penpot是开源的，由社区制作并为社区服务。如果你想合作，我们非常欢迎!"
+
+msgid "onboarding.contrib.desc2.1"
+msgstr "您可以访问"
+
+msgid "onboarding.contrib.desc2.2"
+msgstr "并遵循贡献说明:)"
+
+msgid "onboarding.slide.0.alt"
+msgstr "创作设计"
+
+msgid "onboarding.slide.0.desc1"
+msgstr "在协作项目中与团队成员们一起创作漂亮的用户界面"
+
+msgid "onboarding.slide.0.desc2"
+msgstr "保持组件、库和设计系统规模上的一致性。"
+
+msgid "onboarding.slide.0.title"
+msgstr "设计库、样式和组件"
+
+msgid "onboarding.slide.1.alt"
+msgstr "交互式原型"
+
+msgid "onboarding.slide.1.desc1"
+msgstr "创建丰富的交互以模拟产品行为。"
+
+msgid "onboarding.slide.1.desc2"
+msgstr "分享给利益相关者，向你的团队提出建议，并开始对你的设计进行用户测试，仅仅使用Penpot即可。"
+
+msgid "onboarding.slide.1.title"
+msgstr "通过交互使您的设计栩栩如生"
+
+msgid "onboarding.slide.2.alt"
+msgstr "获取反馈"
+
+msgid "onboarding.slide.2.title"
+msgstr "获取反馈、展示和分享您的工作"
+
+msgid "onboarding.slide.3.alt"
+msgstr "协作且低代码"
+
+msgid "onboarding.slide.3.desc1"
+msgstr "同步你所有组件和样式的设计和代码，并获得代码片段。"
+
+msgid "onboarding.slide.3.desc2"
+msgstr "获取并提供代码规范，如标记（SVG、HTML）或样式（CSS、Less、Stylus...）。"
+
+msgid "onboarding.slide.3.title"
+msgstr "一个共享的事实来源"
+
+msgid "onboarding.team-input-placeholder"
+msgstr "输入新团队名称"
+
+msgid "onboarding.team.skip-and-invite-later"
+msgstr "跳过并稍后邀请"
+
+msgid "onboarding.templates.subtitle"
+msgstr "这里有一些模板。"
+
+msgid "onboarding.templates.title"
+msgstr "开始设计"
+
+msgid "onboarding.welcome.alt"
+msgstr "Penpot"
+
+msgid "onboarding.welcome.desc1"
+msgstr "Hooray!你已经是Penpot的用户了 :)"
+
+#, fuzzy
+msgid "onboarding.welcome.desc2"
+msgstr "Penpot处于第一个测试版，这要归功于核心功能，成熟度，稳定性和整个社区的惊人验证的组合，我们非常欢迎您。"
+
+msgid "onboarding.welcome.desc3"
+msgstr "当你享受Penpot的时候，我们将不断改进它，发布我们希望的计划的迭代。"
+
+msgid "onboarding.welcome.title"
+msgstr "欢迎来到Penpot"
 
 #: src/app/main/ui/auth/recovery.cljs
 msgid "profile.recovery.go-to-login"
@@ -1538,6 +1807,10 @@ msgid "title.settings.profile"
 msgstr "个人资料 - Penpot"
 
 #: src/app/main/ui/dashboard/team.cljs
+msgid "title.team-invitations"
+msgstr "邀请函 - %s - Penpot"
+
+#: src/app/main/ui/dashboard/team.cljs
 msgid "title.team-members"
 msgstr "成员 - %s - Penpot"
 
@@ -1553,6 +1826,12 @@ msgstr "%s - 预览模式）- Penpot"
 msgid "title.workspace"
 msgstr "%s - Penpot"
 
+msgid "viewer.breaking-change.description"
+msgstr "此共享的链接已失效。创建一个新的链接或向所有者索取一个新的链接。"
+
+msgid "viewer.breaking-change.message"
+msgstr "Sorry!"
+
 #: src/app/main/ui/handoff.cljs, src/app/main/ui/viewer.cljs
 msgid "viewer.empty-state"
 msgstr "该页面上未找到任何画框。"
@@ -1560,6 +1839,9 @@ msgstr "该页面上未找到任何画框。"
 #: src/app/main/ui/handoff.cljs, src/app/main/ui/viewer.cljs
 msgid "viewer.frame-not-found"
 msgstr "画框未找到。"
+
+msgid "viewer.header.comments-section"
+msgstr "注释 （%s）"
 
 #: src/app/main/ui/viewer/header.cljs
 msgid "viewer.header.dont-show-interactions"
@@ -1577,9 +1859,15 @@ msgstr "编辑页面"
 msgid "viewer.header.fullscreen"
 msgstr "全屏"
 
+msgid "viewer.header.handoff-section"
+msgstr "交接 (%s)"
+
 #: src/app/main/ui/viewer/header.cljs
 msgid "viewer.header.interactions"
 msgstr "交互"
+
+msgid "viewer.header.interactions-section"
+msgstr "交互 （%s）"
 
 #: src/app/main/ui/viewer/header.cljs
 msgid "viewer.header.share.copy-link"
@@ -1770,6 +2058,18 @@ msgstr "文本变换"
 msgid "workspace.assets.ungroup"
 msgstr "解组"
 
+msgid "workspace.focus.focus-mode"
+msgstr "禅模式"
+
+msgid "workspace.focus.focus-off"
+msgstr "退出禅模式"
+
+msgid "workspace.focus.focus-on"
+msgstr "关注"
+
+msgid "workspace.focus.selection"
+msgstr "选择"
+
 #: src/app/main/data/workspace/libraries.cljs, src/app/main/ui/components/color_bullet.cljs
 msgid "workspace.gradients.linear"
 msgstr "线性渐变"
@@ -1791,6 +2091,13 @@ msgid "workspace.header.menu.disable-snap-grid"
 msgstr "禁用吸附到网格"
 
 #: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.menu.disable-snap-guides"
+msgstr "禁用与参考线对齐"
+
+msgid "workspace.header.menu.disable-snap-pixel-grid"
+msgstr "禁用像素对齐"
+
+#: src/app/main/ui/workspace/header.cljs
 msgid "workspace.header.menu.enable-dynamic-alignment"
 msgstr "启用动态对齐"
 
@@ -1801,6 +2108,17 @@ msgstr "启用缩放文本"
 #: src/app/main/ui/workspace/header.cljs
 msgid "workspace.header.menu.enable-snap-grid"
 msgstr "吸附到网格"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.menu.enable-snap-guides"
+msgstr "与参考线对齐"
+
+msgid "workspace.header.menu.enable-snap-pixel-grid"
+msgstr "启用像素对齐"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.menu.hide-artboard-names"
+msgstr "隐藏画板名称"
 
 #: src/app/main/ui/workspace/header.cljs
 msgid "workspace.header.menu.hide-assets"
@@ -1818,13 +2136,40 @@ msgstr "隐藏图层"
 msgid "workspace.header.menu.hide-palette"
 msgstr "隐藏调色盘"
 
+msgid "workspace.header.menu.hide-pixel-grid"
+msgstr "隐藏像素网格"
+
 #: src/app/main/ui/workspace/header.cljs
 msgid "workspace.header.menu.hide-rules"
 msgstr "隐藏标尺"
 
 #: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.menu.hide-textpalette"
+msgstr "隐藏字体调色板"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.menu.option.edit"
+msgstr "编辑"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.menu.option.file"
+msgstr "文件"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.menu.option.preferences"
+msgstr "首选项"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.menu.option.view"
+msgstr "视图"
+
+#: src/app/main/ui/workspace/header.cljs
 msgid "workspace.header.menu.select-all"
 msgstr "全选"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.menu.show-artboard-names"
+msgstr "显示画板名称"
 
 #: src/app/main/ui/workspace/header.cljs
 msgid "workspace.header.menu.show-assets"
@@ -1842,9 +2187,20 @@ msgstr "显示图层"
 msgid "workspace.header.menu.show-palette"
 msgstr "显示调色盘"
 
+msgid "workspace.header.menu.show-pixel-grid"
+msgstr "显示像素网格"
+
 #: src/app/main/ui/workspace/header.cljs
 msgid "workspace.header.menu.show-rules"
 msgstr "显示标尺"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.menu.show-textpalette"
+msgstr "显示字体调色板"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.reset-zoom"
+msgstr "重置"
 
 #: src/app/main/ui/workspace/header.cljs
 msgid "workspace.header.save-error"
@@ -1866,6 +2222,18 @@ msgstr "未保存的修改"
 msgid "workspace.header.viewer"
 msgstr "预览模式（%s）"
 
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.zoom-fill"
+msgstr "填充 - 填充比例"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.zoom-fit-all"
+msgstr "缩放以适应所有"
+
+#: src/app/main/ui/workspace/header.cljs
+msgid "workspace.header.zoom-full-screen"
+msgstr "全屏"
+
 #: src/app/main/ui/workspace/libraries.cljs
 msgid "workspace.libraries.add"
 msgstr "添加"
@@ -1882,9 +2250,21 @@ msgstr "大缩略图"
 msgid "workspace.libraries.colors.file-library"
 msgstr "文档库"
 
+#: src/app/main/ui/workspace/colorpicker.cljs
+msgid "workspace.libraries.colors.hsv"
+msgstr "HSV"
+
 #: src/app/main/ui/workspace/colorpicker/libraries.cljs, src/app/main/ui/workspace/colorpalette.cljs
 msgid "workspace.libraries.colors.recent-colors"
 msgstr "最近使用的颜色"
+
+#: src/app/main/ui/workspace/colorpicker.cljs
+msgid "workspace.libraries.colors.rgb-complementary"
+msgstr "RGB互补"
+
+#: src/app/main/ui/workspace/colorpicker.cljs
+msgid "workspace.libraries.colors.rgba"
+msgstr "RGBA"
 
 #: src/app/main/ui/workspace/colorpicker.cljs
 msgid "workspace.libraries.colors.save-color"
@@ -1970,6 +2350,10 @@ msgstr "我的库"
 msgid "workspace.library.store"
 msgstr "来自商店的库"
 
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.add-interaction"
+msgstr "单击 + 按钮以添加交互。"
+
 msgid "workspace.options.blur-options.background-blur"
 msgstr "背景"
 
@@ -2045,6 +2429,10 @@ msgid "workspace.options.export"
 msgstr "导出"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/exports.cljs, src/app/main/ui/handoff/exports.cljs
+msgid "workspace.options.export-multiple"
+msgstr "导出已选择"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/exports.cljs, src/app/main/ui/handoff/exports.cljs
 msgid "workspace.options.export-object"
 msgstr "导出形状"
 
@@ -2055,6 +2443,14 @@ msgstr "后缀"
 #: src/app/main/ui/workspace/sidebar/options/menus/exports.cljs, src/app/main/ui/handoff/exports.cljs
 msgid "workspace.options.exporting-object"
 msgstr "正在导出…"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/exports.cljs, src/app/main/ui/handoff/exports.cljs, src/app/main/ui/workspace/header.cljs
+msgid "workspace.options.exporting-object-error"
+msgstr "导出失败"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/exports.cljs, src/app/main/ui/handoff/exports.cljs, src/app/main/ui/workspace/header.cljs
+msgid "workspace.options.exporting-object-slow"
+msgstr "导出速度意外缓慢"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/fill.cljs
 msgid "workspace.options.fill"
@@ -2067,6 +2463,9 @@ msgstr "自动"
 #: src/app/main/ui/workspace/sidebar/options/menus/frame_grid.cljs
 msgid "workspace.options.grid.column"
 msgstr "列"
+
+msgid "workspace.options.grid.params.color"
+msgstr "颜色"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/frame_grid.cljs
 msgid "workspace.options.grid.params.columns"
@@ -2152,6 +2551,209 @@ msgstr "编组填充"
 msgid "workspace.options.group-stroke"
 msgstr "编组边框"
 
+msgid "workspace.options.height"
+msgstr "高度"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-action"
+msgstr "执行"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-after-delay"
+msgstr "延迟后"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-animation"
+msgstr "动画"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-animation-dissolve"
+msgstr "解散"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-animation-none"
+msgstr "无"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-animation-push"
+msgstr "推送"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-animation-slide"
+msgstr "滑动"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-background"
+msgstr "添加背景覆盖"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-close-outside"
+msgstr "点击外部时关闭"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-close-overlay"
+msgstr "关闭覆盖"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-delay"
+msgstr "延迟"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-destination"
+msgstr "目的地"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-easing"
+msgstr "平滑"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-easing-ease"
+msgstr "缓解"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-easing-ease-in"
+msgstr "缓入"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-easing-ease-in-out"
+msgstr "缓进缓出"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-easing-ease-out"
+msgstr "缓出"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-easing-linear"
+msgstr "线性"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-in"
+msgstr "在"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-mouse-enter"
+msgstr "鼠标进入"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-mouse-leave"
+msgstr "鼠标离开"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-ms"
+msgstr "ms"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-navigate-to"
+msgstr "导航至"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-navigate-to-dest"
+msgstr "导航到： %s"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-none"
+msgstr "(未设定)"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-offset-effect"
+msgstr "偏移效果"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-on-click"
+msgstr "点击时"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-open-overlay"
+msgstr "打开叠加层"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-open-overlay-dest"
+msgstr "打开覆盖：%s"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-open-url"
+msgstr "打开网址"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-out"
+msgstr "外"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-pos-bottom-center"
+msgstr "底部中心"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-pos-bottom-left"
+msgstr "左下角"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-pos-bottom-right"
+msgstr "右下角"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-pos-center"
+msgstr "中心"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-pos-manual"
+msgstr "手册"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-pos-top-center"
+msgstr "顶部中心"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-pos-top-left"
+msgstr "左上角"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-pos-top-right"
+msgstr "右上角"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-position"
+msgstr "位置"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-preserve-scroll"
+msgstr "保留滚动位置"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-prev-screen"
+msgstr "上一个屏幕"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-self"
+msgstr "自己"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-toggle-overlay"
+msgstr "切换覆盖层"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-toggle-overlay-dest"
+msgstr "切换覆盖：%s"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-trigger"
+msgstr "触发器"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-url"
+msgstr "URL"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-while-hovering"
+msgstr "悬停时"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-while-pressing"
+msgstr "按下时"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interactions"
+msgstr "交互"
+
 #: src/app/main/ui/workspace/sidebar/options/menus/layer.cljs
 msgid "workspace.options.layer-options.blend-mode.color"
 msgstr "颜色"
@@ -2228,6 +2830,9 @@ msgstr "图层成组"
 msgid "workspace.options.layer-options.title.multiple"
 msgstr "已选中的图层"
 
+msgid "workspace.options.opacity"
+msgstr "不透明度"
+
 #: src/app/main/ui/workspace/sidebar/options/shapes/frame.cljs, src/app/main/ui/workspace/sidebar/options/menus/measures.cljs
 msgid "workspace.options.position"
 msgstr "位置"
@@ -2247,9 +2852,19 @@ msgstr "所有角"
 msgid "workspace.options.radius.single-corners"
 msgstr "单个角"
 
+msgid "workspace.options.recent-fonts"
+msgstr "最近的"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/exports.cljs, src/app/main/ui/handoff/exports.cljs, src/app/main/ui/workspace/header.cljs
+msgid "workspace.options.retry"
+msgstr "重试"
+
 #: src/app/main/ui/workspace/sidebar/options/menus/measures.cljs
 msgid "workspace.options.rotation"
 msgstr "旋转"
+
+msgid "workspace.options.search-font"
+msgstr "搜索字体"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
 msgid "workspace.options.select-a-shape"
@@ -2270,6 +2885,9 @@ msgstr "选项边框"
 #: src/app/main/ui/workspace/sidebar/options/menus/shadow.cljs
 msgid "workspace.options.shadow-options.blur"
 msgstr "模糊"
+
+msgid "workspace.options.shadow-options.color"
+msgstr "阴影颜色"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/shadow.cljs
 msgid "workspace.options.shadow-options.drop-shadow"
@@ -2303,6 +2921,10 @@ msgstr "编组阴影"
 msgid "workspace.options.shadow-options.title.multiple"
 msgstr "选项阴影"
 
+#: src/app/main/ui/workspace/sidebar/options/menus/fill.cljs
+msgid "workspace.options.show-fill-on-export"
+msgstr "在导出中显示"
+
 #: src/app/main/ui/workspace/sidebar/options/shapes/frame.cljs, src/app/main/ui/workspace/sidebar/options/menus/measures.cljs
 msgid "workspace.options.size"
 msgstr "尺寸"
@@ -2314,6 +2936,14 @@ msgstr "尺寸预设"
 #: src/app/main/ui/workspace/sidebar/options/menus/stroke.cljs
 msgid "workspace.options.stroke"
 msgstr "边框"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/stroke.cljs
+msgid "workspace.options.stroke-cap.circle-marker"
+msgstr "圆形标记"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/stroke.cljs
+msgid "workspace.options.stroke-cap.diamond-marker"
+msgstr "钻石标记"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/stroke.cljs
 msgid "workspace.options.stroke.center"

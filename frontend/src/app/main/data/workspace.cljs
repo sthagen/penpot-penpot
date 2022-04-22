@@ -43,6 +43,7 @@
    [app.main.data.workspace.selection :as dws]
    [app.main.data.workspace.state-helpers :as wsh]
    [app.main.data.workspace.svg-upload :as svg]
+   [app.main.data.workspace.thumbnails :as dwth]
    [app.main.data.workspace.transforms :as dwt]
    [app.main.data.workspace.undo :as dwu]
    [app.main.data.workspace.zoom :as dwz]
@@ -195,7 +196,8 @@
     ptk/WatchEvent
     (watch [_ state _]
       (if (contains? (get-in state [:workspace-data :pages-index]) page-id)
-        (rx/of (dwp/preload-data-uris))
+        (rx/of (dwp/preload-data-uris)
+               (dwth/watch-state-changes))
         (let [default-page-id (get-in state [:workspace-data :pages 0])]
           (rx/of (go-to-page default-page-id)))))
 
@@ -964,18 +966,23 @@
   (ptk/reify ::toggle-file-thumbnail-selected
     ptk/WatchEvent
     (watch [_ state _]
-      (let [selected (wsh/lookup-selected state)
-            pages    (-> state :workspace-data :pages-index vals)
-            extract  (fn [{:keys [objects id] :as page}]
-                       (->> (cph/get-frames objects)
-                            (filter :file-thumbnail)
-                            (map :id)
-                            (remove selected)
-                            (map (fn [frame-id] [id frame-id]))))]
+      (let [selected   (wsh/lookup-selected state)
+            pages      (-> state :workspace-data :pages-index vals)
+            get-frames (fn [{:keys [objects id] :as page}]
+                         (->> (cph/get-frames objects)
+                              (sequence
+                               (comp (filter :use-for-thumbnail?)
+                                     (map :id)
+                                     (remove selected)
+                                     (map (partial vector id))))))]
+
         (rx/concat
-         (rx/from (for [[page-id frame-id] (mapcat extract pages)]
-                    (dch/update-shapes [frame-id] #(dissoc % :file-thumbnail) page-id nil)))
-         (rx/of (dch/update-shapes selected #(assoc % :file-thumbnail true))))))))
+         (rx/from
+          (->> (mapcat get-frames pages)
+               (d/group-by first second)
+               (map (fn [[page-id frame-ids]]
+                      (dch/update-shapes frame-ids #(dissoc % :use-for-thumbnail?) {:page-id page-id})))))
+         (rx/of (dch/update-shapes selected #(update % :use-for-thumbnail? not))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Navigation
@@ -1733,7 +1740,6 @@
 (dm/export dws/shift-select-shapes)
 
 ;; Groups
-
 (dm/export dwg/mask-group)
 (dm/export dwg/unmask-group)
 (dm/export dwg/group-selected)
@@ -1762,3 +1768,6 @@
 (dm/export dwz/decrease-zoom)
 (dm/export dwz/increase-zoom)
 (dm/export dwz/set-zoom)
+
+;; Thumbnails
+(dm/export dwth/update-thumbnail)

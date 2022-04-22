@@ -144,6 +144,7 @@
                                     :id (:fill-color-ref-id value)
                                     :file-id (:fill-color-ref-file value)
                                     :gradient (:fill-color-gradient value)}
+                            :key index
                             :index index
                             :title (tr "workspace.options.fill")
                             :on-change (on-change index)
@@ -155,7 +156,7 @@
                             :on-blur on-blur}])])
 
         (when (or (= type :frame)
-                  (and (= type :multiple) (some? hide-fill-on-export?)))
+                  (and (= type :multiple) (some? (:hide-fill-on-export values))))
           [:div.input-checkbox
            [:input {:type "checkbox"
                     :id "show-fill-on-export"

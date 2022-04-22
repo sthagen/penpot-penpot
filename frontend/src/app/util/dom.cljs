@@ -6,6 +6,7 @@
 
 (ns app.util.dom
   (:require
+   [app.common.data :as d]
    [app.common.data.macros :as dm]
    [app.common.geom.point :as gpt]
    [app.common.logging :as log]
@@ -41,6 +42,12 @@
 (defn set-html-title
   [^string title]
   (set! (.-title globals/document) title))
+
+(defn set-html-theme-color
+  [^string color scheme]
+  (let [meta-node (.querySelector js/document "meta[name='theme-color']")]
+    (.setAttribute meta-node "content" color)
+    (.setAttribute meta-node "media" (str/format "(prefers-color-scheme: %s)" scheme))))
 
 (defn set-page-style!
   [styles]
@@ -126,7 +133,17 @@
   (when (some? node)
     (.getAttribute ^js node attr-name)))
 
+(defn get-scroll-position
+  [^js event]
+  (when (some? event)
+      {:scroll-height (.-scrollHeight event)
+       :scroll-left   (.-scrollLeft event)
+       :scroll-top    (.-scrollTop event)
+       :scroll-width  (.-scrollWidth event)}))
+
 (def get-target-val (comp get-value get-target))
+
+(def get-target-scroll (comp get-scroll-position get-target))
 
 (defn click
   "Click a node"
@@ -231,20 +248,20 @@
     (.-innerText el)))
 
 (defn query
-  ([^string query]
-   (query globals/document query))
+  ([^string selector]
+   (query globals/document selector))
 
-  ([^js el ^string query]
+  ([^js el ^string selector]
    (when (some? el)
-     (.querySelector el query))))
+     (.querySelector el selector))))
 
 (defn query-all
-  ([^string query]
-   (query-all globals/document query))
+  ([^string selector]
+   (query-all globals/document selector))
 
-  ([^js el ^string query]
+  ([^js el ^string selector]
    (when (some? el)
-     (.querySelectorAll el query))))
+     (.querySelectorAll el selector))))
 
 (defn get-client-position
   [^js event]
@@ -334,17 +351,41 @@
   {:pre [(blob? b)]}
   (js/URL.createObjectURL b))
 
+(defn make-node
+  ([namespace name]
+   (.createElementNS globals/document namespace name))
+
+  ([name]
+   (.createElement globals/document name)))
+
+(defn node->xml
+  [node]
+  (->  (js/XMLSerializer.)
+       (.serializeToString node)))
+
+(defn svg->data-uri
+  [svg]
+  (assert (string? svg))
+  (let [b64 (-> svg
+                js/encodeURIComponent
+                js/unescape
+                js/btoa)]
+    (dm/str "data:image/svg+xml;base64," b64)))
+
 (defn set-property! [^js node property value]
   (when (some? node)
-    (.setAttribute node property value)))
+    (.setAttribute node property value))
+  node)
 
 (defn set-text! [^js node text]
   (when (some? node)
-    (set! (.-textContent node) text)))
+    (set! (.-textContent node) text))
+  node)
 
 (defn set-css-property! [^js node property value]
   (when (some? node)
-    (.setProperty (.-style ^js node) property value)))
+    (.setProperty (.-style ^js node) property value))
+  node)
 
 (defn capture-pointer [^js event]
   (when (some? event)
@@ -375,7 +416,8 @@
 (defn add-class! [^js node class-name]
   (when (some? node)
     (let [class-list (.-classList ^js node)]
-      (.add ^js class-list class-name))))
+      (.add ^js class-list class-name)))
+  node)
 
 (defn remove-class! [^js node class-name]
   (when (some? node)
@@ -403,16 +445,16 @@
 (defn mtype->extension [mtype]
   ;; https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types
   (case mtype
-    "image/apng"         "apng"
-    "image/avif"         "avif"
-    "image/gif"          "gif"
-    "image/jpeg"         "jpg"
-    "image/png"          "png"
-    "image/svg+xml"      "svg"
-    "image/webp"         "webp"
-    "application/zip"    "zip"
-    "application/penpot" "penpot"
-    "application/pdf"    "pdf"
+    "image/apng"         ".apng"
+    "image/avif"         ".avif"
+    "image/gif"          ".gif"
+    "image/jpeg"         ".jpg"
+    "image/png"          ".png"
+    "image/svg+xml"      ".svg"
+    "image/webp"         ".webp"
+    "application/zip"    ".zip"
+    "application/penpot" ".penpot"
+    "application/pdf"    ".pdf"
     nil))
 
 (defn set-attribute! [^js node ^string attr value]
@@ -464,11 +506,11 @@
 
 (defn trigger-download-uri
   [filename mtype uri]
-  (let [link (create-element "a")
+  (let [link      (create-element "a")
         extension (mtype->extension mtype)
-        filename (if extension
-                   (str filename "." extension)
-                   filename)]
+        filename  (if (and extension (not (str/ends-with? filename extension)))
+                    (str/concat filename extension)
+                    filename)]
     (obj/set! link "href" uri)
     (obj/set! link "download" filename)
     (obj/set! (.-style ^js link) "display" "none")
@@ -535,3 +577,13 @@
   (and (some? node)
        (some? candidate)
        (.contains node candidate)))
+
+(defn seq-nodes
+  [root-node]
+  (letfn [(branch? [node]
+            (d/not-empty? (get-children node)))
+
+          (get-children [node]
+            (seq (.-children node)))]
+    (->> root-node
+         (tree-seq branch? get-children))))

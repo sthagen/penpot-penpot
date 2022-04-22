@@ -47,46 +47,41 @@
   (mf/fnc mask-shape
     {::mf/wrap-props false}
     [props]
-    (let [mask      (unchecked-get props "mask")
-          render-id (mf/use-ctx muc/render-ctx)
-          svg-text? (and (= :text (:type mask)) (some? (:position-data mask)))
+    (let [mask        (unchecked-get props "mask")
+          render-id   (mf/use-ctx muc/render-ctx)
+          svg-text?   (and (= :text (:type mask)) (some? (:position-data mask)))
+          ;; This factory is generic, it's used for viewer, workspace and handoff.
+          ;; These props are generated in viewer wrappers only, in the rest of the 
+          ;; cases these props will be nil, not affecting the code. 
+          fixed?      (unchecked-get props "fixed?")
+          delta       (unchecked-get props "delta")
+          mask-for-bb (-> (gsh/transform-shape mask)
+                          (cond-> fixed? (gsh/move delta)))
+          
+          mask-bb     (cond
+                        svg-text? (gst/position-data-points mask-for-bb)
+                        :else     (:points mask-for-bb))]
+      [:defs
+       [:filter {:id (filter-id render-id mask)}
+        [:feFlood {:flood-color "white"
+                   :result "FloodResult"}]
+        [:feComposite {:in "FloodResult"
+                       :in2 "SourceGraphic"
+                       :operator "in"
+                       :result "comp"}]]
+       ;; Clip path is necessary so the elements inside the mask won't affect
+       ;; the events outside. Clip hides the elements but mask doesn't (like display vs visibility)
+       ;; we cannot use clips instead of mask because clips can only be simple shapes
+       [:clipPath {:class "mask-clip-path"
+                   :id (clip-id render-id mask)}
+        [:polyline {:points (->> mask-bb
+                                 (map #(str (:x %) "," (:y %)))
+                                 (str/join " "))}]]
 
-          mask      (cond-> mask svg-text? set-white-fill)
-
-          mask-bb
-          (cond
-            svg-text?
-            (gst/position-data-points mask)
-
-            :else
-            (-> (gsh/transform-shape mask)
-                (:points)))]
-      [:*
-       [:g {:opacity 0}
-        [:g {:id (str "shape-" (mask-id render-id mask))}
-         [:& shape-wrapper {:shape (dissoc mask :shadow :blur)}]]]
-
-       [:defs
-        [:filter {:id (filter-id render-id mask)}
-         [:feFlood {:flood-color "white"
-                    :result "FloodResult"}]
-         [:feComposite {:in "FloodResult"
-                        :in2 "SourceGraphic"
-                        :operator "in"
-                        :result "comp"}]]
-        ;; Clip path is necessary so the elements inside the mask won't affect
-        ;; the events outside. Clip hides the elements but mask doesn't (like display vs visibility)
-        ;; we cannot use clips instead of mask because clips can only be simple shapes
-        [:clipPath {:class "mask-clip-path"
-                    :id (clip-id render-id mask)}
-         [:polyline {:points (->> mask-bb
-                                  (map #(str (:x %) "," (:y %)))
-                                  (str/join " "))}]]
-
-        [:mask {:class "mask-shape"
-                :id (mask-id render-id mask)}
-         ;; SVG texts are broken in Firefox with the filter. When the masking shapes is a text
-         ;; we use the `set-white-fill` instead of using the filter
-         [:g {:filter (when-not svg-text? (filter-url render-id mask))}
-          [:use {:href (str "#shape-" (mask-id render-id mask))}]]]]])))
+       ;; When te shape is a text we pass to the shape the info and disable the filter.
+       ;; There is a bug in Firefox with filters and texts. We change the text to white at shape level
+       [:mask {:class "mask-shape"
+               :id (mask-id render-id mask)}
+        [:g {:filter (when-not svg-text? (filter-url render-id mask))}
+         [:& shape-wrapper {:shape (-> mask (dissoc :shadow :blur) (assoc :is-mask? true))}]]]])))
 

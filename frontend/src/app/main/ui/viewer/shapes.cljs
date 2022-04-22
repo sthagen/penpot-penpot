@@ -7,14 +7,14 @@
 (ns app.main.ui.viewer.shapes
   "The main container for a frame in viewer mode"
   (:require
-   [app.common.geom.matrix :as gmt]
-   [app.common.geom.point :as gpt]
+   [app.common.data :as d]
    [app.common.geom.shapes :as geom]
    [app.common.pages.helpers :as cph]
    [app.common.spec.interactions :as cti]
    [app.main.data.viewer :as dv]
    [app.main.refs :as refs]
    [app.main.store :as st]
+   [app.main.ui.context :as ctx]
    [app.main.ui.shapes.bool :as bool]
    [app.main.ui.shapes.circle :as circle]
    [app.main.ui.shapes.frame :as frame]
@@ -216,7 +216,8 @@
           childs  (unchecked-get props "childs")
           frame   (unchecked-get props "frame")
           objects (unchecked-get props "objects")
-
+          fixed?  (unchecked-get props "fixed?")
+          delta   (unchecked-get props "delta")
           base-frame    (mf/use-ctx base-frame-ctx)
           frame-offset (mf/use-ctx frame-offset-ctx)
 
@@ -243,7 +244,10 @@
          [:& component {:shape shape
                         :frame frame
                         :childs childs
-                        :is-child-selected? true}]
+                        :is-child-selected? true
+                        :objects objects
+                        :fixed? fixed?
+                        :delta delta}]
 
          [:& interaction {:shape shape
                           :interactions interactions
@@ -252,7 +256,8 @@
         ;; Don't wrap svg elements inside a <g> otherwise some can break
         [:& component {:shape shape
                        :frame frame
-                       :childs childs}]))))
+                       :childs childs
+                       :objects objects}]))))
 
 (defn frame-wrapper
   [shape-container]
@@ -315,11 +320,10 @@
     (mf/fnc group-container
       {::mf/wrap-props false}
       [props]
-      (let [shape  (unchecked-get props "shape")
-            childs (mapv #(get objects %) (:shapes shape))
-            props  (obj/merge! #js {} props
-                               #js {:childs childs
-                                    :objects objects})]
+      (let [childs   (mapv #(get objects %) (:shapes (unchecked-get props "shape")))
+            props    (obj/merge! #js {} props
+                                 #js {:childs childs
+                                      :objects objects})]
         [:> group-wrapper props]))))
 
 (defn bool-container-factory
@@ -329,8 +333,7 @@
     (mf/fnc bool-container
       {::mf/wrap-props false}
       [props]
-      (let [shape  (unchecked-get props "shape")
-            childs (->> (cph/get-children-ids objects (:id shape))
+      (let [childs (->> (cph/get-children-ids objects (:id (unchecked-get props "shape")))
                         (select-keys objects))
             props  (obj/merge! #js {} props
                                #js {:childs childs
@@ -344,8 +347,7 @@
     (mf/fnc svg-raw-container
       {::mf/wrap-props false}
       [props]
-      (let [shape  (unchecked-get props "shape")
-            childs (mapv #(get objects %) (:shapes shape))
+      (let [childs (mapv #(get objects %) (:shapes (unchecked-get props "shape")))
             props  (obj/merge! #js {} props
                                #js {:childs childs
                                     :objects objects})]
@@ -361,7 +363,15 @@
     (mf/fnc shape-container
       {::mf/wrap-props false}
       [props]
-      (let [group-container
+      (let [scroll  (mf/use-ctx ctx/scroll-ctx)
+            local   (mf/deref refs/viewer-local)
+            zoom    (:zoom local)
+            shape   (unchecked-get props "shape")
+            parents (map (d/getf objects) (cph/get-parent-ids objects (:id shape)))
+            fixed?  (or (:fixed-scroll shape) (some :fixed-scroll parents))
+            frame   (unchecked-get props "frame")
+            delta   {:x (/ (:scroll-left scroll) zoom) :y (/ (:scroll-top scroll) zoom)}
+            group-container
             (mf/use-memo (mf/deps objects)
                          #(group-container-factory objects))
 
@@ -371,12 +381,12 @@
 
             svg-raw-container
             (mf/use-memo (mf/deps objects)
-                         #(svg-raw-container-factory objects))
-            shape (unchecked-get props "shape")
-            frame (unchecked-get props "frame")]
+                         #(svg-raw-container-factory objects))]
         (when (and shape (not (:hidden shape)))
           (let [shape (-> (geom/transform-shape shape)
-                          (geom/translate-to-frame frame))
+                          (geom/translate-to-frame frame)
+                          (cond-> fixed? (geom/move delta)))
+
                 opts #js {:shape shape
                           :objects objects}]
             (case (:type shape)
@@ -386,38 +396,7 @@
               :path    [:> path-wrapper opts]
               :image   [:> image-wrapper opts]
               :circle  [:> circle-wrapper opts]
-              :group   [:> group-container {:shape shape :frame frame :objects objects}]
+              :group   [:> group-container {:shape shape :frame frame :objects objects :fixed? fixed? :delta delta}]
               :bool    [:> bool-container {:shape shape :frame frame :objects objects}]
               :svg-raw [:> svg-raw-container {:shape shape :frame frame :objects objects}])))))))
-
-(mf/defc frame-svg
-  {::mf/wrap [mf/memo]}
-  [{:keys [objects frame zoom] :or {zoom 1} :as props}]
-  (let [modifier (-> (gpt/point (:x frame) (:y frame))
-                     (gpt/negate)
-                     (gmt/translate-matrix))
-
-        update-fn    #(assoc-in %1 [%2 :modifiers :displacement] modifier)
-
-        frame-id     (:id frame)
-        modifier-ids (into [frame-id] (cph/get-children-ids objects frame-id))
-        objects      (reduce update-fn objects modifier-ids)
-        frame        (assoc-in frame [:modifiers :displacement] modifier)
-        width        (* (:width frame) zoom)
-        height       (* (:height frame) zoom)
-
-        vbox         (str "0 0 " (:width frame 0)
-                          " "    (:height frame 0))
-        wrapper      (mf/use-memo
-                      (mf/deps objects)
-                      #(frame-container-factory objects))]
-
-    [:svg {:view-box vbox
-           :width width
-           :height height
-           :version "1.1"
-           :xmlnsXlink "http://www.w3.org/1999/xlink"
-           :xmlns "http://www.w3.org/2000/svg"}
-     [:& wrapper {:shape frame
-                  :view-box vbox}]]))
 
