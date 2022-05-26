@@ -317,7 +317,7 @@
         content       (filter #(= (get-role %) :content) children)]
     [:div.asset-section
      [:div.asset-title {:class (when (not open?) "closed")}
-      [:span {:on-click (st/emitf (dwl/set-assets-box-open file-id box (not open?)))}
+      [:span {:on-click #(st/emit! (dwl/set-assets-box-open file-id box (not open?)))}
        i/arrow-slide title]
       [:span.num-assets (str "\u00A0(") assets-count ")"] ;; Unicode 00A0 is non-breaking space
       title-buttons]
@@ -905,7 +905,7 @@
         add-graphic
         (mf/use-callback
          (fn []
-           (st/emitf (dwl/set-assets-box-open file-id :graphics true))
+           #(st/emit! (dwl/set-assets-box-open file-id :graphics true))
            (dom/click (mf/ref-val input-ref))))
 
         on-file-selected
@@ -1898,7 +1898,7 @@
                           (count (:colors selected-assets))
                           (count (:typographies selected-assets)))
 
-        toggle-open     (st/emitf (dwl/set-assets-box-open (:id file) :library (not open?)))
+        toggle-open     #(st/emit! (dwl/set-assets-box-open (:id file) :library (not open?)))
 
         url             (rt/resolve router :workspace
                                     {:project-id (:project-id file)
@@ -2105,7 +2105,7 @@
                                   :on-assets-delete on-assets-delete
                                   :on-clear-selection unselect-all}])
 
-          (when (and (not show-components?) (not show-graphics?) (not show-colors?))
+          (when (and (not show-components?) (not show-graphics?) (not show-colors?) (not show-typography?))
             [:div.asset-section
              [:div.asset-title (tr "workspace.assets.not-found")]])]))]))
 
