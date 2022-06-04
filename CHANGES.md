@@ -9,6 +9,7 @@
 - Added selected colors widget in right sidebar [Taiga #2485](https://tree.taiga.io/project/penpot/us/2485)
 - Added fixed elements when scrolling [Taiga #1533](https://tree.taiga.io/project/penpot/us/1533)
 - Multiple team invitations on onboarding [Taiga #3084](https://tree.taiga.io/project/penpot/us/3084)
+- Change text properties position at the sidebar [Taiga #3047](https://tree.taiga.io/project/penpot/us/3047)
 
 ### :bug: Bugs fixed
 - Fix menu file not accessible in certain conditions [Taiga #3385](https://tree.taiga.io/project/penpot/issue/3385)
@@ -17,6 +18,18 @@
 
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
+
+## 1.13.3-beta
+
+### :bug: Bugs fixed
+
+- Fix docker dependencies
+- Sets invitations expirations to 7 days
+- Add safety measure for text positions
+- Fix old texts with opacity and no fill
+- Remove default font on team change
+- Fix github auth without name
+- Fix problems with font loading in Firefox 95
 
 ## 1.13.2-beta
 
