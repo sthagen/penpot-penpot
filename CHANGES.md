@@ -4,6 +4,13 @@
 
 ### :boom: Breaking changes
 ### :sparkles: New features
+### :bug: Bugs fixed
+### :arrow_up: Deps updates
+### :heart: Community contributions by (Thank you!)
+
+## 1.14.0-beta
+
+### :sparkles: New features
 
 - Added shortcut panel in workspace [Taiga #36](https://tree.taiga.io/project/penpot/us/36)
 - Added selected colors widget in right sidebar [Taiga #2485](https://tree.taiga.io/project/penpot/us/2485)
@@ -16,8 +23,16 @@
 - Remove deprecated menu options [Taiga #3333](https://tree.taiga.io/project/penpot/issue/3333)
 - Prototype connection should be under the rules [Taiga #3384](https://tree.taiga.io/project/penpot/issue/3384)
 
-### :arrow_up: Deps updates
-### :heart: Community contributions by (Thank you!)
+## 1.13.4-beta
+
+### :bug: Bugs fixed
+
+- Fix undo when drawing curves [Taiga #3523](https://tree.taiga.io/project/penpot/issue/3523)
+- Fix issue with text edition and certain fonts (WorkSans, Raleway, ...) and foreign objects [Taiga #3521](https://tree.taiga.io/project/penpot/issue/3521)
+- Fix thumbnail generation when concurrent edition [Taiga #3522](https://tree.taiga.io/project/penpot/issue/3522)
+- Fix environment imporot for exporter in Docker
+- Fix auto scroll layers in Firefox [Taiga #3531](https://tree.taiga.io/project/penpot/issue/3531)
+- Fix base background not visible for imported SVG
 
 ## 1.13.3-beta
 
