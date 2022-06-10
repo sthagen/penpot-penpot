@@ -114,7 +114,7 @@
      :height height}))
 
 (defn render
-  [{:keys [page-id file-id objects token scale suffix type uri]} on-object]
+  [{:keys [page-id file-id objects token scale type]} on-object]
   (letfn [(convert-to-ppm [pngpath]
             (l/trace :fn :convert-to-ppm)
             (let [basepath (path/dirname pngpath)
@@ -363,7 +363,7 @@
                     :render-embed true
                     :object-id (mapv :id objects)
                     :route "objects"}
-            uri    (-> (or uri (cf/get :public-uri))
+            uri    (-> (cf/get :public-uri)
                        (assoc :path "/render.html")
                        (assoc :query (u/map->query-string params)))]
       (bw/exec! (prepare-options uri)
