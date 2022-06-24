@@ -4,12 +4,12 @@
 ;;
 ;; Copyright (c) UXBOX Labs SL
 
-(ns app.main.ui.releases.v1-6
+(ns app.main.ui.releases.v1-14
   (:require
    [app.main.ui.releases.common :as c]
    [rumext.alpha :as mf]))
 
-(defmethod c/render-release-notes "1.6"
+(defmethod c/render-release-notes "1.14"
   [{:keys [slide klass next finish navigate version]}]
   (mf/html
    (case @slide
@@ -18,14 +18,14 @@
       [:div.animated {:class @klass}
        [:div.modal-container.onboarding.feature
         [:div.modal-left
-         [:img {:src "images/login-on.jpg" :border "0" :alt "What's new Alpha release 1.6.0"}]]
+         [:img {:src "images/login-on.jpg" :border "0" :alt "What's new Beta release 1.14"}]]
         [:div.modal-right
          [:div.modal-title
           [:h2 "What's new?"]]
-         [:span.release "Alpha version " version]
+         [:span.release "Beta version " version]
          [:div.modal-content
-          [:p "Penpot continues growing with new features that improve performance, user experience and visual design."]
-          [:p "We are happy to show you a sneak peek of the most important stuff that the Alpha 1.6.0 version brings."]]
+          [:p "Penpot continues to grow with new features that improve performance, user experience and visual design."]
+          [:p "We are happy to show you a sneak peek of the most important stuff that the Beta 1.14 version brings."]]
          [:div.modal-navigation
           [:button.btn-secondary {:on-click next} "Continue"]]]
         [:img.deco {:src "images/deco-left.png" :border "0"}]
@@ -36,13 +36,13 @@
       [:div.animated {:class @klass}
        [:div.modal-container.onboarding.feature
         [:div.modal-left
-         [:img {:src "images/features/custom-fonts.gif" :border "0" :alt "Upload/use custom fonts"}]]
+         [:img {:src "images/features/1.14-shortcuts.gif" :border "0" :alt "Shortcuts panel"}]]
         [:div.modal-right
          [:div.modal-title
-          [:h2 "Upload/use custom fonts"]]
+          [:h2 "Shortcuts panel"]]
          [:div.modal-content
-          [:p "From now on you can upload fonts to a Penpot team and use them across its files. This is one of the most requested features since our first release (we listen!)"]
-          [:p "We hope you enjoy having more typography options and our brand new font selector."]]
+          [:p "Shortcuts boost your productivity but are not easy to find and learn. A handy panel at your workspace will help you with that."]
+          [:p "Categories and filters will help you to find the shortcut you need. One of the most requested features by the community!"]]
          [:div.modal-navigation
           [:button.btn-secondary {:on-click next} "Continue"]
           [:& c/navigation-bullets
@@ -55,13 +55,13 @@
       [:div.animated {:class @klass}
        [:div.modal-container.onboarding.feature
         [:div.modal-left
-         [:img {:src "images/features/scale-text.gif" :border "0" :alt "Interactively scale text"}]]
+         [:img {:src "images/features/1.14-color-group.gif" :border "0" :alt "Colors selection"}]]
         [:div.modal-right
          [:div.modal-title
-          [:h2 "Scale text layers at resizing"]]
+          [:h2 "Colors selection"]]
          [:div.modal-content
-          [:p "New main menu option “Scale text (K)” to enable scale text mode."]
-          [:p "Disabled by default, this tool is disabled back after being used."]]
+          [:p "All of the colors that are contained within a selection of objects are showcased at the sidebar."]
+          [:p "Play with the colors of a group without the hassles of individual selection!"]]
          [:div.modal-navigation
           [:button.btn-secondary {:on-click next} "Continue"]
           [:& c/navigation-bullets
@@ -74,13 +74,13 @@
       [:div.animated {:class @klass}
        [:div.modal-container.onboarding.feature
         [:div.modal-left
-         [:img {:src "images/features/performance.gif" :border "0" :alt "Performance improvements"}]]
+         [:img {:src "images/features/1.14-fix-on-scroll.gif" :border "0" :alt "Fix elements at scroll"}]]
         [:div.modal-right
          [:div.modal-title
-          [:h2 "Performance improvements"]]
+          [:h2 "Fix elements at scroll"]]
          [:div.modal-content
-          [:p "Penpot brings important improvements handling large files. The performance in managing files in the dashboard has also been improved."]
-          [:p "You should have the feeling that files and layers show up a bit faster :)"]]
+          [:p "A new option that allows you to fix the position of an object when scrolling at the presentation view."]
+          [:p "Ideal for prototyping fixed headers, navbars and floating buttons."]]
          [:div.modal-navigation
           [:button.btn-secondary {:on-click next} "Continue"]
           [:& c/navigation-bullets
@@ -93,13 +93,13 @@
       [:div.animated {:class @klass}
        [:div.modal-container.onboarding.feature
         [:div.modal-left
-         [:img {:src "images/features/shapes-to-path.gif" :border "0" :alt "Shapes to path"}]]
+         [:img {:src "images/features/1.14-group-assets.gif" :border "0" :alt "Group library assets with drag & drop"}]]
         [:div.modal-right
          [:div.modal-title
-          [:h2 "Shapes to path"]]
+          [:h2 "Group library assets with drag & drop"]]
          [:div.modal-content
-          [:p "Now you can edit basic shapes like rectangles, circles and image containers by double clicking."]
-          [:p "An easy way to increase speed by working with vectors!"]]
+          [:p "We have improved the way to manage asset groups at libraries."]
+          [:p "Until now you could only do it by renaming the groups, now with drag & drop it is much more user friendly."]]
          [:div.modal-navigation
           [:button.btn-secondary {:on-click finish} "Start!"]
           [:& c/navigation-bullets
