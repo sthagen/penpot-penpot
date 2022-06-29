@@ -10,7 +10,7 @@
    [app.common.geom.point :as gpt]
    [app.common.pages.helpers :as cph]
    [app.common.spec :as us]
-   [app.common.spec.interactions :as cti]
+   [app.common.types.shape.interactions :as ctsi]
    [app.main.data.comments :as dcm]
    [app.main.data.fonts :as df]
    [app.main.repo :as rp]
@@ -33,7 +33,9 @@
    :selected #{}
    :collapsed #{}
    :overlays []
-   :hover nil})
+   :hover nil
+   :share-id ""
+   :file-comments-users []})
 
 (declare fetch-comment-threads)
 (declare fetch-bundle)
@@ -50,7 +52,7 @@
           :opt-un [::share-id ::page-id]))
 
 (defn initialize
-  [{:keys [file-id] :as params}]
+  [{:keys [file-id share-id] :as params}]
   (us/assert ::initialize-params params)
   (ptk/reify ::initialize
     ptk/UpdateEvent
@@ -61,7 +63,8 @@
                   (fn [lstate]
                     (if (nil? lstate)
                       default-local-state
-                      lstate)))))
+                      lstate)))
+          (assoc-in [:viewer-local :share-id] share-id)))
 
     ptk/WatchEvent
     (watch [_ _ _]
@@ -138,7 +141,7 @@
             (rx/of (go-to-frame-auto))))))))
 
 (defn fetch-comment-threads
-  [{:keys [file-id page-id] :as params}]
+  [{:keys [file-id page-id share-id] :as params}]
   (letfn [(fetched [data state]
             (->> data
                  (filter #(= page-id (:page-id %)))
@@ -153,7 +156,7 @@
     (ptk/reify ::fetch-comment-threads
       ptk/WatchEvent
       (watch [_ _ _]
-        (->> (rp/query :comment-threads {:file-id file-id})
+        (->> (rp/query :comment-threads {:file-id file-id :share-id share-id})
              (rx/map #(partial fetched %))
              (rx/catch on-error))))))
 
@@ -389,7 +392,7 @@
 
   ([frame-id animation]
    (us/verify ::us/uuid frame-id)
-   (us/verify (s/nilable ::cti/animation) animation)
+   (us/verify (s/nilable ::ctsi/animation) animation)
    (ptk/reify ::go-to-frame
      ptk/UpdateEvent
      (update [_ state]
@@ -480,7 +483,7 @@
   (us/verify ::gpt/point position)
   (us/verify (s/nilable ::us/boolean) close-click-outside)
   (us/verify (s/nilable ::us/boolean) background-overlay)
-  (us/verify (s/nilable ::cti/animation) animation)
+  (us/verify (s/nilable ::ctsi/animation) animation)
   (ptk/reify ::open-overlay
     ptk/UpdateEvent
     (update [_ state]
@@ -505,7 +508,7 @@
   (us/verify ::gpt/point position)
   (us/verify (s/nilable ::us/boolean) close-click-outside)
   (us/verify (s/nilable ::us/boolean) background-overlay)
-  (us/verify (s/nilable ::cti/animation) animation)
+  (us/verify (s/nilable ::ctsi/animation) animation)
   (ptk/reify ::toggle-overlay
     ptk/UpdateEvent
     (update [_ state]
@@ -524,13 +527,13 @@
                            animation)
           (do-close-overlay state
                             (:id frame)
-                            (cti/invert-direction animation)))))))
+                            (ctsi/invert-direction animation)))))))
 
 (defn close-overlay
   ([frame-id] (close-overlay frame-id nil))
   ([frame-id animation]
    (us/verify ::us/uuid frame-id)
-   (us/verify (s/nilable ::cti/animation) animation)
+   (us/verify (s/nilable ::ctsi/animation) animation)
    (ptk/reify ::close-overlay
      ptk/UpdateEvent
      (update [_ state]
