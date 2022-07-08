@@ -28,6 +28,22 @@
 (def ^:const default-buffer-size
   (:xnio/buffer-size yt/defaults))
 
+(defn input-stream?
+  [s]
+  (instance? InputStream s))
+
+(defn output-stream?
+  [s]
+  (instance? OutputStream s))
+
+(defn data-input-stream?
+  [s]
+  (instance? DataInputStream s))
+
+(defn data-output-stream?
+  [s]
+  (instance? DataOutputStream s))
+
 (defn copy!
   [src dst & {:keys [offset size buffer-size]
               :or {offset 0 buffer-size default-buffer-size}}]
