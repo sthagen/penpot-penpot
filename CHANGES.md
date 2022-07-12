@@ -3,6 +3,15 @@
 ## :rocket: Next
 
 ### :boom: Breaking changes & Deprecations
+### :sparkles: New features
+### :bug: Bugs fixed
+### :arrow_up: Deps updates
+### :heart: Community contributions by (Thank you!)
+
+
+## 1.15.0-beta
+
+### :boom: Breaking changes & Deprecations
 
 - The `PENPOT_LOGIN_WITH_LDAP` environment variable is finally removed (after
   many version with deprecation). It is replaced with the
