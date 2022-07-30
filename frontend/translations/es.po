@@ -1891,23 +1891,6 @@ msgstr "Perfil guardado correctamente!"
 msgid "notifications.validation-email-sent"
 msgstr "Verificación de email enviada a %s. Comprueba tu correo."
 
-msgid "onboarding.choice.desc"
-msgstr "¿Cómo quieres empezar?"
-
-msgid "onboarding.choice.fly-solo"
-msgstr "Volar en solitario"
-
-msgid "onboarding.choice.fly-solo-desc"
-msgstr "Entra en Penpot y empieza a diseñar por tu cuenta."
-
-msgid "onboarding.choice.team-up"
-msgstr "Forma equipo"
-
-msgid "onboarding.choice.team-up-desc"
-msgstr ""
-"¿Estás trabajando con alguien? Crea un equipo e invita a la gente a "
-"trabajar juntos en proyectos y a compartir recursos de diseño."
-
 msgid "onboarding.choice.team-up.create-team"
 msgstr "El nombre de tu equipo"
 
@@ -1920,10 +1903,35 @@ msgstr "Introduce el nombre del equipo"
 msgid "onboarding.choice.team-up.invite-members"
 msgstr "Invitar integrantes"
 
-msgid "onboarding.choice.team-up.invite-members-desc"
-msgstr ""
-"También podrás invitar integrantes y cambiar roles más tarde desde la "
-"sección del equipo."
+msgid "onboarding.choice.team-up.invite-members-info"
+msgstr "No olvides incluir personas de desarrollo, diseño, gestión… la diversidad suma :)"
+
+msgid "onboarding.choice.team-up.roles"
+msgstr "Invitar integrantes con el rol:"
+
+msgid "onboarding.choice.team-up.create-later"
+msgstr "Crea un equipo más tarde"
+
+msgid "onboarding.team-modal.create-team"
+msgstr "Crea un equipo"
+
+msgid "onboarding.team-modal.create-team-desc"
+msgstr "Un equipo permite colaborar en Penpot trabajando en los mismos archivos y proyectos."
+
+msgid "onboarding.team-modal.create-team-feature-1"
+msgstr "Archivos y proyectos ilimitados"
+
+msgid "onboarding.team-modal.create-team-feature-2"
+msgstr "Edición multijugador"
+
+msgid "onboarding.team-modal.create-team-feature-3"
+msgstr "Gestión de roles"
+
+msgid "onboarding.team-modal.create-team-feature-4"
+msgstr "Sin límite de integrantes"
+
+msgid "onboarding.team-modal.create-team-feature-5"
+msgstr "¡100 gratis!"
 
 msgid "onboarding.choice.team-up.invite-members-skip"
 msgstr "Crear equipo e invitar después"
@@ -2094,6 +2102,42 @@ msgid "onboarding.welcome.desc3"
 msgstr ""
 "Mientras disfrutas de Penpot seguiremos haciendo mejoras, lanzando "
 "iteraciones de nuestros esperanzadores planes."
+
+msgid "onboarding-v2.welcome.title"
+msgstr "¡Te damos la bienvenida a Penpot!"
+
+msgid "onboarding-v2.welcome.desc1"
+msgstr "Penpot es Código Abierto y está hecho por Kaleidos y la comunidad, donde ya hay mucha gente ayudándose unos a otros. Formas de colaborar:"
+
+msgid "onboarding-v2.welcome.desc2.title"
+msgstr "Participantdo en la Comunidad"
+
+msgid "onboarding-v2.welcome.desc2"
+msgstr "Un espacio público donde aprender, compatir y discutir sobre el presente y futuro de Penpot con toda la Comunidad y el el equipo de Penpot."
+
+msgid "onboarding-v2.welcome.desc3.title"
+msgstr "Guía de contribución"
+
+msgid "onboarding-v2.welcome.desc3"
+msgstr "Aquí encontrarás cómo colaborar con traducciones, solicitar funcionalidades, contribuir en el código, cazar errores…"
+
+msgid "onboarding-v2.before-start.title"
+msgstr "Antes de comenzar"
+
+msgid "onboarding-v2.before-start.desc1"
+msgstr "Hay multitud de recursos disponibles para ayudarte a comenzar con Penpot, como son la Guía de usuario y nuestro canal de Youtube."
+
+msgid "onboarding-v2.before-start.desc2.title"
+msgstr "Guía de usuario"
+
+msgid "onboarding-v2.before-start.desc2"
+msgstr "Información detallada sobre cómo usar Penpot. Desde prototipar a organizar y compartir diseños."
+
+msgid "onboarding-v2.before-start.desc3.title"
+msgstr "Tutoriales de video"
+
+msgid "onboarding-v2.before-start.desc3"
+msgstr "Puedes ver nuestros tutoriales y los hechos por la comunidad."
 
 msgid "onboarding.welcome.title"
 msgstr "Te damos la bienvenida a Penpot"
