@@ -16,9 +16,11 @@
    [app.common.pages.common :as cpc]
    [app.common.pages.helpers :as cph]
    [app.common.spec :as us]
+   [app.common.types.shape-tree :as ctt]
    [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.collapse :as dwc]
-   [app.main.data.workspace.guides :as dwg]
+   [app.main.data.workspace.comments :as-alias dwcm]
+   [app.main.data.workspace.guides :as-alias dwg]
    [app.main.data.workspace.selection :as dws]
    [app.main.data.workspace.state-helpers :as wsh]
    [app.main.data.workspace.undo :as dwu]
@@ -202,7 +204,8 @@
           (if undo-transation?
             (rx/of (dwu/start-undo-transaction))
             (rx/empty))
-          (rx/of (dwg/move-frame-guides ids-with-children)
+          (rx/of (ptk/event ::dwg/move-frame-guides ids-with-children)
+                 (ptk/event ::dwcm/move-frame-comment-threads ids-with-children)
                  (dch/update-shapes
                   ids
                   (fn [shape]
@@ -752,7 +755,7 @@
       (let [position @ms/mouse-position
             page-id (:current-page-id state)
             objects (wsh/lookup-page-objects state page-id)
-            frame-id (cph/frame-id-by-position objects position)
+            frame-id (ctt/frame-id-by-position objects position)
 
             moving-shapes
             (->> ids

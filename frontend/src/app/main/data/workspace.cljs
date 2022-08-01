@@ -13,14 +13,13 @@
    [app.common.geom.point :as gpt]
    [app.common.geom.proportions :as gpr]
    [app.common.geom.shapes :as gsh]
-   [app.common.math :as mth]
-   [app.common.pages :as cp]
    [app.common.pages.changes-builder :as pcb]
    [app.common.pages.helpers :as cph]
    [app.common.spec :as us]
    [app.common.text :as txt]
    [app.common.transit :as t]
    [app.common.types.shape :as cts]
+   [app.common.types.shape-tree :as ctst]
    [app.common.uuid :as uuid]
    [app.config :as cfg]
    [app.main.data.events :as ev]
@@ -52,6 +51,7 @@
    [app.main.data.workspace.thumbnails :as dwth]
    [app.main.data.workspace.transforms :as dwt]
    [app.main.data.workspace.undo :as dwu]
+   [app.main.data.workspace.viewport :as dwv]
    [app.main.data.workspace.zoom :as dwz]
    [app.main.repo :as rp]
    [app.main.streams :as ms]
@@ -59,7 +59,6 @@
    [app.util.globals :as ug]
    [app.util.http :as http]
    [app.util.i18n :as i18n]
-   [app.util.names :as un]
    [app.util.router :as rt]
    [app.util.timers :as tm]
    [app.util.webapi :as wapi]
@@ -157,7 +156,7 @@
              :workspace-project project
              :workspace-file (assoc file :initialized true)
              :workspace-data (-> (:data file)
-                                 (cph/start-object-indices)
+                                 (ctst/start-object-indices)
                                  ;; DEBUG: Uncomment this to try out migrations in local without changing
                                  ;; the version number
                                  #_(assoc :version 17)
@@ -215,7 +214,8 @@
     (watch [_ state _]
       (if (contains? (get-in state [:workspace-data :pages-index]) page-id)
         (rx/of (dwp/preload-data-uris)
-               (dwth/watch-state-changes))
+               (dwth/watch-state-changes)
+               (dwl/watch-component-changes))
         (let [default-page-id (get-in state [:workspace-data :pages 0])]
           (rx/of (go-to-page default-page-id)))))
 
@@ -270,8 +270,8 @@
       ptk/WatchEvent
       (watch [it state _]
         (let [pages   (get-in state [:workspace-data :pages-index])
-              unames  (un/retrieve-used-names pages)
-              name    (un/generate-unique-name unames "Page-1")
+              unames  (ctst/retrieve-used-names pages)
+              name    (ctst/generate-unique-name unames "Page-1")
 
               changes (-> (pcb/empty-changes it)
                           (pcb/add-empty-page id name))]
@@ -285,9 +285,9 @@
     (watch [it state _]
       (let [id      (uuid/next)
             pages   (get-in state [:workspace-data :pages-index])
-            unames  (un/retrieve-used-names pages)
+            unames  (ctst/retrieve-used-names pages)
             page    (get-in state [:workspace-data :pages-index page-id])
-            name    (un/generate-unique-name unames (:name page))
+            name    (ctst/generate-unique-name unames (:name page))
 
             no_thumbnails_objects (->> (:objects page)
                                       (d/mapm (fn [_ val] (dissoc val :use-for-thumbnail?))))
@@ -398,140 +398,6 @@
       (if (string? content)
         (assoc-in state [:workspace-global :tooltip] content)
         (assoc-in state [:workspace-global :tooltip] nil)))))
-
-;; --- Viewport Sizing
-
-(defn initialize-viewport
-  [{:keys [width height] :as size}]
-  (letfn [(update* [{:keys [vport] :as local}]
-            (let [wprop (/ (:width vport) width)
-                  hprop (/ (:height vport) height)]
-              (-> local
-                  (assoc :vport size)
-                  (update :vbox (fn [vbox]
-                                  (-> vbox
-                                      (update :width #(/ % wprop))
-                                      (update :height #(/ % hprop))))))))
-
-          (initialize [state local]
-            (let [page-id (:current-page-id state)
-                  objects (wsh/lookup-page-objects state page-id)
-                  shapes  (cph/get-immediate-children objects)
-                  srect   (gsh/selection-rect shapes)
-                  local   (assoc local :vport size :zoom 1)]
-              (cond
-                (or (not (d/num? (:width srect)))
-                    (not (d/num? (:height srect))))
-                (assoc local :vbox (assoc size :x 0 :y 0))
-
-                (or (> (:width srect) width)
-                    (> (:height srect) height))
-                (let [srect (gal/adjust-to-viewport size srect {:padding 40})
-                      zoom  (/ (:width size) (:width srect))]
-                  (-> local
-                      (assoc :zoom zoom)
-                      (update :vbox merge srect)))
-
-                :else
-                (assoc local :vbox (assoc size
-                                          :x (+ (:x srect) (/ (- (:width srect) width) 2))
-                                          :y (+ (:y srect) (/ (- (:height srect) height) 2)))))))
-
-          (setup [state local]
-            (if (and (:vbox local) (:vport local))
-              (update* local)
-              (initialize state local)))]
-
-    (ptk/reify ::initialize-viewport
-      ptk/UpdateEvent
-      (update [_ state]
-        (update state :workspace-local
-                (fn [local]
-                  (setup state local)))))))
-
-(defn update-viewport-position
-  [{:keys [x y] :or {x identity y identity}}]
-  (us/assert fn? x)
-  (us/assert fn? y)
-  (ptk/reify ::update-viewport-position
-    ptk/UpdateEvent
-    (update [_ state]
-      (update-in state [:workspace-local :vbox]
-                 (fn [vbox]
-                   (-> vbox
-                       (update :x x)
-                       (update :y y)))))))
-
-(defn update-viewport-size
-  [resize-type {:keys [width height] :as size}]
-  (ptk/reify ::update-viewport-size
-    ptk/UpdateEvent
-    (update [_ state]
-      (update state :workspace-local
-              (fn [{:keys [vport] :as local}]
-                (if (or (nil? vport)
-                        (mth/almost-zero? width)
-                        (mth/almost-zero? height))
-                  ;; If we have a resize to zero just keep the old value
-                  local
-                  (let [wprop (/ (:width vport) width)
-                        hprop (/ (:height vport) height)
-
-                        vbox (:vbox local)
-                        vbox-x (:x vbox)
-                        vbox-y (:y vbox)
-                        vbox-width (:width vbox)
-                        vbox-height (:height vbox)
-
-                        vbox-width' (/ vbox-width wprop)
-                        vbox-height' (/ vbox-height hprop)
-
-                        vbox-x'
-                        (case resize-type
-                          :left  (+ vbox-x (- vbox-width vbox-width'))
-                          :right vbox-x
-                          (+ vbox-x (/ (- vbox-width vbox-width') 2)))
-
-                        vbox-y'
-                        (case resize-type
-                          :top  (+ vbox-y (- vbox-height vbox-height'))
-                          :bottom vbox-y
-                          (+ vbox-y (/ (- vbox-height vbox-height') 2)))]
-                    (-> local
-                        (assoc :vport size)
-                        (assoc-in [:vbox :x] vbox-x')
-                        (assoc-in [:vbox :y] vbox-y')
-                        (assoc-in [:vbox :width] vbox-width')
-                        (assoc-in [:vbox :height] vbox-height')))))))))
-
-(defn start-panning []
-  (ptk/reify ::start-panning
-    ptk/WatchEvent
-    (watch [_ state stream]
-      (let [stopper (->> stream (rx/filter (ptk/type? ::finish-panning)))
-            zoom (-> (get-in state [:workspace-local :zoom]) gpt/point)]
-        (when-not (get-in state [:workspace-local :panning])
-          (rx/concat
-           (rx/of #(-> % (assoc-in [:workspace-local :panning] true)))
-           (->> stream
-                (rx/filter ms/pointer-event?)
-                (rx/filter #(= :delta (:source %)))
-                (rx/map :pt)
-                (rx/take-until stopper)
-                (rx/map (fn [delta]
-                          (let [delta (gpt/divide delta zoom)]
-                            (update-viewport-position {:x #(- % (:x delta))
-                                                       :y #(- % (:y delta))})))))))))))
-
-(defn finish-panning []
-  (ptk/reify ::finish-panning
-    ptk/UpdateEvent
-    (update [_ state]
-      (-> state
-          (update :workspace-local dissoc :panning)))))
-
-
-
 
 ;; --- Update Shape Attrs
 
@@ -991,7 +857,7 @@
       (let [selected   (wsh/lookup-selected state)
             pages      (-> state :workspace-data :pages-index vals)
             get-frames (fn [{:keys [objects id] :as page}]
-                         (->> (cph/get-frames objects)
+                         (->> (ctst/get-frames objects)
                               (sequence
                                (comp (filter :use-for-thumbnail?)
                                      (map :id)
@@ -1223,7 +1089,7 @@
                   ;; selected and its parents
                   objects (cph/selected-subtree objects selected)
 
-                  selected (->> (cph/sort-z-index objects selected)
+                  selected (->> (ctst/sort-z-index objects selected)
                                 (into (d/ordered-set)))]
 
               (assoc data :selected selected)))
@@ -1478,7 +1344,7 @@
                   [frame-id frame-id delta])
 
                 (empty? page-selected)
-                (let [frame-id (cph/frame-id-by-position page-objects mouse-pos)
+                (let [frame-id (ctst/frame-id-by-position page-objects mouse-pos)
                       delta    (gpt/subtract mouse-pos orig-pos)]
                   [frame-id frame-id delta])
 
@@ -1590,8 +1456,8 @@
             height 16
             page-id (:current-page-id state)
             frame-id (-> (wsh/lookup-page-objects state page-id)
-                         (cph/frame-id-by-position @ms/mouse-position))
-            shape (cp/setup-rect-selrect
+                         (ctst/frame-id-by-position @ms/mouse-position))
+            shape (cts/setup-rect-selrect
                    {:id id
                     :type :text
                     :name "Text"
@@ -1681,12 +1547,12 @@
           (let [srect    (gsh/selection-rect selected-objs)
                 frame-id (get-in objects [(first selected) :frame-id])
                 parent-id (get-in objects [(first selected) :parent-id])
-                shape    (-> (cp/make-minimal-shape :frame)
+                shape    (-> (cts/make-minimal-shape :frame)
                              (merge {:x (:x srect) :y (:y srect) :width (:width srect) :height (:height srect)})
                              (assoc :frame-id frame-id :parent-id parent-id)
                              (cond-> (not= frame-id uuid/zero)
                                (assoc :fills [] :hide-in-viewer true))
-                             (cp/setup-rect-selrect))]
+                             (cts/setup-rect-selrect))]
             (rx/of
              (dwu/start-undo-transaction)
              (dwsh/add-shape shape)
@@ -1769,3 +1635,10 @@
 
 ;; Thumbnails
 (dm/export dwth/update-thumbnail)
+
+;; Viewport
+(dm/export dwv/initialize-viewport)
+(dm/export dwv/update-viewport-position)
+(dm/export dwv/update-viewport-size)
+(dm/export dwv/start-panning)
+(dm/export dwv/finish-panning)
