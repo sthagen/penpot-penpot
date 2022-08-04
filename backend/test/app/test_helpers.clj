@@ -34,7 +34,9 @@
    [mockery.core :as mk]
    [promesa.core :as p]
    [yetti.request :as yrq])
-  (:import org.postgresql.ds.PGSimpleDataSource))
+  (:import
+   java.util.UUID
+   org.postgresql.ds.PGSimpleDataSource))
 
 (def ^:dynamic *system* nil)
 (def ^:dynamic *pool* nil)
@@ -50,11 +52,18 @@
 
 (defn state-init
   [next]
-  (let [config (-> main/system-config
+  (let [templates [{:id "test"
+                    :name "test"
+                    :file-uri "test"
+                    :thumbnail-uri "test"
+                    :path (-> "app/test_files/template.penpot" io/resource fs/path)}]
+
+        config (-> main/system-config
                    (assoc-in [:app.msgbus/msgbus :redis-uri] (:redis-uri config))
                    (assoc-in [:app.db/pool :uri] (:database-uri config))
                    (assoc-in [:app.db/pool :username] (:database-username config))
                    (assoc-in [:app.db/pool :password] (:database-password config))
+                   (assoc-in [:app.rpc/methods :templates] templates)
                    (dissoc :app.srepl/server
                            :app.http/server
                            :app.http/router
@@ -64,6 +73,7 @@
                            :app.auth.oidc/gitlab-provider
                            :app.auth.oidc/github-provider
                            :app.auth.oidc/generic-provider
+                           :app.setup/builtin-templates
                            :app.auth.oidc/routes
                            ;; :app.auth.ldap/provider
                            :app.worker/executors-monitor
@@ -128,8 +138,8 @@
 
 (defn mk-uuid
   [prefix & args]
-  (uuid/namespaced uuid/zero (apply str prefix args)))
-
+  (UUID/nameUUIDFromBytes (-> (apply str prefix args)
+                              (.getBytes "UTF-8"))))
 ;; --- FACTORIES
 
 (defn create-profile*

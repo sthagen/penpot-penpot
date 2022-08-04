@@ -9,6 +9,7 @@
    [app.common.data :as d]
    [app.common.spec :as us]
    [app.main.data.dashboard :as dd]
+   [app.main.data.events :as ev]
    [app.main.data.messages :as dm]
    [app.main.data.modal :as modal]
    [app.main.refs :as refs]
@@ -19,6 +20,7 @@
    [app.util.router :as rt]
    [app.util.timers :as tm]
    [cljs.spec.alpha :as s]
+   [potok.core :as ptk]
    [rumext.alpha :as mf]))
 
 (s/def ::name ::us/not-empty-string)
@@ -57,10 +59,17 @@
         (mf/use-callback
          (fn [form _]
            (let [tname (get-in @form [:clean-data :name])]
-             (st/emit! (modal/show {:type :onboarding-team-invitations :name tname})))))
+             (st/emit! (modal/show {:type :onboarding-team-invitations :name tname})
+                       (ptk/event ::ev/event {::ev/name "choose-team-name"
+                                              ::ev/origin "onboarding"
+                                              :name tname
+                                              :step 1})))))
         on-skip
         (fn []
-          (tm/schedule 400  #(st/emit! (modal/hide))))
+          (tm/schedule 400  #(st/emit! (modal/hide)
+                                       (ptk/event ::ev/event {::ev/name "create-team-later"
+                                                              ::ev/origin "onboarding"
+                                                              :step 1}))))
 
         teams (mf/deref refs/teams)]
     (if (< (count teams) 2)
@@ -72,10 +81,9 @@
          [:p.info (tr "onboarding.choice.team-up.create-team-desc")]
          [:& fm/form {:form form
                       :on-submit on-submit}
-          [:div.input-wrapper
-           [:label (tr "onboarding.choice.team-up.create-team-placeholder")]
-           [:& fm/input {:type "text"
-                         :name :name}]]
+          [:& fm/input {:type "text"
+                        :name :name
+                        :label (tr "onboarding.choice.team-up.create-team-placeholder")}]
 
           [:& fm/submit-button
            {:label (tr "labels.continue")}]]
@@ -138,7 +146,11 @@
            (let [mdata  {:on-success (partial on-success form)
                          :on-error   (partial on-error form)}
                  params {:name name}]
-             (st/emit! (dd/create-team (with-meta params mdata))))))
+             (st/emit! (dd/create-team (with-meta params mdata))
+                       (ptk/event ::ev/event {::ev/name "create-team-and-invite-later"
+                                              ::ev/origin "onboarding"
+                                              :name name
+                                              :step 2})))))
 
         ;; The SUBMIT branch creates the team with the invitations
         on-submit
@@ -147,7 +159,13 @@
            (let [mdata  {:on-success (partial on-success form)
                          :on-error   (partial on-error form)}
                  params (:clean-data @form)]
-             (st/emit! (dd/create-team-with-invitations (with-meta params mdata))))))]
+             (st/emit! (dd/create-team-with-invitations (with-meta params mdata))
+                       (ptk/event ::ev/event {::ev/name "create-team-and-send-invitations"
+                                              ::ev/origin "onboarding"
+                                              :invites (count (:emails params))
+                                              :role (:role params)
+                                              :name name
+                                              :step 2})))))]
 
     [:div.modal-overlay
      [:div.modal-container.onboarding-team-members
@@ -159,7 +177,7 @@
                     :on-submit on-submit}
         [:div.invite-row
          [:div.role-wrapper
-          [:span.label (tr "onboarding.choice.team-up.roles")]
+          [:span.rol (tr "onboarding.choice.team-up.roles")]
           [:& fm/select {:name :role :options roles}]]
 
          [:& fm/multi-input {:type "email"
@@ -167,11 +185,16 @@
                              :auto-focus? true
                              :trim true
                              :valid-item-fn us/parse-email
+                             :on-submit  on-submit
                              :label (tr "modals.invite-member.emails")}]]
 
         [:div.buttons
          [:button.btn-secondary.btn-large
-          {:on-click #(st/emit! (modal/show {:type :onboarding-team}))}
+          {:on-click #(st/emit! (modal/show {:type :onboarding-team})
+                                (ptk/event ::ev/event {::ev/name "invite-members-back"
+                                                       ::ev/origin "onboarding"
+                                                       :name name
+                                                       :step 2}))}
           (tr "labels.back")]
          [:& fm/submit-button
           {:label (tr "onboarding.choice.team-up.invite-members-submit")}]]
