@@ -678,7 +678,7 @@ msgstr "El format d'imatge no està suportat (ha de ser SVG, JPG o PNG)."
 
 #: src/app/main/data/workspace/persistence.cljs
 msgid "errors.media-too-large"
-msgstr "La imatge és massa gran (ha de ser inferior a 5 MB)."
+msgstr "La imatge és massa gran."
 
 #: src/app/main/data/workspace/persistence.cljs, src/app/main/data/media.cljs
 msgid "errors.media-type-mismatch"
@@ -1612,10 +1612,6 @@ msgstr "Envia una invitació"
 
 msgid "modals.invite-member.emails"
 msgstr "Correus electrònics, separats per una coma"
-
-#: src/app/main/ui/dashboard/team.cljs
-msgid "modals.invite-member.title"
-msgstr "Convida a unir-se a l'equip"
 
 #: src/app/main/ui/dashboard/sidebar.cljs
 msgid "modals.leave-and-close-confirm.hint"

@@ -42,6 +42,8 @@
 (declare fetch-comment-threads)
 (declare fetch-bundle)
 (declare bundle-fetched)
+(declare zoom-to-fill)
+(declare zoom-to-fit)
 
 (s/def ::file-id ::us/uuid)
 (s/def ::index ::us/integer)
@@ -103,14 +105,14 @@
     ptk/WatchEvent
     (watch [_ state _]
       (let [components-v2 (features/active-feature? state :components-v2)
-            params' (cond-> {:file-id file-id}
-                      (uuid? share-id)
-                      (assoc :share-id share-id)
+            params'       (cond-> {:file-id file-id}
+                            (uuid? share-id)
+                            (assoc :share-id share-id)
 
-                      :always
-                      (assoc :components-v2 components-v2))]
+                            :always
+                            (assoc :components-v2 components-v2))]
 
-        (->> (rp/query :view-only-bundle params')
+        (->> (rp/query! :view-only-bundle params')
              (rx/mapcat
               (fn [{:keys [fonts] :as bundle}]
                 (rx/of (df/fonts-fetched fonts)
@@ -145,8 +147,13 @@
         (let [route   (:route state)
               qparams (:query-params route)
               index   (:index qparams)]
-          (when (nil? index)
-            (rx/of (go-to-frame-auto))))))))
+          (rx/merge
+           (rx/of (case (:zoom qparams)
+                    "fit" zoom-to-fit
+                    "fill" zoom-to-fill
+                    nil))
+           (when (nil? index)
+             (rx/of (go-to-frame-auto)))))))))
 
 (defn fetch-comment-threads
   [{:keys [file-id page-id share-id] :as params}]
@@ -164,7 +171,7 @@
     (ptk/reify ::fetch-comment-threads
       ptk/WatchEvent
       (watch [_ _ _]
-        (->> (rp/query :comment-threads {:file-id file-id :share-id share-id})
+        (->> (rp/cmd! :get-comment-threads {:file-id file-id :share-id share-id})
              (rx/map #(partial fetched %))
              (rx/catch on-error))))))
 
@@ -175,7 +182,7 @@
     (ptk/reify ::refresh-comment-thread
       ptk/WatchEvent
       (watch [_ _ _]
-        (->> (rp/query :comment-thread {:file-id file-id :id id})
+        (->> (rp/cmd! :get-comment-thread {:file-id file-id :id id})
              (rx/map #(partial fetched %)))))))
 
 (defn fetch-comments
@@ -186,7 +193,7 @@
     (ptk/reify ::retrieve-comments
       ptk/WatchEvent
       (watch [_ _ _]
-        (->> (rp/query :comments {:thread-id thread-id})
+        (->> (rp/cmd! :get-comments {:thread-id thread-id})
              (rx/map #(partial fetched %)))))))
 
 ;; --- Zoom Management
@@ -196,32 +203,39 @@
     ptk/UpdateEvent
     (update [_ state]
       (let [increase #(min (* % 1.3) 200)]
-        (update-in state [:viewer-local :zoom] (fnil increase 1))))))
+        (-> state
+            (update-in  [:viewer-local :zoom] (fnil increase 1))
+            (d/dissoc-in  [:viewer-local :zoom-type]))))))
 
 (def decrease-zoom
   (ptk/reify ::decrease-zoom
     ptk/UpdateEvent
     (update [_ state]
       (let [decrease #(max (/ % 1.3) 0.01)]
-        (update-in state [:viewer-local :zoom] (fnil decrease 1))))))
+        (-> state
+            (update-in [:viewer-local :zoom] (fnil decrease 1))
+            (d/dissoc-in  [:viewer-local :zoom-type]))))))
 
 (def reset-zoom
   (ptk/reify ::reset-zoom
     ptk/UpdateEvent
     (update [_ state]
-      (assoc-in state [:viewer-local :zoom] 1))))
+      (-> state
+          (assoc-in  [:viewer-local :zoom] 1)
+          (d/dissoc-in  [:viewer-local :zoom-type])))))
 
 (def zoom-to-fit
   (ptk/reify ::zoom-to-fit
     ptk/UpdateEvent
     (update [_ state]
-      (let [page-id (get-in state [:route :query-params :page-id])
-            frame-idx (get-in state [:route :query-params :index])
-            srect   (get (nth (get-in state [:viewer :pages page-id :frames]) frame-idx) :selrect)
-            original-size (get-in state [:viewer-local :viewport-size])
-            wdiff (/ (:width original-size) (:width srect))
-            hdiff (/ (:height original-size) (:height srect))
-            minzoom (min wdiff hdiff)]
+      (let [srect     (as-> (get-in state [:route :query-params :page-id]) %
+                        (get-in state [:viewer :pages % :frames])
+                        (nth % (get-in state [:route :query-params :index]))
+                        (get % :selrect))
+            orig-size (get-in state [:viewer-local :viewport-size])
+            wdiff     (/ (:width orig-size) (:width srect))
+            hdiff     (/ (:height orig-size) (:height srect))
+            minzoom   (min wdiff hdiff)]
         (-> state
             (assoc-in  [:viewer-local :zoom] minzoom)
             (assoc-in  [:viewer-local :zoom-type] :fit))))))
@@ -230,13 +244,14 @@
   (ptk/reify ::zoom-to-fill
     ptk/UpdateEvent
     (update [_ state]
-      (let [page-id (get-in state [:route :query-params :page-id])
-            frame-idx (get-in state [:route :query-params :index])
-            srect   (get (nth (get-in state [:viewer :pages page-id :frames]) frame-idx) :selrect)
-            original-size (get-in state [:viewer-local :viewport-size])
-            wdiff (/ (:width original-size) (:width srect))
-            hdiff (/ (:height original-size) (:height srect))
-            maxzoom (max wdiff hdiff)]
+      (let [srect     (as-> (get-in state [:route :query-params :page-id]) %
+                            (get-in state [:viewer :pages % :frames])
+                            (nth % (get-in state [:route :query-params :index]))
+                            (get % :selrect))
+            orig-size (get-in state [:viewer-local :viewport-size])
+            wdiff     (/ (:width orig-size) (:width srect))
+            hdiff     (/ (:height orig-size) (:height srect))
+            maxzoom   (max wdiff hdiff)]
         (-> state
             (assoc-in  [:viewer-local :zoom] maxzoom)
             (assoc-in  [:viewer-local :zoom-type] :fill))))))

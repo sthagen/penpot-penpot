@@ -277,6 +277,7 @@ msgid "dashboard.empty-files"
 msgstr "Todavía no hay ningún archivo aquí"
 
 #: src/app/main/ui/dashboard/grid.cljs
+#, markdown
 msgid "dashboard.empty-placeholder-drafts"
 msgstr ""
 "¡Oh, no! ¡Aún no tienes archivos! Si quieres probar con alguna plantilla ve "
@@ -378,6 +379,7 @@ msgid_plural "dashboard.fonts.fonts-added"
 msgstr[0] "1 fuente añadida"
 msgstr[1] "%s fuentes añadidas"
 
+#, markdown
 msgid "dashboard.fonts.hero-text1"
 msgstr ""
 "Cualquier fuente personalizada añadida aquí aparecerá en la lista de "
@@ -386,6 +388,7 @@ msgstr ""
 "como una **única familia de fuentes**. Se pueden cargar fuentes con los "
 "siguientes formatos: **TTF, OTF and WOFF** (con uno es suficiente)."
 
+#, markdown
 msgid "dashboard.fonts.hero-text2"
 msgstr ""
 "Sólo deberías cargar fuentes que te pertenecen o de las que tienes una "
@@ -480,6 +483,18 @@ msgstr "Nuevo Archivo"
 #: src/app/main/ui/dashboard/projects.cljs
 msgid "dashboard.new-project"
 msgstr "+ Nuevo proyecto"
+
+#: src/app/main/ui/dashboard/projects.cljs
+msgid "dasboard.team-hero.title"
+msgstr "¡Forma equipo!"
+
+#: src/app/main/ui/dashboard/projects.cljs
+msgid "dasboard.team-hero.text"
+msgstr " Penpot está dirigido a equipos. Invita a personas para trabajar conjuntamente en proyectos y archivos."
+
+#: src/app/main/ui/dashboard/projects.cljs
+msgid "dasboard.team-hero.management"
+msgstr "Gestión del equipo"
 
 #: src/app/main/data/dashboard.cljs
 msgid "dashboard.new-project-prefix"
@@ -660,6 +675,15 @@ msgstr "Tu nombre"
 msgid "dashboard.your-penpot"
 msgstr "Tu Penpot"
 
+msgid "dashboard.libraries-and-templates"
+msgstr "Bibliotecas y plantillas"
+
+msgid "dashboard.libraries-and-templates.explore"
+msgstr "Explora más y descubre cómo contribuir"
+
+msgid "dashboard.libraries-and-templates.import-error"
+msgstr "Hubo un problema importando la plantilla. No ha podido ser importada."
+
 #: src/app/main/ui/alert.cljs
 msgid "ds.alert-ok"
 msgstr "Ok"
@@ -754,7 +778,7 @@ msgstr "Este fichero ya se ha usado con los Componentes V2 activados."
 
 #: src/app/main/data/workspace/persistence.cljs
 msgid "errors.media-too-large"
-msgstr "La imagen es demasiado grande (debe tener menos de 5mb)."
+msgstr "La imagen es demasiado grande."
 
 #: src/app/main/data/workspace/persistence.cljs, src/app/main/data/media.cljs
 msgid "errors.media-type-mismatch"
@@ -1764,8 +1788,8 @@ msgid "modals.invite-member.emails"
 msgstr "Emails, separados por coma"
 
 #: src/app/main/ui/dashboard/team.cljs
-msgid "modals.invite-member.title"
-msgstr "Invitar a unirse al equipo"
+msgid "modals.invite-team-member.title"
+msgstr "Invitar a miembros al equipo"
 
 #: src/app/main/ui/dashboard/sidebar.cljs
 msgid "modals.leave-and-close-confirm.hint"
@@ -1985,7 +2009,7 @@ msgid "onboarding.choice.team-up.invite-members-info"
 msgstr "No olvides incluir personas de desarrollo, diseño, gestión… la diversidad suma :)"
 
 msgid "onboarding.choice.team-up.roles"
-msgstr "Invitar integrantes con el rol:"
+msgstr "Invitar con el rol:"
 
 msgid "onboarding.choice.team-up.create-later"
 msgstr "Crea un equipo más tarde"
@@ -2009,7 +2033,7 @@ msgid "onboarding.team-modal.create-team-feature-4"
 msgstr "Sin límite de integrantes"
 
 msgid "onboarding.team-modal.create-team-feature-5"
-msgstr "¡100 gratis!"
+msgstr "¡100% gratis!"
 
 msgid "onboarding.choice.team-up.invite-members-skip"
 msgstr "Crear equipo e invitar después"

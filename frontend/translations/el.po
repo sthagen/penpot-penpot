@@ -414,7 +414,7 @@ msgstr "Η μορφή εικόνας δεν αναγνωρίζεται (πρέπ
 
 #: src/app/main/data/workspace/persistence.cljs
 msgid "errors.media-too-large"
-msgstr "Η εικόνα είναι πολύ μεγάλη (πρέπει να είναι μικρότερη από 5mb)."
+msgstr "Η εικόνα είναι πολύ μεγάλη."
 
 #: src/app/main/data/workspace/persistence.cljs, src/app/main/data/media.cljs
 msgid "errors.media-type-mismatch"
@@ -1114,10 +1114,6 @@ msgstr "Διαγραφή μέλους της ομάδας"
 #: src/app/main/ui/dashboard/team.cljs
 msgid "modals.invite-member-confirm.accept"
 msgstr "Αποστολή πρόσκλησης"
-
-#: src/app/main/ui/dashboard/team.cljs
-msgid "modals.invite-member.title"
-msgstr "Προσκαλέστε να συμμετάσχετε στην ομάδα"
 
 #: src/app/main/ui/dashboard/sidebar.cljs
 msgid "modals.leave-and-reassign.hint1"

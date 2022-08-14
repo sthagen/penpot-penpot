@@ -469,7 +469,7 @@ msgstr "Formatul imaginii nu este acceptat (poate fi svg, jpg sau png)."
 
 #: src/app/main/data/workspace/persistence.cljs
 msgid "errors.media-too-large"
-msgstr "Imaginea este prea mare pentru a fi inserată (trebuie să fie sub 5mb)."
+msgstr "Imaginea este prea mare pentru a fi inserată."
 
 #: src/app/main/data/workspace/persistence.cljs, src/app/main/data/media.cljs
 msgid "errors.media-type-mismatch"
@@ -1229,10 +1229,6 @@ msgstr "Elimină un membru al echipei"
 #: src/app/main/ui/dashboard/team.cljs
 msgid "modals.invite-member-confirm.accept"
 msgstr "Trimite invitație"
-
-#: src/app/main/ui/dashboard/team.cljs
-msgid "modals.invite-member.title"
-msgstr "Invită o persoană în echipă"
 
 msgid "modals.leave-and-reassign.forbiden"
 msgstr ""

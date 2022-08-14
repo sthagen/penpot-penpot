@@ -591,7 +591,7 @@ msgstr "O formato da imagem não é compatível (deve ser svg, jpg ou png)."
 
 #: src/app/main/data/workspace/persistence.cljs
 msgid "errors.media-too-large"
-msgstr "A imagem é muito grande para ser inserida (deve ter menos de 5mb)."
+msgstr "A imagem é muito grande para ser inserida."
 
 #: src/app/main/data/workspace/persistence.cljs, src/app/main/data/media.cljs
 msgid "errors.media-type-mismatch"
@@ -1316,10 +1316,6 @@ msgstr "Excluir membro da equipe"
 #: src/app/main/ui/dashboard/team.cljs
 msgid "modals.invite-member-confirm.accept"
 msgstr "Enviar convite"
-
-#: src/app/main/ui/dashboard/team.cljs
-msgid "modals.invite-member.title"
-msgstr "Convidar para se juntar à equipe"
 
 msgid "modals.leave-and-reassign.forbiden"
 msgstr ""

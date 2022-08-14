@@ -5,9 +5,16 @@
 ### :boom: Breaking changes & Deprecations
 ### :sparkles: New features
 
+- Add team hero in projects dashboard [Taiga #3863](https://tree.taiga.io/project/penpot/us/3863)
+- Add zoom style to shared link [Taiga #3874](https://tree.taiga.io/project/penpot/us/3874)
+- Add dashboard creation button as placeholder [Taiga #3861](https://tree.taiga.io/project/penpot/us/3861)
+- Improve invitation flow on onboarding [Taiga #3241](https://tree.taiga.io/project/penpot/us/3241)
+- Add new text to initial modals [Taiga #3458](https://tree.taiga.io/project/penpot/us/3458)
+- Add new questions to onboarding [Taiga #3462](https://tree.taiga.io/project/penpot/us/3462)
 - Add cosmetic changes in viewer mode [Taiga #3688](https://tree.taiga.io/project/penpot/us/3688)
 - Outline highlights on layer hovering [Taiga #2645](https://tree.taiga.io/project/penpot/us/2645) by @andrewzhurov
 - Add zoom to shape on double click up on its icon [Taiga #3929](https://tree.taiga.io/project/penpot/us/3929) by @andrewzhurov
+- Add Libraries & Templates carousel [Taiga #3860](https://tree.taiga.io/project/penpot/us/3860)
 
 ### :bug: Bugs fixed
 
@@ -52,10 +59,13 @@
 - Support for import/export binary format [Taiga #2991](https://tree.taiga.io/project/penpot/us/2991)
 - Comments positioning [Taiga #2007](https://tree.taiga.io/project/penpot/us/2007)
 - Select all inside a group select only the objects at this group level [Taiga #2382](https://tree.taiga.io/project/penpot/issue/2382)
+- Make the media maximum upload size configurable
 
 ### :bug: Bugs fixed
 
 - Fix font rendering on grid thumbnails [Taiga #3473](https://tree.taiga.io/project/penpot/issue/3473)
+- Fix recent fonts info [Taiga #3953](https://tree.taiga.io/project/penpot/issue/3953)
+- Fix clipped elements affect boards and centering [Taiga #3666](https://tree.taiga.io/project/penpot/issue/3666)
 - Fix intro action in multi input [Taiga #3541](https://tree.taiga.io/project/penpot/issue/3541)
 - Fix team default image [Taiga #3919](https://tree.taiga.io/project/penpot/issue/3919)
 - Fix problem with group coordinates [#2008](https://github.com/penpot/penpot/issues/2008)

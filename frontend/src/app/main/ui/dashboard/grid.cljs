@@ -142,10 +142,10 @@
          (fn [event]
            (dom/prevent-default event)
            (when-not selected?
-             (let [shift? (kbd/shift? event)]
-               (when-not shift?
-                 (st/emit! (dd/clear-selected-files)))
-               (st/emit! (dd/toggle-file-select file))))
+             (when-not (kbd/shift? event)
+               (st/emit! (dd/clear-selected-files)))
+             (st/emit! (dd/toggle-file-select file)))
+
            (let [position (dom/get-client-position event)]
              (swap! local assoc
                     :menu-open true
@@ -273,12 +273,12 @@
             :key (:id item)
             :navigate? true
             :origin origin}])]
-
        :else
        [:& empty-placeholder {:default? (:is-default project)
                               :on-create-clicked on-create-clicked
                               :project project
-                              :limit limit}])]))
+                              :limit limit
+                              :origin origin}])]))
 
 (mf/defc line-grid-row
   [{:keys [files selected-files dragging? limit] :as props}]

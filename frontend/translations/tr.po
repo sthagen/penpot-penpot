@@ -237,6 +237,7 @@ msgid "dashboard.empty-files"
 msgstr "Burada hiç dosyan yok"
 
 #: src/app/main/ui/dashboard/grid.cljs
+#, markdown
 msgid "dashboard.empty-placeholder-drafts"
 msgstr ""
 "Olamaz! Henüz dosyanız yok! Bazı şablonları denemek isterseniz "
@@ -692,7 +693,7 @@ msgstr "Görsel biçimi desteklenmiyor (svg, jpg veya png olmalı)."
 
 #: src/app/main/data/workspace/persistence.cljs
 msgid "errors.media-too-large"
-msgstr "Bu görsel eklemek için çok büyük (5MB altında olmalı)."
+msgstr "Bu görsel eklemek için çok büyük."
 
 #: src/app/main/data/workspace/persistence.cljs, src/app/main/data/media.cljs
 msgid "errors.media-type-mismatch"
@@ -1641,10 +1642,6 @@ msgstr "Davet gönder"
 
 msgid "modals.invite-member.emails"
 msgstr "E-posta adresleri, virgülle ayrılmış"
-
-#: src/app/main/ui/dashboard/team.cljs
-msgid "modals.invite-member.title"
-msgstr "Takıma katılma daveti gönder"
 
 #: src/app/main/ui/dashboard/sidebar.cljs
 msgid "modals.leave-and-close-confirm.hint"

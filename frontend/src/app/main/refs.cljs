@@ -210,7 +210,7 @@
 
 (def workspace-recent-fonts
   (l/derived (fn [data]
-               (get data :workspace-data []))
+               (get data :recent-fonts []))
              workspace-data))
 
 (def workspace-file-typography
@@ -396,6 +396,11 @@
 (def viewer-fullscreen?
   (l/derived (fn [state]
                (dm/get-in state [:viewer-local :fullscreen?]))
+             st/state))
+
+(def viewer-zoom-type
+  (l/derived (fn [state]
+               (dm/get-in state [:viewer-local :zoom-type]))
              st/state))
 
 (def thumbnail-data

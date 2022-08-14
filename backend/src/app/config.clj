@@ -42,8 +42,7 @@
     data))
 
 (def defaults
-  {
-   :database-uri "postgresql://postgres/penpot"
+  {:database-uri "postgresql://postgres/penpot"
    :database-username "penpot"
    :database-password "penpot"
 
@@ -84,11 +83,11 @@
    ;; a server prop key where initial project is stored.
    :initial-project-skey "initial-project"})
 
-(s/def ::flags ::us/vec-of-valid-keywords)
 
-;; DEPRECATED PROPERTIES
+(s/def ::media-max-file-size ::us/integer)
+
+(s/def ::flags ::us/vec-of-valid-keywords)
 (s/def ::telemetry-enabled ::us/boolean)
-;; END DEPRECATED
 
 (s/def ::audit-log-archive-uri ::us/string)
 (s/def ::audit-log-gc-max-age ::dt/duration)
@@ -101,10 +100,14 @@
 (s/def ::blocking-executor-parallelism ::us/integer)
 (s/def ::worker-executor-parallelism ::us/integer)
 
+(s/def ::authenticated-cookie-domain ::us/string)
+(s/def ::authenticated-cookie-name ::us/string)
+(s/def ::auth-token-cookie-name ::us/string)
+(s/def ::auth-token-cookie-max-age ::dt/duration)
+
 (s/def ::secret-key ::us/string)
 (s/def ::allow-demo-users ::us/boolean)
 (s/def ::assets-path ::us/string)
-(s/def ::authenticated-cookie-domain ::us/string)
 (s/def ::database-password (s/nilable ::us/string))
 (s/def ::database-uri ::us/string)
 (s/def ::database-username (s/nilable ::us/string))
@@ -140,9 +143,6 @@
 (s/def ::http-server-max-multipart-body-size ::us/integer)
 (s/def ::http-server-io-threads ::us/integer)
 (s/def ::http-server-worker-threads ::us/integer)
-(s/def ::http-session-idle-max-age ::dt/duration)
-(s/def ::http-session-updater-batch-max-age ::dt/duration)
-(s/def ::http-session-updater-batch-max-size ::us/integer)
 (s/def ::initial-project-skey ::us/string)
 (s/def ::ldap-attrs-email ::us/string)
 (s/def ::ldap-attrs-fullname ::us/string)
@@ -206,6 +206,9 @@
                    ::allow-demo-users
                    ::audit-log-archive-uri
                    ::audit-log-gc-max-age
+                   ::auth-token-cookie-name
+                   ::auth-token-cookie-max-age
+                   ::authenticated-cookie-name
                    ::authenticated-cookie-domain
                    ::database-password
                    ::database-uri
@@ -246,9 +249,6 @@
                    ::http-server-max-multipart-body-size
                    ::http-server-io-threads
                    ::http-server-worker-threads
-                   ::http-session-idle-max-age
-                   ::http-session-updater-batch-max-age
-                   ::http-session-updater-batch-max-size
                    ::initial-project-skey
                    ::ldap-attrs-email
                    ::ldap-attrs-fullname
@@ -264,6 +264,7 @@
                    ::local-assets-uri
                    ::loggers-loki-uri
                    ::loggers-zmq-uri
+                   ::media-max-file-size
                    ::profile-bounce-max-age
                    ::profile-bounce-threshold
                    ::profile-complaint-max-age
@@ -307,6 +308,7 @@
 
 (def default-flags
   [:enable-backend-api-doc
+   :enable-backend-worker
    :enable-secure-session-cookies])
 
 (defn- parse-flags
