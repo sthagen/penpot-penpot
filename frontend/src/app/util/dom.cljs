@@ -37,6 +37,14 @@
   (when (some? e)
     (.-target e)))
 
+(defn event->native-event
+  [^js e]
+  (.-nativeEvent e))
+
+(defn event->browser-event
+  [^js e]
+  (.getBrowserEvent e))
+
 ;; --- New methods
 
 (declare get-elements-by-tag)
@@ -121,7 +129,7 @@
 
 (defn get-current-target
   "Extract the current target from event instance (different from target
-   when event triggered in a child of the subscribing element)."
+  when event triggered in a child of the subscribing element)."
   [^js event]
   (when (some? event)
     (.-currentTarget event)))

@@ -22,6 +22,7 @@
    [app.common.types.shape-tree :as ctst]
    [app.common.uuid :as uuid]
    [app.config :as cfg]
+   [app.main.data.comments :as dcm]
    [app.main.data.events :as ev]
    [app.main.data.messages :as msg]
    [app.main.data.users :as du]
@@ -65,6 +66,7 @@
    [beicon.core :as rx]
    [cljs.spec.alpha :as s]
    [cuerdas.core :as str]
+   [linked.core :as lks]
    [potok.core :as ptk]))
 
 (s/def ::shape-attrs ::cts/shape-attrs)
@@ -114,7 +116,8 @@
     ptk/WatchEvent
     (watch [_ _ stream]
       (rx/merge
-       (rx/of (dwp/fetch-bundle project-id file-id))
+       (rx/of (dwp/fetch-bundle project-id file-id)
+              (dcm/retrieve-comment-threads file-id))
 
        ;; Initialize notifications (websocket connection) and the file persistence
        (->> stream
@@ -961,7 +964,6 @@
                                                             :graphics #{}
                                                             :colors #{}
                                                             :typographies #{}}))))
-
 (defn go-to-component
   [component-id]
   (ptk/reify ::go-to-component
@@ -983,6 +985,31 @@
     (effect [_ _ _]
       (let [wrapper-id    (str "component-shape-id-" component-id)]
         (tm/schedule-on-idle #(dom/scroll-into-view-if-needed! (dom/get-element wrapper-id)))))))
+
+(defn go-to-main-instance
+  [page-id shape-id on-page-selected]
+  (us/verify ::us/uuid page-id)
+  (us/verify ::us/uuid shape-id)
+  (ptk/reify ::go-to-main-instance
+    ptk/WatchEvent
+    (watch [_ state stream]
+      (let [current-page-id (:current-page-id state)]
+        (if (= page-id current-page-id)
+          (do
+            (on-page-selected)
+            (rx/of (dws/select-shapes (lks/set shape-id))))
+          (let [project-id      (:current-project-id state)
+                file-id         (:current-file-id state)
+                pparams         {:file-id file-id :project-id project-id}
+                qparams         {:page-id page-id :layout :assets}]
+            (rx/merge
+              (rx/of (rt/nav :workspace pparams qparams))
+              (->> stream
+                   (rx/filter (ptk/type? ::dwv/initialize-viewport))
+                   (rx/take 1)
+                   (rx/mapcat #(do
+                                 (on-page-selected)
+                                 (rx/of (dws/select-shapes (lks/set shape-id)))))))))))))
 
 (def go-to-file
   (ptk/reify ::go-to-file

@@ -78,11 +78,11 @@ msgstr "Google"
 
 #: src/app/main/ui/auth/login.cljs
 msgid "auth.login-with-ldap-submit"
-msgstr "Entrar con LDAP"
+msgstr "LDAP"
 
 #: src/app/main/ui/auth/login.cljs
 msgid "auth.login-with-oidc-submit"
-msgstr "OpenID Connect"
+msgstr "OpenID"
 
 #: src/app/main/ui/auth/recovery.cljs
 msgid "auth.new-password"
@@ -228,6 +228,12 @@ msgstr "Compartir prototipos"
 
 msgid "common.share-link.view-all"
 msgstr "Selecctionar todas"
+
+msgid "common.publish"
+msgstr "Publicar"
+
+msgid "common.unpublish"
+msgstr "Despublicar"
 
 #: src/app/main/ui/workspace/header.cljs,
 #: src/app/main/ui/dashboard/file_menu.cljs
@@ -2914,9 +2920,8 @@ msgstr "Duplicar"
 msgid "workspace.assets.edit"
 msgstr "Editar"
 
-#: src/app/main/ui/workspace/sidebar/assets.cljs
-msgid "workspace.assets.file-library"
-msgstr "Biblioteca del archivo"
+msgid "workspace.assets.local-library"
+msgstr "biblioteca local"
 
 #: src/app/main/ui/workspace/sidebar/assets.cljs,
 #: src/app/main/ui/workspace/sidebar/assets.cljs
