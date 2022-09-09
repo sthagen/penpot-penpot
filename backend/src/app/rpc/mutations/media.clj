@@ -15,14 +15,14 @@
    [app.db :as db]
    [app.media :as media]
    [app.rpc.queries.teams :as teams]
-   [app.rpc.rlimit :as rlimit]
+   [app.rpc.semaphore :as rsem]
    [app.storage :as sto]
    [app.storage.tmp :as tmp]
-   [app.util.bytes :as bs]
    [app.util.services :as sv]
    [app.util.time :as dt]
    [clojure.spec.alpha :as s]
    [cuerdas.core :as str]
+   [datoteka.io :as io]
    [promesa.core :as p]
    [promesa.exec :as px]))
 
@@ -53,7 +53,7 @@
           :opt-un [::id]))
 
 (sv/defmethod ::upload-file-media-object
-  {::rlimit/permits (cf/get :rlimit-image)}
+  {::rsem/permits (cf/get :rpc-semaphore-permits-image)}
   [{:keys [pool] :as cfg} {:keys [profile-id file-id content] :as params}]
   (let [file (select-file pool file-id)
         cfg  (update cfg :storage media/configure-assets-storage)]
@@ -181,7 +181,7 @@
           :opt-un [::id ::name]))
 
 (sv/defmethod ::create-file-media-object-from-url
-  {::rlimit/permits (cf/get :rlimit-image)}
+  {::rsem/permits (cf/get :rpc-semaphore-permits-image)}
   [{:keys [pool] :as cfg} {:keys [profile-id file-id] :as params}]
   (let [file (select-file pool file-id)
         cfg  (update cfg :storage media/configure-assets-storage)]
@@ -224,7 +224,7 @@
           (process-response [{:keys [body headers] :as response}]
             (let [{:keys [size mtype]} (parse-and-validate-size headers)
                   path                 (tmp/tempfile :prefix "penpot.media.download.")
-                  written              (bs/write-to-file! body path :size size)]
+                  written              (io/write-to-file! body path :size size)]
 
               (when (not= written size)
                 (ex/raise :type :internal

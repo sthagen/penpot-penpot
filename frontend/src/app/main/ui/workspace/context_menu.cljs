@@ -10,6 +10,7 @@
    [app.common.data :as d]
    [app.common.data.macros :as dm]
    [app.common.pages.helpers :as cph]
+   [app.common.types.components-list :as ctkl]
    [app.common.types.page :as ctp]
    [app.main.data.events :as ev]
    [app.main.data.modal :as modal]
@@ -18,6 +19,7 @@
    [app.main.data.workspace.libraries :as dwl]
    [app.main.data.workspace.selection :as dws]
    [app.main.data.workspace.shortcuts :as sc]
+   [app.main.features :as features]
    [app.main.refs :as refs]
    [app.main.store :as st]
    [app.main.ui.components.dropdown :refer [dropdown]]
@@ -211,8 +213,9 @@
         single?   (= (count shapes) 1)
         do-create-artboard-from-selection #(st/emit! (dw/create-artboard-from-selection))
 
-        has-group? (->> shapes (d/seek #(= :group (:type %))))
-        has-bool? (->> shapes (d/seek #(= :bool (:type %))))
+        has-frame? (->> shapes (d/seek cph/frame-shape?))
+        has-group? (->> shapes (d/seek cph/group-shape?))
+        has-bool? (->> shapes (d/seek cph/bool-shape?))
         has-mask? (->> shapes (d/seek :masked-group?))
 
         is-group? (and single? has-group?)
@@ -224,7 +227,7 @@
         do-unmask-group #(st/emit! dw/unmask-group)]
 
     [:*
-     (when (or has-bool? has-group? has-mask?)
+     (when (or has-bool? has-group? has-mask? has-frame?)
        [:& menu-entry {:title (tr "workspace.shape.menu.ungroup")
                        :shortcut (sc/get-tooltip :ungroup)
                        :on-click do-remove-group}])
@@ -264,9 +267,9 @@
   (let [multiple? (> (count shapes) 1)
         single?   (= (count shapes) 1)
 
-        has-group? (->> shapes (d/seek #(= :group (:type %))))
-        has-bool? (->> shapes (d/seek #(= :bool (:type %))))
-        has-frame? (->> shapes (d/seek #(= :frame (:type %))))
+        has-group? (->> shapes (d/seek cph/group-shape?))
+        has-bool? (->> shapes (d/seek cph/bool-shape?))
+        has-frame? (->> shapes (d/seek cph/frame-shape?))
 
         is-group? (and single? has-group?)
         is-bool? (and single? has-bool?)
@@ -348,7 +351,7 @@
 
         prototype?      (= options-mode :prototype)
         single?         (= (count shapes) 1)
-        has-frame?      (->> shapes (d/seek #(= :frame (:type %))))
+        has-frame?      (->> shapes (d/seek cph/frame-shape?))
         is-frame?       (and single? has-frame?)]
 
     (when (and prototype? is-frame?)
@@ -364,7 +367,7 @@
   [{:keys [shapes]}]
   (let [single?   (= (count shapes) 1)
 
-        has-frame? (->> shapes (d/seek #(= :frame (:type %))))
+        has-frame? (->> shapes (d/seek cph/frame-shape?))
         has-component? (some true? (map #(contains? % :component-id) shapes))
         is-component? (and single? (-> shapes first :component-id some?))
 
@@ -373,8 +376,18 @@
         component-file (-> shapes first :component-file)
         component-shapes (filter #(contains? % :component-id) shapes)
 
+        components-v2 (features/use-feature :components-v2)
+
         current-file-id (mf/use-ctx ctx/current-file-id)
         local-component? (= component-file current-file-id)
+
+        local-library (when local-component?
+                        ;; Not needed to subscribe to changes because it's not expected
+                        ;; to change while context menu is open
+                        (deref refs/workspace-local-library))
+
+        main-component (when local-component?
+                         (ctkl/get-component local-library (:component-id (first shapes))))
 
         do-add-component #(st/emit! (dwl/add-component))
         do-detach-component #(st/emit! (dwl/detach-component shape-id))
@@ -384,6 +397,7 @@
         do-navigate-component-file #(st/emit! (dwl/nav-to-component-file component-file))
         do-update-component #(st/emit! (dwl/update-component-sync shape-id component-file))
         do-update-component-in-bulk #(st/emit! (dwl/update-component-in-bulk component-shapes component-file))
+        do-restore-component #(st/emit! (dwl/restore-component component-id))
 
         do-update-remote-component
         #(st/emit! (modal/show
@@ -436,11 +450,14 @@
 
 
         (if local-component?
-          [:*
-           [:& menu-entry {:title (tr "workspace.shape.menu.update-main")
-                           :on-click do-update-component}]
-           [:& menu-entry {:title (tr "workspace.shape.menu.show-main")
-                           :on-click do-show-component}]]
+          (if (and (nil? main-component) components-v2)
+            [:& menu-entry {:title (tr "workspace.shape.menu.restore-main")
+                            :on-click do-restore-component}]
+            [:*
+             [:& menu-entry {:title (tr "workspace.shape.menu.update-main")
+                             :on-click do-update-component}]
+             [:& menu-entry {:title (tr "workspace.shape.menu.show-main")
+                             :on-click do-show-component}]])
 
           [:*
            [:& menu-entry {:title (tr "workspace.shape.menu.go-main")

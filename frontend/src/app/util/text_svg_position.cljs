@@ -19,13 +19,14 @@
   [parent-node direction text-node]
 
   (letfn [(parse-entry [^js entry]
-            {:node      (.-node entry)
-             :position  (dom/bounding-rect->rect (.-position entry))
-             :text      (.-text entry)
-             :direction direction})]
+            (when (some? (.-position entry))
+              {:node      (.-node entry)
+               :position  (dom/bounding-rect->rect (.-position entry))
+               :text      (.-text entry)
+               :direction direction}))]
     (into
      []
-     (map parse-entry)
+     (keep parse-entry)
      (tpd/parse-text-nodes parent-node text-node))))
 
 (def load-promises (atom {}))
@@ -55,7 +56,8 @@
 
     (-> (fonts/ensure-loaded! font-id)
         (p/then #(when (not (dom/check-font? font))
-                   (load-font font))))))
+                   (load-font font)))
+        (p/catch #(.error js/console (dm/str "Cannot load font" font-id) %)))))
 
 (defn- calc-text-node-positions
   [shape-id]

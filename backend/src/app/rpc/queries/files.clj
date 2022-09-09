@@ -402,6 +402,7 @@
 (def ^:private sql:team-shared-files
   "select f.id,
           f.revn,
+          f.data,
           f.project_id,
           f.created_at,
           f.modified_at,
@@ -420,7 +421,26 @@
 
 (sv/defmethod ::team-shared-files
   [{:keys [pool] :as cfg} {:keys [team-id] :as params}]
-  (db/exec! pool [sql:team-shared-files team-id]))
+  (let [assets-sample
+        (fn [assets limit]
+          (let [sorted-assets (->> (vals assets)
+                                   (sort-by #(str/lower (:name %))))]
+
+          {:count (count sorted-assets)
+           :sample (into [] (take limit sorted-assets))}))
+
+        library-summary
+        (fn [data]
+          {:components (assets-sample (:components data) 4)
+           :colors (assets-sample (:colors data) 3)
+           :typographies (assets-sample (:typographies data) 3)})
+
+        xform (comp
+                (map decode-row)
+                (map #(assoc % :library-summary (library-summary (:data %))))
+                (map #(dissoc % :data)))]
+
+    (into #{} xform (db/exec! pool [sql:team-shared-files team-id]))))
 
 
 ;; --- Query: File Libraries used by a File
@@ -468,11 +488,12 @@
 ;; --- Query: Files that use this File library
 
 (def ^:private sql:library-using-files
-  "SELECT f.id, 
+  "SELECT f.id,
           f.name
-     FROM file_library_rel AS flr 
-     INNER JOIN file AS f ON f.id = flr.file_id
-    WHERE flr.library_file_id = ?;")
+     FROM file_library_rel AS flr
+     JOIN file AS f ON (f.id = flr.file_id)
+    WHERE flr.library_file_id = ?
+      AND (f.deleted_at IS NULL OR f.deleted_at > now())")
 
 (s/def ::library-using-files
   (s/keys :req-un [::profile-id ::file-id]))

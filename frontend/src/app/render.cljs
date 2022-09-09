@@ -7,11 +7,11 @@
 (ns app.render
   "The main entry point for UI part needed by the exporter."
   (:require
+   [app.common.geom.shapes.bounds :as gsb]
    [app.common.logging :as l]
    [app.common.math :as mth]
    [app.common.spec :as us]
    [app.common.uri :as u]
-   [app.config :as cf]
    [app.main.data.fonts :as df]
    [app.main.features :as features]
    [app.main.render :as render]
@@ -36,10 +36,6 @@
 (declare ^:private render-single-object)
 (declare ^:private render-components)
 (declare ^:private render-objects)
-
-(l/info :hint "Welcome to penpot (Export)"
-        :version (:full @cf/version)
-        :public-uri (str cf/public-uri))
 
 (defn- parse-params
   [loc]
@@ -125,10 +121,11 @@
     ;; exportation process.
     (mf/with-effect [object]
       (when object
-        (dom/set-page-style!
-          {:size (str/concat
-                   (mth/ceil (:width object)) "px "
-                   (mth/ceil (:height object)) "px")})))
+        (let [{:keys [width height]} (gsb/get-object-bounds [objects] object)]
+          (dom/set-page-style!
+           {:size (str/concat
+                   (mth/ceil width) "px "
+                   (mth/ceil height) "px")}))))
 
     (when objects
       [:& render/object-svg

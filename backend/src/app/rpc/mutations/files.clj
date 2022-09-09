@@ -17,10 +17,11 @@
    [app.db :as db]
    [app.loggers.audit :as audit]
    [app.metrics :as mtx]
+   [app.msgbus :as mbus]
    [app.rpc.permissions :as perms]
    [app.rpc.queries.files :as files]
    [app.rpc.queries.projects :as proj]
-   [app.rpc.rlimit :as rlimit]
+   [app.rpc.semaphore :as rsem]
    [app.storage.impl :as simpl]
    [app.util.blob :as blob]
    [app.util.services :as sv]
@@ -162,25 +163,21 @@
   "Find all files using a shared library, and absorb all library assets
   into the file local libraries"
   [conn {:keys [id] :as params}]
-  (let [library (->> (db/get-by-id conn :file id)
-                     (files/decode-row)
-                     (pmg/migrate-file))]
+  (let [library (db/get-by-id conn :file id)]
     (when (:is-shared library)
-      (let [process-file
-            (fn [row]
-              (let [ts (dt/now)
-                    file (->> (db/get-by-id conn :file (:file-id row))
-                              (files/decode-row)
-                              (pmg/migrate-file))
-                    updated-data (ctf/absorb-assets (:data file) (:data library))]
-
-                (db/update! conn :file
-                            {:revn (inc (:revn file))
-                             :data (blob/encode updated-data)
-                             :modified-at ts}
-                            {:id (:id file)})))]
-
-        (run! process-file (db/query conn :file-library-rel {:library-file-id id}))))))
+      (let [ldata (-> library files/decode-row pmg/migrate-file :data)]
+        (->> (db/query conn :file-library-rel {:library-file-id id})
+             (keep (fn [{:keys [file-id]}]
+                    (some->> (db/get-by-id conn :file file-id {:check-not-found false})
+                             (files/decode-row)
+                             (pmg/migrate-file))))
+             (run! (fn [{:keys [id data revn] :as file}]
+                     (let [data (ctf/absorb-assets data ldata)]
+                       (db/update! conn :file
+                                   {:revn (inc revn)
+                                    :data (blob/encode data)
+                                    :modified-at (dt/now)}
+                                   {:id id})))))))))
 
 ;; --- Mutation: Link file to library
 
@@ -318,7 +315,7 @@
          (contains? o :changes-with-metadata)))))
 
 (sv/defmethod ::update-file
-  {::rlimit/permits (cf/get :rlimit-file-update)}
+  {::rsem/permits (cf/get :rpc-semaphore-permits-file-update)}
   [{:keys [pool] :as cfg} {:keys [id profile-id] :as params}]
   (db/with-atomic [conn pool]
     (db/xact-lock! conn id)
@@ -443,12 +440,12 @@
 
 (defn- send-notifications
   [{:keys [conn] :as cfg} {:keys [file changes session-id] :as params}]
-  (let [lchanges  (filter library-change? changes)
-        msgbus-fn (:msgbus cfg)]
+  (let [lchanges (filter library-change? changes)
+        msgbus   (:msgbus cfg)]
 
 
     ;; Asynchronously publish message to the msgbus
-    (msgbus-fn :cmd :pub
+    (mbus/pub! msgbus
                :topic (:id file)
                :message {:type :file-change
                          :profile-id (:profile-id params)
@@ -460,7 +457,7 @@
     (when (and (:is-shared file) (seq lchanges))
       (let [team-id (retrieve-team-id conn (:project-id file))]
         ;; Asynchronously publish message to the msgbus
-        (msgbus-fn :cmd :pub
+        (mbus/pub! msgbus
                    :topic team-id
                    :message {:type :library-change
                              :profile-id (:profile-id params)

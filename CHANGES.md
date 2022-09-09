@@ -3,6 +3,12 @@
 ## :rocket: Next
 
 ### :boom: Breaking changes & Deprecations
+
+- Removed the support for v2 internal file data blob format.  This
+  version has never been documented nor set as default value so
+  technicaly this is not a breaking change because we are removing
+  a "private API".
+
 ### :sparkles: New features
 
 - Add team hero in projects dashboard [Taiga #3863](https://tree.taiga.io/project/penpot/us/3863)
@@ -15,18 +21,54 @@
 - Outline highlights on layer hovering [Taiga #2645](https://tree.taiga.io/project/penpot/us/2645) by @andrewzhurov
 - Add zoom to shape on double click up on its icon [Taiga #3929](https://tree.taiga.io/project/penpot/us/3929) by @andrewzhurov
 - Add Libraries & Templates carousel [Taiga #3860](https://tree.taiga.io/project/penpot/us/3860)
+- Ungroup frames [Taiga #4012](https://tree.taiga.io/project/penpot/us/4012)
 
 ### :bug: Bugs fixed
 
 - Fix unexpected removal of guides on copy&paste frames [Taiga #3887](https://tree.taiga.io/project/penpot/issue/3887) by @andrewzhurov
 - Fix props preserving on copy&paste texts [Taiga #3629](https://tree.taiga.io/project/penpot/issue/3629) by @andrewzhurov
 - Fix unexpected layers ungrouping on moving it [Taiga #3932](https://tree.taiga.io/project/penpot/issue/3932) by @andrewzhurov
+- Fix artboards moving with comment tool selected [Taiga #3938](https://tree.taiga.io/project/penpot/issue/3938)
+- Fix undo on delete page does not preserve its order [Taiga #3375](https://tree.taiga.io/project/penpot/issue/3375)
+- Fix unexpected 404 on deleting library that is used by deleted files
+- Fix inconsistent message on deleting library when a library is linked from deleted files
 
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
 
 - To @andrewzhurov for many code contributions on this release.
 
+## 1.15.3-beta
+
+### :bug: Bugs fixed
+
+- Fix default value of grow type in texts [Taiga #4034](https://tree.taiga.io/project/penpot/issue/4034)
+- Fix error when moving nested frames outside [Taiga #4017](https://tree.taiga.io/project/penpot/issue/4017)
+- Fix problem when hovering over nested frames [Taiga #4018](https://tree.taiga.io/project/penpot/issue/4018)
+- Fix problem editing rotated texts [Taiga #4026](https://tree.taiga.io/project/penpot/issue/4026)
+- Fix problem with texts for non existing fonts [Taiga #4087](https://tree.taiga.io/project/penpot/issue/4087)
+
+## 1.15.2-beta
+
+### :bug: Bugs fixed
+
+- Fix problem with multi-user text editing [Taiga #3446](https://tree.taiga.io/project/penpot/issue/3446)
+- Fix path tools blocking elements underneath [#2050](https://github.com/penpot/penpot/issues/2050)
+- Fix frame titles deforming when resize [#2207](https://github.com/penpot/penpot/issues/2207)
+- Fix export simple line path [#3890](https://tree.taiga.io/project/penpot/issue/3890)
+- Fix color-picker recent colors [Taiga #4013](https://tree.taiga.io/project/penpot/issue/4013)
+
+## 1.15.1-beta
+
+### :bug: Bugs fixed
+
+- Fix shadows doesn't work on nested artboards [Taiga #3886](https://tree.taiga.io/project/penpot/issue/3886)
+- Fix problems with double-click and selection [Taiga #4005](https://tree.taiga.io/project/penpot/issue/4005)
+- Fix mismatch between editor and displayed text in workspace [Taiga #3975](https://tree.taiga.io/project/penpot/issue/3975)
+- Fix validation error on text position [Taiga #4010](https://tree.taiga.io/project/penpot/issue/4010)
+- Fix objects jitter while scrolling [Github #2167](https://github.com/penpot/penpot/issues/2167)
+- Fix on color-picker, click+drag adds lots of recent colors [Taiga #4013](https://tree.taiga.io/project/penpot/issue/4013)
+- Fix opening profile URL while signed out takes to "your account" section[Taiga #3976](https://tree.taiga.io/project/penpot/issue/3976)
 
 ## 1.15.0-beta
 
@@ -86,6 +128,7 @@
 - Fix unexpected exception and behavior on colorpicker with gradients [Taiga #3448](https://tree.taiga.io/project/penpot/issue/3448)
 - Fix multiselection with shift not working inside a library group [Taiga #3532](https://tree.taiga.io/project/penpot/issue/3532)
 - Fix drag and drop graphic assets in groups [Taiga #4002](https://tree.taiga.io/project/penpot/issue/4002)
+- Fix bringing complete file data when launching the export dialog [Taiga #4006](https://tree.taiga.io/project/penpot/issue/4006)
 
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
