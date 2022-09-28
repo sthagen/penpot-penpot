@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.fonts
   "Fonts management and loading logic."
@@ -154,8 +154,7 @@
     font-style: %(style)s;
     font-weight: %(weight)s;
     font-display: block;
-    src: url(%(woff2-uri)s) format('woff2'),
-         url(%(woff1-uri)s) format('woff'),
+    src: url(%(woff1-uri)s) format('woff'),
          url(%(ttf-uri)s) format('ttf'),
          url(%(otf-uri)s) format('otf');
   }")

@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.shapes.frame
   (:require
@@ -13,7 +13,7 @@
    [app.main.ui.shapes.custom-stroke :refer [shape-fills shape-strokes]]
    [app.util.object :as obj]
    [debug :refer [debug?]]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (defn frame-clip-id
   [shape render-id]

@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.util.websocket
   "A general protocol implementation on top of websockets."
@@ -101,7 +101,8 @@
           (fn [_ error]
             (a/close! close-ch)
             (when-not (or (instance? java.nio.channels.ClosedChannelException error)
-                          (instance? java.net.SocketException error))
+                          (instance? java.net.SocketException error)
+                          (instance? java.io.IOException error))
               (l/error :hint (ex-message error) :cause error)))
 
           on-ws-message

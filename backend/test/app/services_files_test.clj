@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.services-files-test
   (:require
@@ -537,10 +537,12 @@
                   :file-id (:id file)
                   :object-id frame1-id
                   :components-v2 true}
-            {:keys [error result] :as out} (th/query! data)]
-        ;; (th/print-result! out)
-        (t/is (= :validation (th/ex-type error)))
-        (t/is (= :spec-validation (th/ex-code error)))))
+            out  (th/query! data)]
+
+        (t/is (not (th/success? out)))
+        (let [{:keys [type code]} (-> out :error ex-data)]
+          (t/is (= :validation type))
+          (t/is (= :spec-validation code)))))
 
     (t/testing "RPC :file-data-for-thumbnail"
       ;; Insert a thumbnail data for the frame-id
@@ -728,8 +730,8 @@
 
       ;; Then query the specific revn
       (let [{:keys [result error] :as out} (th/query! (assoc data :revn 1))]
-        (t/is (= :not-found (th/ex-type error)))
-        (t/is (= :file-thumbnail-not-found (th/ex-code error)))))
+        (t/is (th/ex-of-type? error :not-found))
+        (t/is (th/ex-of-code? error :file-thumbnail-not-found))))
     ))
 
 

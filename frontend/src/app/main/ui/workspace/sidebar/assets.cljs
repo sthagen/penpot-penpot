@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.sidebar.assets
   (:require
@@ -45,7 +45,7 @@
    [cuerdas.core :as str]
    [okulary.core :as l]
    [potok.core :as ptk]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 ;; NOTE: TODO: for avoid too many arguments, I think we can use react
 ;; context variables for pass to the down tree all the common
@@ -1736,10 +1736,10 @@
            (apply st/emit!
                   (->> typographies
                        (filter #(str/starts-with? (:path %) path))
-                       (map #(dwl/update-typography
-                              (assoc % :name
-                                     (ungroup % path))
-                              file-id))))
+                       (map #(dwl/rename-typography
+                              file-id
+                              (:id %)
+                              (ungroup % path)))))
            (st/emit! (dwu/commit-undo-transaction))))
 
         on-context-menu

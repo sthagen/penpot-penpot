@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.viewport.comments
   (:require
@@ -13,7 +13,7 @@
    [app.main.ui.comments :as cmt]
    [cuerdas.core :as str]
    [okulary.core :as l]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (mf/defc comments-layer
   [{:keys [vbox vport zoom file-id page-id drawing] :as props}]

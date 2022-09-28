@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.loggers.database
   "A specific logger impl that persists errors on the database."
@@ -46,6 +46,7 @@
 (defn parse-event
   [event]
   (-> (parse-event-data event)
+      (assoc :hint (or (:hint event) (:message event)))
       (assoc :tenant (cf/get :tenant))
       (assoc :host (cf/get :host))
       (assoc :public-uri (cf/get :public-uri))

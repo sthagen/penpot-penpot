@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.sidebar.options.menus.blur
   (:require
@@ -12,7 +12,7 @@
    [app.main.ui.icons :as i]
    [app.main.ui.workspace.sidebar.options.rows.input-row :refer [input-row]]
    [app.util.i18n :as i18n :refer [tr]]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (def blur-attrs [:blur])
 

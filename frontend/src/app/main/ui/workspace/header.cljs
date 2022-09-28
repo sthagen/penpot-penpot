@@ -2,10 +2,12 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.header
   (:require
+   [app.common.pages.helpers :as cph]
+   [app.common.uuid :as uuid]
    [app.config :as cf]
    [app.main.data.events :as ev]
    [app.main.data.exports :as de]
@@ -29,7 +31,7 @@
    [beicon.core :as rx]
    [okulary.core :as l]
    [potok.core :as ptk]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (def workspace-persistence-ref
   (l/derived :workspace-persistence st/state))
@@ -107,7 +109,9 @@
         show-sub-menu? (mf/use-state false)
         editing?       (mf/use-state false)
         edit-input-ref (mf/use-ref nil)
-        frames         (mf/deref refs/workspace-frames)
+        objects        (mf/deref refs/workspace-page-objects)
+        frames         (->> (cph/get-immediate-children objects uuid/zero)
+                            (filterv cph/frame-shape?))
 
         add-shared-fn
         #(st/emit! (dwl/set-file-shared (:id file) true))
@@ -461,6 +465,7 @@
        [:& export-progress-widget]
        [:button.document-history
         {:alt (tr "workspace.sidebar.history" (sc/get-tooltip :toggle-history))
+         :aria-label (tr "workspace.sidebar.history" (sc/get-tooltip :toggle-history))
          :class (when (contains? layout :document-history) "selected")
          :on-click #(st/emit! (-> (dw/toggle-layout-flag :document-history)
                                   (vary-meta assoc ::ev/origin "workspace-header")))}

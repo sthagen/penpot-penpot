@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.sidebar.options.menus.color-selection
   (:require
@@ -16,7 +16,7 @@
    [app.main.ui.workspace.sidebar.options.rows.color-row :refer [color-row]]
    [app.util.i18n :as i18n :refer [tr]]
    [cuerdas.core :as str]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (defn fill->color-att
   [fill file-id shared-libs]
@@ -166,7 +166,17 @@
                                      (dissoc :name)
                                      (dissoc :path)
                                      (d/without-nils))
-                 shapes-by-color (get @grouped-colors* old-color)]
+
+                 prev-color       (-> @prev-color*
+                                      (dissoc :name)
+                                      (dissoc :path)
+                                      (d/without-nils))
+
+                 ;; When dragging on the color picker sometimes all the shapes hasn't updated the color to the prev value so we need this extra calculation
+                 shapes-by-old-color  (get @grouped-colors* old-color)
+                 shapes-by-prev-color (get @grouped-colors* prev-color)
+                 shapes-by-color (or shapes-by-prev-color shapes-by-old-color)]
+             (reset! prev-color* new-color)
              (st/emit! (dc/change-color-in-selected new-color shapes-by-color old-color)))))
 
         on-open (mf/use-fn
@@ -197,7 +207,7 @@
        [:div.element-set-content
         [:div.selected-colors
          (for [[index color] (d/enumerate (take 3 library-colors))]
-           [:& color-row {:key (dm/str "color-" index)
+           [:& color-row {:key (dm/str "library-color-" index)
                           :color color
                           :index index
                           :on-detach on-detach
@@ -210,7 +220,7 @@
             [:span.text (tr "workspace.options.more-lib-colors")]])
          (when @expand-lib-color
            (for [[index color] (d/enumerate (drop 3 library-colors))]
-             [:& color-row {:key (dm/str "color-" index)
+             [:& color-row {:key (dm/str "library-color-" index)
                             :color color
                             :index index
                             :on-detach on-detach

@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.viewer.thumbnails
   (:require
@@ -18,7 +18,7 @@
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.object :as obj]
    [app.util.timers :as ts]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (mf/defc thumbnails-content
   [{:keys [children expanded? total] :as props}]

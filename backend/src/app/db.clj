@@ -2,9 +2,10 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.db
+  (:refer-clojure :exclude [get])
   (:require
    [app.common.data :as d]
    [app.common.exceptions :as ex]
@@ -27,6 +28,8 @@
    com.zaxxer.hikari.HikariConfig
    com.zaxxer.hikari.HikariDataSource
    com.zaxxer.hikari.metrics.prometheus.PrometheusMetricsTrackerFactory
+   io.whitfin.siphash.SipHasher
+   io.whitfin.siphash.SipHasherContainer
    java.io.InputStream
    java.io.OutputStream
    java.lang.AutoCloseable
@@ -75,7 +78,7 @@
 (def defaults
   {:name :main
    :min-size 0
-   :max-size 30
+   :max-size 60
    :connection-timeout 10000
    :validation-timeout 10000
    :idle-timeout 120000 ; 2min
@@ -268,28 +271,55 @@
               (sql/delete table params opts)
               (assoc opts :return-keys true))))
 
-(defn- is-deleted?
+(defn is-row-deleted?
   [{:keys [deleted-at]}]
   (and (dt/instant? deleted-at)
        (< (inst-ms deleted-at)
           (inst-ms (dt/now)))))
 
-(defn get-by-params
+(defn get*
+  "Internal function for retrieve a single row from database that
+  matches a simple filters."
   ([ds table params]
-   (get-by-params ds table params nil))
-  ([ds table params {:keys [check-not-found] :or {check-not-found true} :as opts}]
-   (let [res (exec-one! ds (sql/select table params opts))]
-     (when (and check-not-found (or (not res) (is-deleted? res)))
+   (get* ds table params nil))
+  ([ds table params {:keys [check-deleted?] :or {check-deleted? true} :as opts}]
+   (let [rows (exec! ds (sql/select table params opts))
+         rows (cond->> rows
+                check-deleted?
+                (remove is-row-deleted?))]
+     (first rows))))
+
+(defn get
+  ([ds table params]
+   (get ds table params nil))
+  ([ds table params {:keys [check-deleted?] :or {check-deleted? true} :as opts}]
+   (let [row (get* ds table params opts)]
+     (when (and (not row) check-deleted?)
        (ex/raise :type :not-found
                  :table table
                  :hint "database object not found"))
-     res)))
+     row)))
+
+(defn get-by-params
+  "DEPRECATED"
+  ([ds table params]
+   (get-by-params ds table params nil))
+  ([ds table params {:keys [check-not-found] :or {check-not-found true} :as opts}]
+   (let [row (get* ds table params (assoc opts :check-deleted? check-not-found))]
+     (when (and (not row) check-not-found)
+       (ex/raise :type :not-found
+                 :table table
+                 :hint "database object not found"))
+     row)))
 
 (defn get-by-id
   ([ds table id]
-   (get-by-params ds table {:id id} nil))
+   (get ds table {:id id} nil))
   ([ds table id opts]
-   (get-by-params ds table {:id id} opts)))
+   (let [opts (cond-> opts
+                (contains? opts :check-not-found)
+                (assoc :check-deleted? (:check-not-found opts)))]
+     (get ds table {:id id} opts))))
 
 (defn query
   ([ds table params]
@@ -367,23 +397,23 @@
    (.rollback conn sp)))
 
 (defn interval
-  [data]
+  [o]
   (cond
-    (integer? data)
-    (->> (/ data 1000.0)
+    (or (integer? o)
+        (float? o))
+    (->> (/ o 1000.0)
          (format "%s seconds")
          (pginterval))
 
-    (string? data)
-    (pginterval data)
+    (string? o)
+    (pginterval o)
 
-    (dt/duration? data)
-    (->> (/ (.toMillis ^java.time.Duration data) 1000.0)
-         (format "%s seconds")
-         (pginterval))
+    (dt/duration? o)
+    (interval (inst-ms o))
 
     :else
-    (ex/raise :type :not-implemented)))
+    (ex/raise :type :not-implemented
+              :hint (format "no implementation found for value %s" (pr-str o)))))
 
 (defn decode-json-pgobject
   [^PGobject o]
@@ -431,10 +461,19 @@
 
 ;; --- Locks
 
+(def ^:private siphash-state
+  (SipHasher/container
+   (uuid/get-bytes uuid/zero)))
+
+(defn uuid->hash-code
+  [o]
+  (.hash ^SipHasherContainer siphash-state
+         ^bytes (uuid/get-bytes o)))
+
 (defn- xact-check-param
   [n]
   (cond
-    (uuid? n) (uuid/get-word-high n)
+    (uuid? n) (uuid->hash-code n)
     (int? n)  n
     :else (throw (IllegalArgumentException. "uuid or number allowed"))))
 

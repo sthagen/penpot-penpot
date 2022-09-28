@@ -2,14 +2,14 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.util.perf
   "Performance profiling for react components."
   (:require-macros [app.util.perf])
   (:require
    [app.common.math :as mth]
-   [rumext.alpha :as mf]
+   [rumext.v2 :as mf]
    [goog.functions :as f]
    ["react" :as react]
    ["tdigest" :as td]))
@@ -131,3 +131,15 @@
       (js/performance.clearMeasures end-mark)
       #js {:duration duration
            :avg avg})))
+
+(defn now
+  []
+  (js/performance.now))
+
+(defn tpoint
+  "Create a measurement checkpoint for time measurement of potentially
+  asynchronous flow."
+  []
+  (let [p1 (now)]
+    #(js/Math.floor (- (now) p1))))
+

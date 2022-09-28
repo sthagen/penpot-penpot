@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.colorpicker.ramp
   (:require
@@ -11,7 +11,7 @@
    [app.main.ui.workspace.colorpicker.slider-selector :refer [slider-selector]]
    [app.util.color :as uc]
    [app.util.dom :as dom]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (mf/defc value-saturation-selector [{:keys [saturation value on-change on-start-drag on-finish-drag]}]
   (let [dragging? (mf/use-state false)
@@ -41,6 +41,7 @@
         ]
     [:div.value-saturation-selector
      {:on-pointer-down handle-start-drag
+      :on-pointer-up handle-stop-drag
       :on-lost-pointer-capture handle-stop-drag
       :on-click calculate-pos
       :on-mouse-move #(when @dragging? (calculate-pos %))}

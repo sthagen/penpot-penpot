@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.components.select
   (:require
@@ -10,7 +10,7 @@
    [app.common.uuid :as uuid]
    [app.main.ui.components.dropdown :refer [dropdown]]
    [app.main.ui.icons :as i]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (mf/defc select [{:keys [default-value options class on-change]}]
   (let [state (mf/use-state {:id (uuid/next)

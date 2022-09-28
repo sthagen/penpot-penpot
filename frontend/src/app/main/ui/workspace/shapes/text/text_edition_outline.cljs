@@ -2,14 +2,14 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.shapes.text.text-edition-outline
   (:require
    [app.common.geom.shapes :as gsh]
    [app.main.data.workspace.texts :as dwt]
    [app.main.refs :as refs]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (mf/defc text-edition-outline
   [{:keys [shape zoom]}]

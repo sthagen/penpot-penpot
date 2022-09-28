@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.components.numeric-input
   (:require
@@ -16,7 +16,7 @@
    [app.util.simple-math :as sm]
    [cuerdas.core :as str]
    [goog.events :as events]
-   [rumext.alpha :as mf])
+   [rumext.v2 :as mf])
   (:import goog.events.EventType))
 
 (mf/defc numeric-input

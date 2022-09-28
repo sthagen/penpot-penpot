@@ -2,13 +2,13 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.data.workspace.drawing.curve
   (:require
    [app.common.geom.shapes :as gsh]
    [app.common.geom.shapes.path :as gsp]
-   [app.common.types.shape-tree :as ctt]
+   [app.common.types.shape-tree :as ctst]
    [app.main.data.workspace.drawing.common :as common]
    [app.main.data.workspace.state-helpers :as wsh]
    [app.main.streams :as ms]
@@ -47,7 +47,7 @@
       (let [objects  (wsh/lookup-page-objects state)
             content  (get-in state [:workspace-drawing :object :content] [])
             position (get-in content [0 :params] nil)
-            frame-id (ctt/frame-id-by-position objects position)]
+            frame-id (ctst/top-nested-frame objects position)]
         (-> state
             (assoc-in [:workspace-drawing :object :frame-id] frame-id))))))
 

@@ -333,7 +333,7 @@ msgid "dashboard.export-binary-multi"
 msgstr "Descargar %s archivos Penpot (.penpot)"
 
 msgid "dashboard.export-frames"
-msgstr "Exportar tableros a PDF..."
+msgstr "Exportar tableros a PDF"
 
 #: src/app/main/ui/export.cljs
 msgid "dashboard.export-frames.title"
@@ -4581,6 +4581,12 @@ msgstr "Atributos del SVG Importado"
 msgid "workspace.sidebar.sitemap"
 msgstr "Páginas"
 
+msgid "workspace.sidebar.collapse"
+msgstr "Cerrar barra lateral"
+
+msgid "workspace.sidebar.expand"
+msgstr "Abrir barra lateral"
+
 #: src/app/main/ui/workspace/header.cljs
 msgid "workspace.sitemap"
 msgstr "Mapa del sitio"
@@ -4766,3 +4772,6 @@ msgstr "Actualizar"
 
 msgid "workspace.viewport.click-to-close-path"
 msgstr "Pulsar para cerrar la ruta"
+
+msgid "errors.profile-blocked"
+msgstr "El perfil esta blockeado"

@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.sidebar.options.shapes.text
   (:require
@@ -19,7 +19,7 @@
    [app.main.ui.workspace.sidebar.options.menus.shadow :refer [shadow-menu]]
    [app.main.ui.workspace.sidebar.options.menus.stroke :refer [stroke-attrs stroke-menu]]
    [app.main.ui.workspace.sidebar.options.menus.text :refer [text-menu text-fill-attrs root-attrs paragraph-attrs text-attrs]]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (mf/defc options
   [{:keys [shape file-id] :as props}]

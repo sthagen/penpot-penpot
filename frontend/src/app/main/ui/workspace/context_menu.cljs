@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.context-menu
   "A workspace specific context menu (mouse right click)."
@@ -31,7 +31,7 @@
    [app.util.i18n :refer [tr] :as i18n]
    [app.util.timers :as timers]
    [okulary.core :as l]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (def menu-ref
   (l/derived :context-menu refs/workspace-local))
@@ -392,7 +392,7 @@
         do-add-component #(st/emit! (dwl/add-component))
         do-detach-component #(st/emit! (dwl/detach-component shape-id))
         do-detach-component-in-bulk #(st/emit! dwl/detach-selected-components)
-        _do-reset-component #(st/emit! (dwl/reset-component shape-id))
+        do-reset-component #(st/emit! (dwl/reset-component shape-id))
         do-show-component #(st/emit! (dw/go-to-component component-id))
         do-navigate-component-file #(st/emit! (dwl/nav-to-component-file component-file))
         do-update-component #(st/emit! (dwl/update-component-sync shape-id component-file))
@@ -451,9 +451,9 @@
                [:& menu-entry {:title (tr "workspace.shape.menu.detach-instance")
                                :shortcut (sc/get-tooltip :detach-component)
                                :on-click do-detach-component}]
-                ;; This is commented due this functionality is not yet available
-                ;; [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
-                ;;                 :on-click _do-reset-component}]
+               ;; This is commented due this functionality is not yet available
+               ;; [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
+               ;;                 :on-click do-reset-component}]
                (when components-v2
                  [:& menu-entry {:title (tr "workspace.shape.menu.restore-main")
                                  :on-click do-restore-component}])]
@@ -461,9 +461,8 @@
                [:& menu-entry {:title (tr "workspace.shape.menu.detach-instance")
                                :shortcut (sc/get-tooltip :detach-component)
                                :on-click do-detach-component}]
-                ;; This is commented due this functionality is not yet available
-                ;; [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
-                ;;                 :on-click _do-reset-component}]
+               [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
+                               :on-click do-reset-component}]
                [:& menu-entry {:title (tr "workspace.shape.menu.update-main")
                                :on-click do-update-component}]
                [:& menu-entry {:title (tr "workspace.shape.menu.show-main")
@@ -473,9 +472,9 @@
                [:& menu-entry {:title (tr "workspace.shape.menu.detach-instance")
                                :shortcut (sc/get-tooltip :detach-component)
                                :on-click do-detach-component}]
-                ;; This is commented due this functionality is not yet available
-                ;; [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
-                ;;                 :on-click _do-reset-component}]
+               ;; This is commented due this functionality is not yet available
+               ;; [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
+               ;;                 :on-click do-reset-component}]
                (when components-v2
                  [:& menu-entry {:title (tr "workspace.shape.menu.restore-main")
                                  :on-click do-restore-component}])]
@@ -483,12 +482,10 @@
                [:& menu-entry {:title (tr "workspace.shape.menu.detach-instance")
                                :shortcut (sc/get-tooltip :detach-component)
                                :on-click do-detach-component}]
-                ;; This is commented due this functionality is not yet available
-                ;; [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
-                ;;                 :on-click _do-reset-component}]
-                ;; This is commented due this functionality is not yet available
-                ;;[:& menu-entry {:title (tr "workspace.shape.menu.update-main")
-                ;;                :on-click _do-update-remote-component}]
+               [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
+                               :on-click do-reset-component}]
+               [:& menu-entry {:title (tr "workspace.shape.menu.update-main")
+                               :on-click _do-update-remote-component}]
                [:& menu-entry {:title (tr "workspace.shape.menu.go-main")
                                :on-click do-navigate-component-file}]])))])
      [:& menu-separator]]))

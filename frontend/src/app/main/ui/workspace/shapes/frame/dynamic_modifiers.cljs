@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.shapes.frame.dynamic-modifiers
   (:require
@@ -14,7 +14,7 @@
    [app.main.store :as st]
    [app.main.ui.workspace.viewport.utils :as vwu]
    [app.util.dom :as dom]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (defn- transform-no-resize
   "If we apply a scale directly to the texts it will show deformed so we need to create this

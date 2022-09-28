@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.viewport.selection
   "Selection handlers component."
@@ -20,8 +20,8 @@
    [app.util.dom :as dom]
    [app.util.object :as obj]
    [debug :refer [debug?]]
-   [rumext.alpha :as mf]
-   [rumext.util :refer [map->obj]]))
+   [rumext.v2 :as mf]
+   [rumext.v2.util :refer [map->obj]]))
 
 (def rotation-handler-size 20)
 (def resize-point-radius 4)

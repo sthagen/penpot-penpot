@@ -2,13 +2,13 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.presence
   (:require
    [app.config :as cfg]
    [app.main.refs :as refs]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 ;; --- SESSION WIDGET
 
@@ -16,7 +16,8 @@
   [{:keys [session profile] :as props}]
   [:li.tooltip.tooltip-bottom
    {:alt (:fullname profile)}
-   [:img {:style {:border-color (:color session)}
+   [:img {:alt (:fullname profile)
+          :style {:border-color (:color session)}
           :src (cfg/resolve-profile-photo-url profile)}]])
 
 (mf/defc active-sessions

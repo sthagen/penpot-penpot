@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.viewport.scroll-bars
   (:require
@@ -13,7 +13,7 @@
    [app.main.store :as st]
    [app.main.ui.workspace.viewport.utils :as utils]
    [app.util.dom :as dom]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (def scroll-x 10)
 (def scroll-y 10)

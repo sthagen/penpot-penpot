@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.util.i18n
   "A i18n foundation."
@@ -16,7 +16,7 @@
    [cuerdas.core :as str]
    [goog.object :as gobj]
    [okulary.core :as l]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (log/set-level! :info)
 
@@ -39,7 +39,7 @@
    {:label "عربي/عربى (community)" :value "ar"}
    {:label "فارسی (community)" :value "fa"}
    {:label "简体中文 (community)" :value "zh_cn"}
-   {:label "中国传统的 (community)" :value "zh_hant"}])
+   {:label "繁體中文 (community)" :value "zh_hant"}])
 
 (defn- parse-locale
   [locale]
@@ -105,6 +105,7 @@
 (add-watch locale ::browser-font
            (fn [_ _ _ locale]
              (log/info :hint "locale changed" :locale locale)
+             (dom/set-html-lang! locale)
              (let [node  (dom/get-body)]
                (if (or (= locale "fa")
                        (= locale "ar"))

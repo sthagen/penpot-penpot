@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.viewport.presence
   (:require
@@ -11,7 +11,7 @@
    [app.util.timers :as ts]
    [beicon.core :as rx]
    [cuerdas.core :as str]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (def pointer-icon-path
   (str "M11.58,-0.47L11.47,-0.35L0.34,10.77L0.30,10.96L-0.46,"

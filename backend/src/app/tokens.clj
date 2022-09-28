@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.tokens
   "Tokens generation API."
@@ -26,10 +26,14 @@
                     (t/encode))]
     (jwe/encrypt payload tokens-key {:alg :a256kw :enc :a256gcm})))
 
+(defn decode
+  [{:keys [tokens-key]} token]
+  (let [payload (jwe/decrypt token tokens-key {:alg :a256kw :enc :a256gcm})]
+    (t/decode payload)))
+
 (defn verify
-  [{:keys [tokens-key]} {:keys [token] :as params}]
-  (let [payload (jwe/decrypt token tokens-key {:alg :a256kw :enc :a256gcm})
-        claims  (t/decode payload)]
+  [sprops {:keys [token] :as params}]
+  (let [claims (decode sprops token)]
     (when (and (dt/instant? (:exp claims))
                (dt/is-before? (:exp claims) (dt/now)))
       (ex/raise :type :validation

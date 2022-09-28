@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.config
   "A configuration management."
@@ -11,7 +11,6 @@
    [app.common.data :as d]
    [app.common.exceptions :as ex]
    [app.common.flags :as flags]
-   [app.common.logging :as l]
    [app.common.spec :as us]
    [app.common.version :as v]
    [app.util.time :as dt]
@@ -94,14 +93,12 @@
 (s/def ::telemetry-enabled ::us/boolean)
 
 (s/def ::audit-log-archive-uri ::us/string)
-(s/def ::audit-log-gc-max-age ::dt/duration)
 
 (s/def ::admins ::us/set-of-strings)
 (s/def ::file-change-snapshot-every ::us/integer)
 (s/def ::file-change-snapshot-timeout ::dt/duration)
 
 (s/def ::default-executor-parallelism ::us/integer)
-(s/def ::blocking-executor-parallelism ::us/integer)
 (s/def ::worker-executor-parallelism ::us/integer)
 
 (s/def ::authenticated-cookie-domain ::us/string)
@@ -171,12 +168,11 @@
 (s/def ::redis-uri ::us/string)
 (s/def ::registration-domain-whitelist ::us/set-of-strings)
 
+(s/def ::semaphore-process-font ::us/integer)
+(s/def ::semaphore-process-image ::us/integer)
+(s/def ::semaphore-update-file ::us/integer)
+(s/def ::semaphore-authentication ::us/integer)
 
-
-(s/def ::rpc-semaphore-permits-font ::us/integer)
-(s/def ::rpc-semaphore-permits-file-update ::us/integer)
-(s/def ::rpc-semaphore-permits-image ::us/integer)
-(s/def ::rpc-semaphore-permits-password ::us/integer)
 (s/def ::smtp-default-from ::us/string)
 (s/def ::smtp-default-reply-to ::us/string)
 (s/def ::smtp-host ::us/string)
@@ -201,18 +197,12 @@
 (s/def ::telemetry-with-taiga ::us/boolean)
 (s/def ::tenant ::us/string)
 
-(s/def ::sentry-trace-sample-rate ::us/number)
-(s/def ::sentry-attach-stack-trace ::us/boolean)
-(s/def ::sentry-debug ::us/boolean)
-(s/def ::sentry-dsn ::us/string)
-
 (s/def ::config
   (s/keys :opt-un [::secret-key
                    ::flags
                    ::admins
                    ::allow-demo-users
                    ::audit-log-archive-uri
-                   ::audit-log-gc-max-age
                    ::auth-token-cookie-name
                    ::auth-token-cookie-max-age
                    ::authenticated-cookie-name
@@ -227,7 +217,6 @@
                    ::default-rpc-rlimit
                    ::error-report-webhook
                    ::default-executor-parallelism
-                   ::blocking-executor-parallelism
                    ::worker-executor-parallelism
                    ::file-change-snapshot-every
                    ::file-change-snapshot-timeout
@@ -280,15 +269,13 @@
                    ::public-uri
                    ::redis-uri
                    ::registration-domain-whitelist
-                   ::rpc-semaphore-permits-font
-                   ::rpc-semaphore-permits-file-update
-                   ::rpc-semaphore-permits-image
-                   ::rpc-semaphore-permits-password
                    ::rpc-rlimit-config
-                   ::sentry-dsn
-                   ::sentry-debug
-                   ::sentry-attach-stack-trace
-                   ::sentry-trace-sample-rate
+
+                   ::semaphore-process-font
+                   ::semaphore-process-image
+                   ::semaphore-update-file
+                   ::semaphore-auth
+
                    ::smtp-default-from
                    ::smtp-default-reply-to
                    ::smtp-host
@@ -297,8 +284,10 @@
                    ::smtp-ssl
                    ::smtp-tls
                    ::smtp-username
+
                    ::srepl-host
                    ::srepl-port
+
                    ::assets-storage-backend
                    ::storage-assets-fs-directory
                    ::storage-assets-s3-bucket
@@ -318,7 +307,8 @@
 (def default-flags
   [:enable-backend-api-doc
    :enable-backend-worker
-   :enable-secure-session-cookies])
+   :enable-secure-session-cookies
+   :enable-email-verification])
 
 (defn- parse-flags
   [config]
@@ -359,11 +349,7 @@
                "%version%")))
 
 (defonce ^:dynamic config (read-config))
-
-(defonce ^:dynamic flags
-  (let [flags (parse-flags config)]
-    (l/info :hint "flags initialized" :flags (str/join "," (map name flags)))
-    flags))
+(defonce ^:dynamic flags (parse-flags config))
 
 (def deletion-delay
   (dt/duration {:days 7}))

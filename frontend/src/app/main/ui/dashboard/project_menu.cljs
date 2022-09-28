@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.dashboard.project-menu
   (:require
@@ -19,7 +19,7 @@
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.router :as rt]
    [cljs.spec.alpha :as s]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (s/def ::project some?)
 (s/def ::show? boolean?)

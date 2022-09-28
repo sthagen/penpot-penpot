@@ -2,14 +2,14 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.components.color-bullet
   (:require
    [app.util.color :as uc]
    [app.util.dom :as dom]
    [app.util.i18n :as i18n :refer [tr]]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (defn gradient-type->string [type]
   (case type
@@ -36,7 +36,7 @@
                                  :is-not-library-color (nil? (:id color))
                                  :is-gradient (some? (:gradient color)))
           :on-click on-click
-          :alt (or (:name color) (:color color) (gradient-type->string (:type (:gradient color))))}
+          :title (or (:name color) (:color color) (gradient-type->string (:type (:gradient color))))}
          (if  (:gradient color)
            [:div.color-bullet-wrapper {:style {:background (uc/color->background color)}}]
            [:div.color-bullet-wrapper

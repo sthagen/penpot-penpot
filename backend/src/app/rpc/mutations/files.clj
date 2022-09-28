@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.rpc.mutations.files
   (:require
@@ -315,7 +315,7 @@
          (contains? o :changes-with-metadata)))))
 
 (sv/defmethod ::update-file
-  {::rsem/permits (cf/get :rpc-semaphore-permits-file-update)}
+  {::rsem/queue :update-file}
   [{:keys [pool] :as cfg} {:keys [id profile-id] :as params}]
   (db/with-atomic [conn pool]
     (db/xact-lock! conn id)
@@ -565,6 +565,8 @@
   (s/keys :req-un [::profile-id ::file-id ::revn ::data ::props]))
 
 (sv/defmethod ::upsert-file-thumbnail
+  "Creates or updates the file thumbnail. Mainly used for paint the
+  grid thumbnals."
   [{:keys [pool] :as cfg} {:keys [profile-id file-id revn data props]}]
   (db/with-atomic [conn pool]
     (files/check-edition-permissions! conn profile-id file-id)

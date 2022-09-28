@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.rpc.commands.ldap
   (:require
@@ -46,6 +46,11 @@
                 :code :wrong-credentials))
 
     (let [profile (login-or-register cfg info)]
+
+      (when (:is-blocked profile)
+        (ex/raise :type :restriction
+                  :code :profile-blocked))
+
       (if-let [token (:invitation-token params)]
         ;; If invitation token comes in params, this is because the
         ;; user comes from team-invitation process; in this case,

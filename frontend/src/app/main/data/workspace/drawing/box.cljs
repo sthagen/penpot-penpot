@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.data.workspace.drawing.box
   (:require
@@ -11,7 +11,7 @@
    [app.common.math :as mth]
    [app.common.pages.helpers :as cph]
    [app.common.types.shape :as cts]
-   [app.common.types.shape-tree :as ctt]
+   [app.common.types.shape-tree :as ctst]
    [app.common.uuid :as uuid]
    [app.main.data.workspace.drawing.common :as common]
    [app.main.data.workspace.state-helpers :as wsh]
@@ -65,8 +65,7 @@
             objects (wsh/lookup-page-objects state page-id)
             focus   (:workspace-focus-selected state)
             zoom    (get-in state [:workspace-local :zoom] 1)
-
-            fid     (ctt/frame-id-by-position objects initial)
+            fid     (ctst/top-nested-frame objects initial)
 
             shape   (get-in state [:workspace-drawing :object])
             shape   (-> shape

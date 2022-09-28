@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.data.workspace.shortcuts
   (:require
@@ -45,8 +45,8 @@
                           :subsections [:edit]
                           :fn #(st/emit! dwc/redo)}
 
-   :clear-undo           {:tooltip (ds/meta "Q")
-                          :command (ds/c-mod "q")
+   :clear-undo           {:tooltip (ds/alt "Z")
+                          :command "alt+z"
                           :subsections [:edit]
                           :fn #(st/emit! dwu/reinitialize-undo)}
 

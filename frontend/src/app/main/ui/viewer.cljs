@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.viewer
   (:require
@@ -40,7 +40,7 @@
    [cuerdas.core :as str]
    [goog.events :as events]
    [okulary.core :as l]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (def current-animations-ref
   (l/derived :viewer-animations st/state))
@@ -354,14 +354,14 @@
           (events/unlistenByKey key1)
           (events/unlistenByKey key2))))
 
-    (mf/use-layout-effect
+    (mf/use-effect
      (fn []
        (set-up-new-size)
        (.addEventListener js/window "resize" set-up-new-size)
        (fn []
          (.removeEventListener js/window "resize" set-up-new-size))))
 
-    (mf/use-layout-effect
+    (mf/use-effect
      (mf/deps nav-scroll)
      (fn []
         ;; Set scroll position after navigate
@@ -381,19 +381,19 @@
              (wapi/request-fullscreen wrapper)
              (wapi/exit-fullscreen))))))
 
-    (mf/use-layout-effect
-     (mf/deps page)
+    (mf/use-effect
+     (mf/deps zoom-type)
      (fn []
        (case zoom-type
          :fit (st/emit! dv/zoom-to-fit)
          :fill (st/emit! dv/zoom-to-fill)
          nil)))
 
-    (mf/use-layout-effect
-     (mf/deps index current-animations)
+    (mf/use-effect
+     (mf/deps index current-animations zoom-type)
      (fn []
        (case zoom-type
-         :fit (st/emit! dv/zoom-to-fit)
+         :fit  (st/emit! dv/zoom-to-fit)
          :fill (st/emit! dv/zoom-to-fill)
          nil)
         ;; Navigate animation needs to be started after navigation
@@ -410,7 +410,7 @@
               orig-size
               wrapper-size))))))
 
-    (mf/use-layout-effect
+    (mf/use-effect
      (mf/deps current-animations)
      (fn []
         ;; Overlay animations may be started when needed.

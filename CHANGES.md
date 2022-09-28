@@ -1,6 +1,18 @@
 # CHANGELOG
 
-## :rocket: Next
+## :rocket: 1.16.0-beta
+
+### :boom: Breaking changes & Deprecations
+### :sparkles: New features
+### :bug: Bugs fixed
+
+- Fix some texts and a typo [Taiga #4215](https://tree.taiga.io/project/penpot/issue/4215)
+
+### :arrow_up: Deps updates
+### :heart: Community contributions by (Thank you!)
+
+
+## :rocket: 1.16.0-beta
 
 ### :boom: Breaking changes & Deprecations
 
@@ -11,6 +23,7 @@
 
 ### :sparkles: New features
 
+- Add title to color bullets [Taiga #4218](https://tree.taiga.io/project/penpot/task/4218)
 - Add team hero in projects dashboard [Taiga #3863](https://tree.taiga.io/project/penpot/us/3863)
 - Add zoom style to shared link [Taiga #3874](https://tree.taiga.io/project/penpot/us/3874)
 - Add dashboard creation button as placeholder [Taiga #3861](https://tree.taiga.io/project/penpot/us/3861)
@@ -23,6 +36,8 @@
 - Add Libraries & Templates carousel [Taiga #3860](https://tree.taiga.io/project/penpot/us/3860)
 - Ungroup frames [Taiga #4012](https://tree.taiga.io/project/penpot/us/4012)
 - Newsletter Opt-in options for subscription categories [Taiga #3242](https://tree.taiga.io/project/penpot/us/3242)
+- Print emails to console by default if smtp is disabled
+- Add `email-verification` flag for enable/disable email verification
 
 ### :bug: Bugs fixed
 
@@ -33,20 +48,45 @@
 - Fix undo on delete page does not preserve its order [Taiga #3375](https://tree.taiga.io/project/penpot/issue/3375)
 - Fix unexpected 404 on deleting library that is used by deleted files
 - Fix inconsistent message on deleting library when a library is linked from deleted files
+- Fix change multiple colors with SVG [Taiga #3889](https://tree.taiga.io/project/penpot/issue/3889)
+- Fix ungroup does not work for typographies [Taiga #4195](https://tree.taiga.io/project/penpot/issue/4195)
+- Fix inviting to non existing users can fail [Taiga #4108](https://tree.taiga.io/project/penpot/issue/4108)
 
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
 
 - To @andrewzhurov for many code contributions on this release.
+- UI improvements in Project section (by @Waishnav) [#2285](https://github.com/penpot/penpot/pull/2285)
 
 ## 1.15.4-beta
 
 ### :bug: Bugs fixed
 
+- Remove gitter information from feedback page [Taiga #4157](https://tree.taiga.io/project/penpot/issue/4157)
 - Fix overlay remains open on frame change [Taiga #4066](https://tree.taiga.io/project/penpot/issue/4066)
 - Fix toggle overlay position [Taiga #4091](https://tree.taiga.io/project/penpot/issue/4091)
 - Fix overlay closed on clicked outside [Taiga #4027](https://tree.taiga.io/project/penpot/issue/4027)
 - Fix animate multiple overlays [Taiga #3993](https://tree.taiga.io/project/penpot/issue/3993)
+- Fix problem with snap to grids [#2221](https://github.com/penpot/penpot/issues/2221)
+- Fix issue when scaling to value 0 [#2252](https://github.com/penpot/penpot/issues/2252)
+- Fix problem when moving shapes inside nested frames [Taiga #4113](https://tree.taiga.io/project/penpot/issue/4113)
+- Fix color type icon does not change [Taiga #4133](https://tree.taiga.io/project/penpot/issue/4133)
+- Fix recent colors are not working [Taiga #4153](https://tree.taiga.io/project/penpot/issue/4153)
+- Fix change opacity in colorpicker cause bugged color [Taiga #4154](https://tree.taiga.io/project/penpot/issue/4154)
+- Fix gradient colors don't arrive in recent colors palette (https://tree.taiga.io/project/penpot/issue/4155)
+- Fix selected colors allow gradients in shadows [Taiga #4156](https://tree.taiga.io/project/penpot/issue/4156)
+- Fix import files with unexpected format or invalid content [Taiga #4136](https://tree.taiga.io/project/penpot/issue/4136)
+- Fix wrong shortcut button tip of "Delete" function [Taiga #4162](https://tree.taiga.io/project/penpot/issue/4162)
+- Fix error after user drags any layer in search functionality [Taiga #4161](https://tree.taiga.io/project/penpot/issue/4161)
+- Fix font search works only with lowercase letters [Taiga #4140](https://tree.taiga.io/project/penpot/issue/4140)
+- Fix Terms and Privacy links overlapping [Taiga #4137](https://tree.taiga.io/project/penpot/issue/4137)
+- Fix Export bounding box mask [Taiga #950](https://tree.taiga.io/project/penpot/issue/950)
+- Fix delete layers in bulk [Taiga #4160](https://tree.taiga.io/project/penpot/issue/4160)
+- Fix Cannot take out an element from a group at layers panel by drag [Taiga #4209](https://tree.taiga.io/project/penpot/issue/4209)
+- Fix Internal error when resending invitation email [Taiga #4212](https://tree.taiga.io/project/penpot/issue/4212)
+- Fix PDF exportation order [Taiga #4216](https://tree.taiga.io/project/penpot/issue/4216)
+- Fix some typos [Taiga #4215](https://tree.taiga.io/project/penpot/issue/4215)
+- Fix "no boards" message in viewer [Taiga #4243](https://tree.taiga.io/project/penpot/issue/4243)
 
 ## 1.15.3-beta
 
@@ -60,6 +100,8 @@
 - Fix undo after moving layers will wrongly order the layers [Taiga #3344](https://tree.taiga.io/project/penpot/issue/3344)
 - Fix grouping typographies by drag & drop does not work (again) [#2203](https://github.com/penpot/penpot/issues/2203)
 - Fix when ungrouping, the items previously grouped should ALWAYS remain selected [Taiga #4064](https://tree.taiga.io/project/penpot/issue/4064)
+- Change shortcut for "Clear undo" [#2219](https://github.com/penpot/penpot/issues/2219)
+
 
 ## 1.15.2-beta
 

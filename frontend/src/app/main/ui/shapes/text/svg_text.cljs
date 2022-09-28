@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.shapes.text.svg-text
   (:require
@@ -17,7 +17,7 @@
    [app.main.ui.shapes.custom-stroke :refer [shape-custom-strokes]]
    [app.main.ui.shapes.gradients :as grad]
    [app.util.object :as obj]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (def fill-attrs [:fill-color :fill-color-gradient :fill-opacity])
 

@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.viewport.guides
   (:require
@@ -21,7 +21,7 @@
    [app.main.ui.formats :as fmt]
    [app.main.ui.workspace.viewport.rules :as rules]
    [app.util.dom :as dom]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (def guide-width 1)
 (def guide-opacity 0.7)

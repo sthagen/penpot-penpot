@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.dashboard.import
   (:require
@@ -24,7 +24,7 @@
    [app.util.webapi :as wapi]
    [beicon.core :as rx]
    [potok.core :as ptk]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (log/set-level! :debug)
 
@@ -347,7 +347,11 @@
         success-files (->> @state :files (filter #(and (= (:status %) :import-finish) (empty? (:errors %)))) count)
         pending-analysis? (> (->> @state :files (filter #(= (:status %) :analyzing)) count) 0)
         pending-import? (> num-importing 0)
-        files (->> (:files @state) (filterv (comp not :deleted?)))]
+        files (->> (:files @state) (filterv (comp not :deleted?)))
+        ;; pending-import? (> (->> @state :files (filter #(= (:status %) :importing)) count) 0)
+        ;; files (->> (:files @state) (filterv (comp not :deleted?)))
+        valid-files? (or (some? template)
+                         (> (+ (->> files (filterv (fn [x] (not= (:status x) :analyze-error))) count)) 0))]
 
     (mf/use-effect
      (fn []
@@ -408,7 +412,7 @@
            {:class "primary"
             :type "button"
             :value (tr "labels.continue")
-            :disabled pending-analysis?
+            :disabled (or pending-analysis? (not valid-files?))
             :on-click handle-continue}])
 
         (when (= :importing (:status @state))
@@ -416,5 +420,5 @@
            {:class "primary"
             :type "button"
             :value (tr "labels.accept")
-            :disabled pending-import?
+            :disabled (or pending-import? (not valid-files?))
             :on-click handle-accept}])]]]]))

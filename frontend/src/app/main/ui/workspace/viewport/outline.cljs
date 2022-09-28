@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.viewport.outline
   (:require
@@ -12,8 +12,8 @@
    [app.util.object :as obj]
    [app.util.path.format :as upf]
    [clojure.set :as set]
-   [rumext.alpha :as mf]
-   [rumext.util :refer [map->obj]]))
+   [rumext.v2 :as mf]
+   [rumext.v2.util :refer [map->obj]]))
 
 (mf/defc outline
   {::mf/wrap-props false}

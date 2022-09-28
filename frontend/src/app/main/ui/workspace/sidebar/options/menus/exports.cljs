@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.sidebar.options.menus.exports
   (:require
@@ -16,7 +16,7 @@
    [app.main.ui.icons :as i]
    [app.util.dom :as dom]
    [app.util.i18n :refer  [tr c]]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (def exports-attrs
   "Shape attrs that corresponds to exports. Used in other namespaces."

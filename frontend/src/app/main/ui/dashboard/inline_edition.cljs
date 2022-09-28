@@ -2,14 +2,14 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.dashboard.inline-edition
   (:require
    [app.main.ui.icons :as i]
    [app.util.dom :as dom]
    [app.util.keyboard :as kbd]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (mf/defc inline-edition
   [{:keys [content on-end] :as props}]

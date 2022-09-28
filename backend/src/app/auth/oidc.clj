@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.auth.oidc
   "OIDC client implementation."
@@ -434,6 +434,10 @@
                      (assoc :path "/#/auth/verify-token")
                      (assoc :query (u/map->query-string params)))]
 
+      (when (:is-blocked profile)
+        (ex/raise :type :restriction
+                  :code :profile-blocked))
+
       (when (fn? audit)
         (audit :cmd :submit
                :type "command"
@@ -465,7 +469,7 @@
                                {:iss :oauth
                                 :invitation-token (:invitation-token params)
                                 :props props
-                                :exp (dt/in-future "15m")})
+                                :exp (dt/in-future "4h")})
         uri   (build-auth-uri cfg state)]
     (yrs/response 200 {:redirect-uri uri})))
 

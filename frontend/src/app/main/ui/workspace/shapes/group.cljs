@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.shapes.group
   (:require
@@ -13,7 +13,7 @@
    [app.main.ui.shapes.group :as group]
    [app.main.ui.shapes.shape :refer [shape-container]]
    [app.util.dom :as dom]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (defn use-double-click [{:keys [id]}]
   (mf/use-callback

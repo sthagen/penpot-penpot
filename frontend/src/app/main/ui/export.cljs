@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.export
   "Assets exportation common components."
@@ -20,7 +20,7 @@
    [app.util.i18n :as i18n :refer  [tr c]]
    [app.util.strings :as ust]
    [cuerdas.core :as str]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (mf/defc export-multiple-dialog
   [{:keys [exports title cmd no-selection]}]

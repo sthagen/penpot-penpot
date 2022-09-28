@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.colorpicker
   (:require
@@ -24,7 +24,7 @@
    [app.util.i18n :as i18n :refer [tr]]
    [cuerdas.core :as str]
    [okulary.core :as l]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 ;; --- Refs
 
@@ -67,11 +67,9 @@
         (mf/use-fn
          (mf/deps @drag?)
          (fn [color]
-           (let [recent-color (merge color)
+           (let [recent-color (merge current-color color)
                  recent-color (dc/materialize-color-components recent-color)]
-             (when (not @drag?)
-               (st/emit! (dwl/add-recent-color recent-color)))
-             (st/emit! (dc/update-colorpicker-color color)))))
+             (st/emit! (dc/update-colorpicker-color recent-color (not @drag?))))))
 
         handle-click-picker
         (mf/use-fn

@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.sidebar.options.rows.color-row
   (:require
@@ -10,7 +10,9 @@
    [app.common.data.macros :as dm]
    [app.common.pages :as cp]
    [app.main.data.modal :as modal]
+   [app.main.data.workspace.libraries :as dwl]
    [app.main.refs :as refs]
+   [app.main.store :as st]
    [app.main.ui.components.color-bullet :as cb]
    [app.main.ui.components.color-input :refer [color-input]]
    [app.main.ui.components.numeric-input :refer [numeric-input]]
@@ -21,7 +23,7 @@
    [app.util.color :as uc]
    [app.util.dom :as dom]
    [app.util.i18n :as i18n :refer [tr]]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (defn opacity->string
   [opacity]
@@ -73,18 +75,22 @@
         (mf/use-fn
          (mf/deps color on-change)
          (fn [new-value]
-           (on-change (-> color
-                          (assoc :color new-value)
-                          (dissoc :gradient)))))
+           (let [color (-> color
+                           (assoc :color new-value)
+                           (dissoc :gradient))]
+             (st/emit! (dwl/add-recent-color color)
+             (on-change color)))))
 
         handle-opacity-change
         (mf/use-fn
          (mf/deps color on-change)
          (fn [value]
-           (on-change (assoc color
-                             :opacity (/ value 100)
-                             :id nil
-                             :file-id nil))))
+           (let [color (assoc color
+                              :opacity (/ value 100)
+                              :id nil
+                              :file-id nil)]
+             (st/emit! (dwl/add-recent-color color)
+             (on-change color)))))
 
         handle-click-color
         (mf/use-fn

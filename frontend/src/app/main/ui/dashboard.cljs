@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.dashboard
   (:require
@@ -37,7 +37,7 @@
    [goog.events :as events]
    [okulary.core :as l]
    [potok.core :as ptk]
-   [rumext.alpha :as mf])
+   [rumext.v2 :as mf])
   (:import goog.events.EventType))
 
 (defn ^boolean uuid-str?
@@ -144,7 +144,7 @@
                                            :section section})))]
 
     [:div.dashboard-templates-section {:class (when collapsed "collapsed")}
-     [:div.title 
+     [:div.title
       [:div {:on-click toggle-collapse}
        [:span (tr "dashboard.libraries-and-templates")]
        [:span.icon (if collapsed i/arrow-up i/arrow-down)]]]
@@ -156,7 +156,8 @@
                               :on-click #(import-template item)}
          [:div.template-card
           [:div.img-container
-           [:img {:src (:thumbnail-uri item)}]]
+           [:img {:src (:thumbnail-uri item)
+                  :alt (:name item)}]]
           [:div.card-name [:span (:name item)] [:span.icon i/download]]]])
 
       [:div.card-container
@@ -195,8 +196,8 @@
      (case section
        :dashboard-projects
        [:*
-        [:& projects-section {:team team 
-                              :projects projects 
+        [:& projects-section {:team team
+                              :projects projects
                               :profile profile
                               :default-project-id default-project-id}]
         [:& templates-section {:profile profile

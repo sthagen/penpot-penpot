@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.util.snap-data
   "Data structure that holds and retrieves the data to make the snaps. Internaly
@@ -56,7 +56,7 @@
 
 (defn get-grids-snap-points
   [frame coord]
-  (if (not (ctst/rotated-frame? frame))
+  (if (ctst/rotated-frame? frame)
     []
     (let [grid->snap (fn [[grid-type position]]
                        {:type :layout

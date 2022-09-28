@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.dashboard.sidebar
   (:require
@@ -33,7 +33,7 @@
    [cljs.spec.alpha :as s]
    [goog.functions :as f]
    [potok.core :as ptk]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (mf/defc sidebar-project
   [{:keys [item selected?] :as props}]
@@ -227,7 +227,8 @@
        [:li.team-name {:on-click (partial team-selected (:id team))
                        :key (dm/str (:id team))}
         [:span.team-icon
-         [:img {:src (cf/resolve-team-photo-url team)}]]
+         [:img {:src (cf/resolve-team-photo-url team)
+                :alt (:name team)}]]
         [:span.team-text {:title (:name team)} (:name team)]])
 
      [:hr]
@@ -354,7 +355,8 @@
           [:span.team-text (tr "dashboard.default-team-name")]]
          [:div.team-name
           [:span.team-icon
-           [:img {:src (cf/resolve-team-photo-url team)}]]
+           [:img {:src (cf/resolve-team-photo-url team)
+                  :alt (:name team)}]]
           [:span.team-text {:title (:name team)} (:name team)]])
 
        [:span.switch-icon
@@ -487,7 +489,8 @@
     [:div.profile-section
      [:div.profile {:on-click #(reset! show true)
                     :data-test "profile-btn"}
-      [:img {:src photo}]
+      [:img {:src photo
+             :alt (:fullname profile)}]
       [:span (:fullname profile)]]
 
      [:& dropdown {:on-close #(reset! show false)

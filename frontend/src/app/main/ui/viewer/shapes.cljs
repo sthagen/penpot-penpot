@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.viewer.shapes
   "The main container for a frame in viewer mode"
@@ -28,7 +28,7 @@
    [app.util.router :as rt]
    [app.util.timers :as tm]
    [okulary.core :as l]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (def base-frame-ctx (mf/create-context nil))
 (def frame-offset-ctx (mf/create-context nil))

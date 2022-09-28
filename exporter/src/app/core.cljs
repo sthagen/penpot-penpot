@@ -2,14 +2,14 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.core
   (:require
    ["process" :as proc]
    [app.browser :as bwr]
    [app.common.logging :as l]
-   [app.config]
+   [app.config :as cf]
    [app.http :as http]
    [app.redis :as redis]
    [promesa.core :as p]))
@@ -19,7 +19,9 @@
 
 (defn start
   [& _]
-  (l/info :msg "initializing")
+  (l/info :msg "initializing"
+          :public-uri (str (cf/get :public-uri))
+          :version (:full @cf/version))
   (p/do!
    (bwr/init)
    (redis/init)
@@ -39,5 +41,6 @@
    (http/stop)
    (done)))
 
-(proc/on "uncaughtException" (fn [cause]
-                               (js/console.error cause)))
+(proc/on "uncaughtException"
+         (fn [cause]
+           (js/console.error cause)))

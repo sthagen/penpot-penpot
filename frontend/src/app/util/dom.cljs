@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.util.dom
   (:require
@@ -52,6 +52,10 @@
 (defn set-html-title
   [^string title]
   (set! (.-title globals/document) title))
+
+(defn set-html-lang!
+  [^string lang]
+  (.setAttribute (.querySelector js/document "html") "lang" lang))
 
 (defn set-html-theme-color
   [^string color scheme]
@@ -261,6 +265,11 @@
   [^js el child]
   (when (some? el)
     (.appendChild ^js el child)))
+
+(defn remove-child!
+  [^js el child]
+  (when (some? el)
+    (.removeChild ^js el child)))
 
 (defn get-first-child
   [^js el]

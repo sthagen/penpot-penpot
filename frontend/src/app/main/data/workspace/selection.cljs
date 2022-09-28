@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.data.workspace.selection
   (:require
@@ -141,6 +141,16 @@
       (update-in state [:workspace-local :selected] disj id))))
 
 (defn shift-select-shapes
+  ([id objects]
+   (ptk/reify ::shift-select-shapes
+     ptk/UpdateEvent
+     (update [_ state]
+       (let [selection (-> state
+                           wsh/lookup-selected
+                           (conj id))]
+         (-> state
+             (assoc-in [:workspace-local :selected]
+                       (cph/expand-region-selection objects selection)))))))
   ([id]
    (ptk/reify ::shift-select-shapes
      ptk/UpdateEvent

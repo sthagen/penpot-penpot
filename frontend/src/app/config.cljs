@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.config
   (:require
@@ -88,7 +88,6 @@
 (def worker-uri           (obj/get global "penpotWorkerURI" "/js/worker.js"))
 (def translations         (obj/get global "penpotTranslations"))
 (def themes               (obj/get global "penpotThemes"))
-(def sentry-dsn           (obj/get global "penpotSentryDsn"))
 (def onboarding-form-id   (obj/get global "penpotOnboardingQuestionsFormId"))
 
 (def build-date           (parse-build-date global))

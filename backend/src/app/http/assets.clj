@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.http.assets
   "Assets related handlers."
@@ -52,18 +52,12 @@
   (let [mdata   (meta obj)
         backend (sto/resolve-backend storage (:backend obj))]
     (case (:type backend)
-      :db
-      (p/let [body (sto/get-object-bytes storage obj)]
-        (yrs/response :status  200
-                      :body    body
-                      :headers {"content-type" (:content-type mdata)
-                                "cache-control" (str "max-age=" (inst-ms cache-max-age))}))
-
       :s3
       (p/let [{:keys [host port] :as url} (sto/get-object-url storage obj {:max-age signature-max-age})]
         (yrs/response :status  307
                       :headers {"location" (str url)
                                 "x-host"   (cond-> host port (str ":" port))
+                                "x-mtype"  (:content-type mdata)
                                 "cache-control" (str "max-age=" (inst-ms cache-max-age))}))
 
       :fs

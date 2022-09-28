@@ -2,12 +2,12 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.releases.v1-15
   (:require
    [app.main.ui.releases.common :as c]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (defmethod c/render-release-notes "1.15"
   [{:keys [slide klass next finish navigate version]}]
@@ -77,7 +77,7 @@
          [:img {:src "images/features/1.15-comments.gif" :border "0" :alt "Comments positioning"}]]
         [:div.modal-right
          [:div.modal-title
-          [:h2 "Comments poitioning"]]
+          [:h2 "Comments positioning"]]
          [:div.modal-content
           [:p "They live! Now you can move existing comments wherever you want by dragging them."]
           [:p "Also, comments inside boards will be associated with it, so that if you move a board its comments will maintain its place inside it."]]

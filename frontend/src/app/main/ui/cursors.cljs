@@ -2,14 +2,14 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.cursors
   (:require-macros [app.main.ui.cursors :refer [cursor-ref cursor-fn]])
   (:require
    [app.util.timers :as ts]
    [cuerdas.core :as str]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 ;; Static cursors
 (def comments (cursor-ref :comments 0 2 20))

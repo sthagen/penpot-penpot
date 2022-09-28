@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.sidebar
   (:require
@@ -22,7 +22,7 @@
    [app.util.dom :as dom]
    [app.util.i18n :refer [tr]]
    [app.util.object :as obj]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 ;; --- Left Sidebar (Component)
 
@@ -56,7 +56,8 @@
             [:& shortcuts-container]
             [:*
              [:button.collapse-sidebar
-              {:on-click handle-collapse}
+              {:on-click handle-collapse
+               :aria-label (tr "workspace.sidebar.collapse")}
               i/arrow-slide]
              [:& tab-container {:on-change-tab #(st/emit! (dw/go-to-layout %))
                                 :selected section

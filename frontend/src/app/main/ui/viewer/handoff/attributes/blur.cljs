@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.viewer.handoff.attributes.blur
   (:require
@@ -10,7 +10,7 @@
    [app.util.code-gen :as cg]
    [app.util.i18n :refer [tr]]
    [cuerdas.core :as str]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (defn has-blur? [shape]
   (:blur shape))

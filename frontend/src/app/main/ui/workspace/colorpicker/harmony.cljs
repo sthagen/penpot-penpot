@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.colorpicker.harmony
   (:require
@@ -13,7 +13,7 @@
    [app.util.dom :as dom]
    [app.util.object :as obj]
    [cuerdas.core :as str]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 (defn create-color-wheel
   [canvas-node]
@@ -131,6 +131,7 @@
         :width canvas-side
         :height canvas-side
         :on-pointer-down handle-start-drag
+        :on-pointer-up handle-stop-drag
         :on-lost-pointer-capture handle-stop-drag
         :on-click calculate-pos
         :on-mouse-move #(when @dragging? (calculate-pos %))}]

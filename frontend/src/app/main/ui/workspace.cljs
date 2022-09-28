@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace
   (:require
@@ -33,7 +33,7 @@
    [app.util.object :as obj]
    [debug :refer [debug?]]
    [okulary.core :as l]
-   [rumext.alpha :as mf]))
+   [rumext.v2 :as mf]))
 
 ;; --- Workspace
 
@@ -81,7 +81,8 @@
        [:*
         [:& left-toolbar {:layout layout}]
         (if (:collapse-left-sidebar layout)
-          [:button.collapse-sidebar.collapsed {:on-click #(st/emit! (dw/toggle-layout-flag :collapse-left-sidebar))}
+          [:button.collapse-sidebar.collapsed {:on-click #(st/emit! (dw/toggle-layout-flag :collapse-left-sidebar))
+                                               :aria-label (tr "workspace.sidebar.expand")}
            i/arrow-slide]
           [:& left-sidebar {:layout layout}])
         [:& right-sidebar {:section options-mode

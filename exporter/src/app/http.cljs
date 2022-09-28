@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.http
   (:require
@@ -90,12 +90,13 @@
      (fn [{:keys [:response/body :response/status] :as exchange}]
        (cond
          (map? body)
-         (let [data (t/encode-str body {:type :json-verbose})]
+         (let [data (t/encode-str body {:type :json-verbose})
+               size (js/Buffer.byteLength data "utf-8")]
            (-> exchange
                (assoc :response/body data)
                (assoc :response/status 200)
                (update :response/headers assoc "content-type" "application/transit+json")
-               (update :response/headers assoc "content-length" (count data))))
+               (update :response/headers assoc "content-length" size)))
 
          (and (nil? body)
               (= 200 status))

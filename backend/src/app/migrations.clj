@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.migrations
   (:require
@@ -244,6 +244,9 @@
 
    {:name "0078-mod-file-media-object-table-drop-cascade"
     :fn (mg/resource "app/migrations/sql/0078-mod-file-media-object-table-drop-cascade.sql")}
+
+   {:name "0079-mod-profile-table"
+    :fn (mg/resource "app/migrations/sql/0079-mod-profile-table.sql")}
    ])
 
 
