@@ -1,13 +1,17 @@
 # CHANGELOG
 
-## :rocket: 1.16.0-beta
+## :rocket: Next (1.17)
 
 ### :boom: Breaking changes & Deprecations
 ### :sparkles: New features
 ### :bug: Bugs fixed
 
+- Add title to color bullets [Taiga #4218](https://tree.taiga.io/project/penpot/task/4218)
+- Fix color bullets in library color modal [Taiga #4186](https://tree.taiga.io/project/penpot/issue/4186)
 - Fix shortcut texts alignment [Taiga #4275](https://tree.taiga.io/project/penpot/issue/4275)
 - Fix some texts and a typo [Taiga #4215](https://tree.taiga.io/project/penpot/issue/4215)
+- Fix twitter support account link [Taiga #4279](https://tree.taiga.io/project/penpot/issue/4279)
+
 
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
@@ -19,12 +23,12 @@
 
 - Removed the support for v2 internal file data blob format.  This
   version has never been documented nor set as default value so
-  technicaly this is not a breaking change because we are removing
+  technically this is not a breaking change because we are removing
   a "private API".
 
 ### :sparkles: New features
 
-- Add title to color bullets [Taiga #4218](https://tree.taiga.io/project/penpot/task/4218)
+- Improve interactions with nested boards [Taiga #4054](https://tree.taiga.io/project/penpot/us/4054)
 - Add team hero in projects dashboard [Taiga #3863](https://tree.taiga.io/project/penpot/us/3863)
 - Add zoom style to shared link [Taiga #3874](https://tree.taiga.io/project/penpot/us/3874)
 - Add dashboard creation button as placeholder [Taiga #3861](https://tree.taiga.io/project/penpot/us/3861)
@@ -39,6 +43,7 @@
 - Newsletter Opt-in options for subscription categories [Taiga #3242](https://tree.taiga.io/project/penpot/us/3242)
 - Print emails to console by default if smtp is disabled
 - Add `email-verification` flag for enable/disable email verification
+- Make graphics thumbnails load lazy [Taiga #4252](https://tree.taiga.io/project/penpot/issue/4252)
 
 ### :bug: Bugs fixed
 
@@ -52,12 +57,16 @@
 - Fix change multiple colors with SVG [Taiga #3889](https://tree.taiga.io/project/penpot/issue/3889)
 - Fix ungroup does not work for typographies [Taiga #4195](https://tree.taiga.io/project/penpot/issue/4195)
 - Fix inviting to non existing users can fail [Taiga #4108](https://tree.taiga.io/project/penpot/issue/4108)
+- Fix components marked as touched when moved [Taiga #4061](https://tree.taiga.io/project/penpot/task/4061)
 
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
 
 - To @andrewzhurov for many code contributions on this release.
 - UI improvements in Project section (by @Waishnav) [#2285](https://github.com/penpot/penpot/pull/2285)
+- Fix fronted comments (by @lol768) [#2368](https://github.com/penpot/penpot/pull/2368)
+
+## 1.15.5-beta
 
 ## 1.15.4-beta
 
@@ -88,6 +97,7 @@
 - Fix PDF exportation order [Taiga #4216](https://tree.taiga.io/project/penpot/issue/4216)
 - Fix some typos [Taiga #4215](https://tree.taiga.io/project/penpot/issue/4215)
 - Fix "no boards" message in viewer [Taiga #4243](https://tree.taiga.io/project/penpot/issue/4243)
+- Fix view mode login size [Taiga #4210](https://tree.taiga.io/project/penpot/issue/4210)
 
 ## 1.15.3-beta
 
@@ -136,7 +146,7 @@
 - The `PENPOT_LDAP_ATTRS_PHOTO` finally removed, it was unused for many
   versions.
 - If you are using social login (google, github, gitlab or generic OIDC) you
-  will need to ensure to add the following flags respectivelly to let them
+  will need to ensure to add the following flags respectively to let them
   enabled: `enable-login-with-google`, `enable-login-with-github`,
   `enable-login-with-gitlab` and `enable-login-with-oidc`. If not, they will
   remain disabled after application start independently if you set the client-id
@@ -241,7 +251,7 @@
 - Fix undo when drawing curves [Taiga #3523](https://tree.taiga.io/project/penpot/issue/3523)
 - Fix issue with text edition and certain fonts (WorkSans, Raleway, ...) and foreign objects [Taiga #3521](https://tree.taiga.io/project/penpot/issue/3521)
 - Fix thumbnail generation when concurrent edition [Taiga #3522](https://tree.taiga.io/project/penpot/issue/3522)
-- Fix environment imporot for exporter in Docker
+- Fix environment import for exporter in Docker
 - Fix auto scroll layers in Firefox [Taiga #3531](https://tree.taiga.io/project/penpot/issue/3531)
 - Fix base background not visible for imported SVG
 
@@ -325,7 +335,7 @@
 - Fix mouse leave in handoff close overlay animation breaks [Taiga #3173](https://tree.taiga.io/project/penpot/issue/3173)
 - Fix different behaviour during image drag [Taiga #2279](https://tree.taiga.io/project/penpot/issue/2279)
 - Fix hidden file name on import [Taiga #3172](https://tree.taiga.io/project/penpot/issue/3172)
-- Fix unneccessary scrollbars at the color list [Taiga #3211](https://tree.taiga.io/project/penpot/issue/3211)
+- Fix unnecessary scrollbars at the color list [Taiga #3211](https://tree.taiga.io/project/penpot/issue/3211)
 - "Show in exports" is showing in multiselections [Taiga #3194](https://tree.taiga.io/project/penpot/issue/3194)
 - Edit file name navigates to the file workspace [Taiga #3183](https://tree.taiga.io/project/penpot/issue/3183)
 - Fix scroll into view behind fixed element [Taiga #3170](https://tree.taiga.io/project/penpot/issue/3170)
@@ -334,7 +344,7 @@
 - Fix duplicate multi selected elements [Taiga #3155](https://tree.taiga.io/project/penpot/issue/3155)
 - Fix add fills to artboard modify children [Taiga #3151](https://tree.taiga.io/project/penpot/issue/3151)
 - Avoid numeric inputs to allow big numbers [Taiga #2858](https://tree.taiga.io/project/penpot/issue/2858)
-- Fix component contex menu size [Taiga #2480](https://tree.taiga.io/project/penpot/issue/2480)
+- Fix component context menu size [Taiga #2480](https://tree.taiga.io/project/penpot/issue/2480)
 - Add shadow to artboard make it lose the fill [Taiga #3139](https://tree.taiga.io/project/penpot/issue/3139)
 - Avoid numeric inputs to change its value without focusing them [Taiga #3140](https://tree.taiga.io/project/penpot/issue/3140)
 - Fix comments modal when changing pages [Taiga #2597](https://tree.taiga.io/project/penpot/issue/2508)
@@ -463,7 +473,7 @@
 
 - Fix issue on handling empty content on boolean shapes
 - Fix race condition issue on component renaming
-- Handle EOF errors on writting streamed response
+- Handle EOF errors on writing streamed response
 - Handle EOF errors on websocket send/ping methods
 - Disable parallel upload of file media on import (causes too much
   contention on the rlimit subsistem that does not works as expected
@@ -575,7 +585,7 @@
 
 ## 1.10.4-beta
 
-### :sparkles: Enhacements
+### :sparkles: Enhancements
 
 - Allow parametrice file snapshoting interval
 
@@ -587,7 +597,7 @@
 
 ## 1.10.3-beta
 
-### :sparkles: Enhacements
+### :sparkles: Enhancements
 
 - Make all logging asynchronous, this avoid some overhead on jetty threads at cost of logging latency.
 - Increase default session time to 15 days.
@@ -923,7 +933,7 @@
 
 - Add better auth module logging.
 - Add missing `email` scope to OIDC backend.
-- Add missing cause prop on error loging.
+- Add missing cause prop on error logging.
 - Fix empty font-family handling on custom fonts page.
 - Fix incorrect unicode code points handling on draft-to-penpot conversion.
 - Fix some problems with paths.
