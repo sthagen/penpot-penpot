@@ -27,6 +27,10 @@
                clojure.lang.IRecord
                clojure.lang.IDeref)
 
+(prefer-method print-method
+               clojure.lang.IPersistentMap
+               clojure.lang.IDeref)
+
 (prefer-method pprint/simple-dispatch
                clojure.lang.IPersistentMap
                clojure.lang.IDeref)
@@ -46,7 +50,7 @@
    :database-username "penpot"
    :database-password "penpot"
 
-   :default-blob-version 4
+   :default-blob-version 5
    :loggers-zmq-uri "tcp://localhost:45556"
    :rpc-rlimit-config (fs/path "resources/rlimit.edn")
 

@@ -2,14 +2,14 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.common.types.component)
 
 (defn instance-root?
   [shape]
   (some? (:component-id shape)))
- 
+
 (defn instance-of?
   [shape file-id component-id]
   (and (some? (:component-id shape))

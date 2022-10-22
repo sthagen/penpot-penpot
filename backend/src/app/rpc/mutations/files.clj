@@ -8,6 +8,8 @@
   (:require
    [app.common.data :as d]
    [app.common.exceptions :as ex]
+   [app.common.files.features :as ffeat]
+   [app.common.logging :as l]
    [app.common.pages :as cp]
    [app.common.pages.migrations :as pmg]
    [app.common.spec :as us]
@@ -18,12 +20,15 @@
    [app.loggers.audit :as audit]
    [app.metrics :as mtx]
    [app.msgbus :as mbus]
+   [app.rpc :as-alias rpc]
+   [app.rpc.doc :as-alias doc]
    [app.rpc.permissions :as perms]
    [app.rpc.queries.files :as files]
    [app.rpc.queries.projects :as proj]
    [app.rpc.semaphore :as rsem]
    [app.storage.impl :as simpl]
    [app.util.blob :as blob]
+   [app.util.objects-map :as omap]
    [app.util.services :as sv]
    [app.util.time :as dt]
    [clojure.spec.alpha :as s]
@@ -44,12 +49,14 @@
 
 ;; --- Mutation: Create File
 
+(s/def ::features ::us/set-of-strings)
 (s/def ::is-shared ::us/boolean)
 (s/def ::create-file
   (s/keys :req-un [::profile-id ::name ::project-id]
-          :opt-un [::id ::is-shared ::components-v2]))
+          :opt-un [::id ::is-shared ::features ::components-v2]))
 
 (sv/defmethod ::create-file
+  {::doc/added "1.0"}
   [{:keys [pool] :as cfg} {:keys [profile-id project-id] :as params}]
   (db/with-atomic [conn pool]
     (let [team-id (retrieve-team-id conn project-id)]
@@ -68,27 +75,37 @@
 (defn create-file
   [conn {:keys [id name project-id is-shared data revn
                 modified-at deleted-at ignore-sync-until
-                components-v2]
+                components-v2 features]
          :or {is-shared false revn 0}
          :as params}]
-  (let [id   (or id (:id data) (uuid/next))
-        data (or data (ctf/make-file-data id components-v2))
-        file (db/insert! conn :file
-                         (d/without-nils
-                          {:id id
-                           :project-id project-id
-                           :name name
-                           :revn revn
-                           :is-shared is-shared
-                           :data (blob/encode data)
-                           :ignore-sync-until ignore-sync-until
-                           :modified-at modified-at
-                           :deleted-at deleted-at}))]
+  (let [id       (or id (:id data) (uuid/next))
+
+        ;; BACKWARD COMPATIBILITY with the components-v2 param
+        features (cond-> (or features #{})
+                   components-v2 (conj "components/v2"))
+
+        data     (or data
+                     (binding [ffeat/*current* features]
+                       (ctf/make-file-data id)))
+
+        features (db/create-array conn "text" features)
+        file     (db/insert! conn :file
+                             (d/without-nils
+                              {:id id
+                               :project-id project-id
+                               :name name
+                               :revn revn
+                               :is-shared is-shared
+                               :data (blob/encode data)
+                               :features features
+                               :ignore-sync-until ignore-sync-until
+                               :modified-at modified-at
+                               :deleted-at deleted-at}))]
 
     (->> (assoc params :file-id id :role :owner)
          (create-file-role conn))
 
-    (assoc file :data data)))
+    (-> file files/decode-row)))
 
 ;; --- Mutation: Rename File
 
@@ -98,6 +115,7 @@
   (s/keys :req-un [::profile-id ::name ::id]))
 
 (sv/defmethod ::rename-file
+  {::doc/added "1.0"}
   [{:keys [pool] :as cfg} {:keys [id profile-id] :as params}]
   (db/with-atomic [conn pool]
     (files/check-edition-permissions! conn profile-id id)
@@ -105,10 +123,11 @@
 
 (defn- rename-file
   [conn {:keys [id name] :as params}]
-  (db/update! conn :file
-              {:name name}
-              {:id id}))
-
+  (-> (db/update! conn :file
+                  {:name name
+                   :modified-at (dt/now)}
+                  {:id id})
+      (select-keys [:id :name :created-at :modified-at])))
 
 ;; --- Mutation: Set File shared
 
@@ -120,6 +139,7 @@
   (s/keys :req-un [::profile-id ::id ::is-shared]))
 
 (sv/defmethod ::set-file-shared
+  {::doc/added "1.2"}
   [{:keys [pool] :as cfg} {:keys [id profile-id is-shared] :as params}]
   (db/with-atomic [conn pool]
     (files/check-edition-permissions! conn profile-id id)
@@ -146,6 +166,7 @@
   (s/keys :req-un [::id ::profile-id]))
 
 (sv/defmethod ::delete-file
+  {::doc/added "1.0"}
   [{:keys [pool] :as cfg} {:keys [id profile-id] :as params}]
   (db/with-atomic [conn pool]
     (files/check-edition-permissions! conn profile-id id)
@@ -309,24 +330,68 @@
 (s/def ::update-file
   (s/and
    (s/keys :req-un [::id ::session-id ::profile-id ::revn]
-           :opt-un [::changes ::changes-with-metadata ::components-v2])
+           :opt-un [::changes ::changes-with-metadata ::components-v2 ::features])
    (fn [o]
      (or (contains? o :changes)
          (contains? o :changes-with-metadata)))))
 
+(def ^:private sql:retrieve-file
+  "SELECT f.*, p.team_id
+     FROM file AS f
+     JOIN project AS p ON (p.id = f.project_id)
+    WHERE f.id = ?
+      AND (f.deleted_at IS NULL OR
+           f.deleted_at > now())
+      FOR KEY SHARE")
+
 (sv/defmethod ::update-file
-  {::rsem/queue :update-file}
-  [{:keys [pool] :as cfg} {:keys [id profile-id] :as params}]
+  {::rsem/queue :update-file
+   ::doc/added "1.0"}
+  [{:keys [pool] :as cfg} {:keys [id profile-id components-v2] :as params}]
   (db/with-atomic [conn pool]
     (db/xact-lock! conn id)
-    (let [{:keys [id] :as file} (db/get-by-id conn :file id {:for-key-share true})
-          team-id (retrieve-team-id conn (:project-id file))]
-      (files/check-edition-permissions! conn profile-id id)
-      (with-meta
-        (update-file (assoc cfg :conn  conn)
-                     (assoc params :file file))
-        {::audit/props {:project-id (:project-id file)
-                        :team-id team-id}}))))
+    (let [file      (db/exec-one! conn [sql:retrieve-file id])
+          features' (:features params #{})
+          features  (db/decode-pgarray (:features file) features')
+
+          ;; BACKWARD COMPATIBILITY with the components-v2 parameter
+          features  (cond-> features
+                      components-v2 (conj "components/v2"))
+
+          file      (assoc file :features features)
+          tpoint    (dt/tpoint)]
+
+      (when-not file
+        (ex/raise :type :not-found
+                  :code :object-not-found
+                  :hint (format "file with id '%s' does not exists" id)))
+
+      ;; If features are specified from params and the final feature
+      ;; set is different than the persisted one, update it on the
+      ;; database.
+      (when (not= features features')
+        (let [features (db/create-array conn "text" features)]
+          (db/update! conn :file
+                      {:features features}
+                      {:id id})))
+
+      (binding [ffeat/*current* features
+                ffeat/*wrap-objects-fn* (if (features "storate/objects-map")
+                                         omap/wrap
+                                         identity)]
+        (files/check-edition-permissions! conn profile-id (:id file))
+        (with-meta
+          (update-file (assoc cfg :conn conn)
+                       (assoc params :file file))
+          {::audit/props
+           {:project-id (:project-id file)
+            :team-id    (:team-id file)}
+
+           ::rpc/before-complete
+           (fn []
+             (let [elapsed (tpoint)]
+               (l/trace :hint "update-file" :time (dt/format-duration elapsed))))})))))
+
 
 (defn- take-snapshot?
   "Defines the rule when file `data` snapshot should be saved."
@@ -347,7 +412,7 @@
 
 (defn- update-file
   [{:keys [conn metrics] :as cfg}
-   {:keys [file changes changes-with-metadata session-id profile-id components-v2] :as params}]
+   {:keys [file changes changes-with-metadata session-id profile-id] :as params}]
   (when (> (:revn params)
            (:revn file))
 
@@ -378,7 +443,8 @@
                                           (assoc :id (:id file))
                                           (pmg/migrate-data))
 
-                                      components-v2
+
+                                      (contains? ffeat/*current* "components/v2")
                                       (ctf/migrate-to-components-v2)
 
                                       :always
@@ -455,7 +521,8 @@
                          :changes changes})
 
     (when (and (:is-shared file) (seq lchanges))
-      (let [team-id (retrieve-team-id conn (:project-id file))]
+      (let [team-id (or (:team-id file)
+                        (retrieve-team-id conn (:project-id file)))]
         ;; Asynchronously publish message to the msgbus
         (mbus/pub! msgbus
                    :topic team-id
@@ -487,6 +554,7 @@
   (s/keys :req-un [::changes ::revn ::session-id ::id]))
 
 (sv/defmethod ::update-temp-file
+  {::doc/added "1.7"}
   [{:keys [pool] :as cfg} {:keys [profile-id session-id id revn changes] :as params}]
   (db/with-atomic [conn pool]
     (db/insert! conn :file-change
@@ -504,6 +572,7 @@
   (s/keys :req-un [::id ::profile-id]))
 
 (sv/defmethod ::persist-temp-file
+  {::doc/added "1.7"}
   [{:keys [pool] :as cfg} {:keys [id profile-id] :as params}]
   (db/with-atomic [conn pool]
     (files/check-edition-permissions! conn profile-id id)

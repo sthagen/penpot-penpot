@@ -16,6 +16,7 @@
    [app.config :as cf]
    [app.db :as db]
    [app.media :as media]
+   [app.rpc :as-alias rpc]
    [app.rpc.doc :as-alias doc]
    [app.rpc.queries.files :as files]
    [app.rpc.queries.projects :as projects]
@@ -634,7 +635,7 @@
 
             params  {:id file-id'
                      :project-id project-id
-                     :name (str "Imported: " (:name file))
+                     :name (:name file)
                      :revn (:revn file)
                      :is-shared (:is-shared file)
                      :data (blob/encode data)
@@ -807,7 +808,7 @@
         cs (volatile! nil)]
     (try
       (l/info :hint "start exportation" :export-id id)
-      (with-open [output (io/output-stream output)]
+      (with-open [^AutoCloseable output (io/output-stream output)]
         (binding [*position* (atom 0)]
           (write-export! (assoc cfg ::output output))))
 
@@ -830,7 +831,7 @@
 (defn export-to-tmpfile!
   [cfg]
   (let [path (tmp/tempfile :prefix "penpot.export.")]
-    (with-open [output (io/output-stream path)]
+    (with-open [^AutoCloseable output (io/output-stream path)]
       (export! cfg output)
       path)))
 
@@ -842,7 +843,7 @@
     (try
       (l/info :hint "start importation" :import-id id)
       (binding [*position* (atom 0)]
-        (with-open [input (io/input-stream input)]
+        (with-open [^AutoCloseable input (io/input-stream input)]
           (read-import! (assoc cfg ::input input))))
 
       (catch Throwable cause
@@ -879,10 +880,11 @@
                      (export! output-stream))))]
 
     (with-meta (sv/wrap nil)
-      {:transform-response (fn [_ response]
-                             (-> response
-                                 (assoc :body resp)
-                                 (assoc :headers {"content-type" "application/octet-stream"})))})))
+      {::rpc/transform-response
+       (fn [_ response]
+         (-> response
+             (assoc :body resp)
+             (assoc :headers {"content-type" "application/octet-stream"})))})))
 
 (s/def ::file ::media/upload)
 (s/def ::import-binfile

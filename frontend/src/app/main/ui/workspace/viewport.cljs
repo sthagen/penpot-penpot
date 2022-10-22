@@ -96,7 +96,6 @@
 
         ;; REFS
         viewport-ref      (mf/use-ref nil)
-        overlays-ref      (mf/use-ref nil)
 
         ;; VARS
         disable-paste     (mf/use-var false)
@@ -184,7 +183,7 @@
 
         disabled-guides?         (or drawing-tool transform)]
 
-    (hooks/setup-dom-events viewport-ref overlays-ref zoom disable-paste in-viewport?)
+    (hooks/setup-dom-events viewport-ref zoom disable-paste in-viewport?)
     (hooks/setup-viewport-size viewport-ref)
     (hooks/setup-cursor cursor alt? mod? space? panning drawing-tool drawing-path? node-editing?)
     (hooks/setup-keyboard alt? mod? space?)
@@ -194,7 +193,7 @@
     (hooks/setup-active-frames base-objects hover-ids selected active-frames zoom transform vbox)
 
     [:div.viewport
-     [:div.viewport-overlays {:ref overlays-ref}
+     [:div.viewport-overlays
       ;; The behaviour inside a foreign object is a bit different that in plain HTML so we wrap
       ;; inside a foreign object "dummy" so this awkward behaviour is take into account
       [:svg {:style {:top 0 :left 0 :position "fixed" :width "100%" :height "100%" :opacity 0}}
@@ -240,6 +239,13 @@
 
       (when (debug? :show-export-metadata)
         [:& use/export-page {:options options}])
+
+      ;; We need a "real" background shape so layer transforms work properly in firefox
+      [:rect {:width (:width vbox 0)
+              :height (:height vbox 0)
+              :x (:x vbox 0)
+              :y (:y vbox 0)
+              :fill background}]
 
       [:& (mf/provider use/include-metadata-ctx) {:value (debug? :show-export-metadata)}
        [:& (mf/provider embed/context) {:value true}
@@ -336,11 +342,6 @@
            :on-frame-enter on-frame-enter
            :on-frame-leave on-frame-leave
            :on-frame-select on-frame-select}])
-
-       (when show-gradient-handlers?
-         [:& gradients/gradient-handlers
-          {:id (first selected)
-           :zoom zoom}])
 
        (when show-draw-area?
          [:& drawarea/draw-area
@@ -441,4 +442,9 @@
               :zoom zoom
               :objects objects-modified
               :current-transform transform
-              :hover-disabled? hover-disabled?}])])]]]))
+              :hover-disabled? hover-disabled?}])])
+
+       (when show-gradient-handlers?
+         [:& gradients/gradient-handlers
+          {:id (first selected)
+           :zoom zoom}])]]]))

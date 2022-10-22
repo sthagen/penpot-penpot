@@ -2,7 +2,7 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.common.geom.shapes.modifiers
   (:require
@@ -21,7 +21,8 @@
   "Adjust modifiers so they adjust to the pixel grid"
   [modifiers shape]
 
-  (if (some? (:resize-transform modifiers))
+  (if (and (some? (:resize-transform modifiers))
+           (not (gmt/unit? (:resize-transform modifiers))))
     ;; If we're working with a rotation we don't handle pixel precision because
     ;; the transformation won't have the precision anyway
     modifiers
@@ -243,7 +244,10 @@
 
   (let [set-modifiers
         (fn [modif-tree id]
-          (assoc modif-tree id {:modifiers (get-modifier (get objects id))}))
+          (let [shape (get objects id)
+                modifiers (cond-> (get-modifier shape) snap-pixel? (set-pixel-precision shape))]
+            (-> modif-tree
+                (assoc id {:modifiers modifiers}))))
 
         modif-tree (reduce set-modifiers {} ids)
 

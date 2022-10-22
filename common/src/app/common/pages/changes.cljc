@@ -2,12 +2,13 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 ;;
-;; Copyright (c) UXBOX Labs SL
+;; Copyright (c) KALEIDOS INC
 
 (ns app.common.pages.changes
   #_:clj-kondo/ignore
   (:require
    [app.common.data :as d]
+   [app.common.data.macros :as dm]
    [app.common.exceptions :as ex]
    [app.common.geom.shapes :as gsh]
    [app.common.geom.shapes.bool :as gshb]
@@ -39,7 +40,27 @@
 ;; Page Transformation Changes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; === Changes Processing Impl
+;; Changes Processing Impl
+
+(defn validate-shapes!
+  [data objects items]
+  (letfn [(validate-shape! [[page-id {:keys [id] :as shape}]]
+            (when-not (= shape (dm/get-in data [:pages-index page-id :objects id]))
+              ;; If object has change verify is correct
+              (us/verify ::cts/shape shape)))]
+    (let [lookup (d/getf objects)]
+      (->> (into #{} (map :page-id) items)
+           (mapcat (fn [page-id]
+                     (filter #(= page-id (:page-id %)) items)))
+           (mapcat (fn [{:keys [type id page-id] :as item}]
+                     (sequence
+                      (comp (keep lookup)
+                            (map (partial vector page-id)))
+                      (case type
+                        (:add-obj :mod-obj :del-obj) (cons id nil)
+                        (:mov-objects :reg-objects)  (:shapes item)
+                        nil))))
+           (run! validate-shape!)))))
 
 (defmulti process-change (fn [_ change] (:type change)))
 (defmulti process-operation (fn [_ op] (:type op)))
@@ -56,14 +77,7 @@
 
    (let [result (reduce #(or (process-change %1 %2) %1) data items)]
      ;; Validate result shapes (only on the backend)
-     #?(:clj
-        (doseq [page-id (into #{} (map :page-id) items)]
-          (let [page (get-in result [:pages-index page-id])]
-            (doseq [[id shape] (:objects page)]
-              (when-not (= shape (get-in data [:pages-index page-id :objects id]))
-                ;; If object has change verify is correct
-                (us/verify ::cts/shape shape))))))
-
+     #?(:clj (validate-shapes! data result items))
      result)))
 
 (defmethod process-change :set-option
@@ -211,8 +225,8 @@
                 (-> (update :touched cph/set-touched-group :shapes-group)
                     (dissoc :remote-synced?)))))
 
-          (remove-from-old-parent [cpindex objects shape-id]
-            (let [prev-parent-id (get cpindex shape-id)]
+          (remove-from-old-parent [old-objects objects shape-id]
+            (let [prev-parent-id (dm/get-in old-objects [shape-id :parent-id])]
               ;; Do nothing if the parent id of the shape is the same as
               ;; the new destination target parent id.
               (if (= prev-parent-id parent-id)
@@ -249,17 +263,6 @@
 
           (move-objects [objects]
             (let [valid?   (every? (partial is-valid-move? objects) shapes)
-
-                  ;; Create a index of shape ids pointing to the
-                  ;; corresponding parents; used mainly for update old
-                  ;; parents after move operation.
-                  cpindex  (reduce (fn [index id]
-                                     (let [obj (get objects id)]
-                                       (assoc! index id (:parent-id obj))))
-                                   (transient {})
-                                   (keys objects))
-                  cpindex  (persistent! cpindex)
-
                   parent   (get objects parent-id)
                   frame-id (if (= :frame (:type parent))
                              (:id parent)
@@ -276,7 +279,7 @@
                   ;; Analyze the old parents and clear the old links
                   ;; only if the new parent is different form old
                   ;; parent.
-                  (reduce (partial remove-from-old-parent cpindex) $ shapes)
+                  (reduce (partial remove-from-old-parent objects) $ shapes)
 
                   ;; Ensure that all shapes of the new parent has a
                   ;; correct link to the topside frame.
@@ -347,27 +350,12 @@
 ;; -- Components
 
 (defmethod process-change :add-component
-  [data {:keys [id name path main-instance-id main-instance-page shapes]}]
-  (ctkl/add-component data
-                      id
-                      name
-                      path
-                      main-instance-id
-                      main-instance-page
-                      shapes))
+  [data params]
+  (ctkl/add-component data params))
 
 (defmethod process-change :mod-component
-  [data {:keys [id name path objects]}]
-  (update-in data [:components id]
-             #(cond-> %
-                  (some? name)
-                  (assoc :name name)
-
-                  (some? path)
-                  (assoc :path path)
-
-                  (some? objects)
-                  (assoc :objects objects))))
+  [data params]
+  (ctkl/mod-component data params))
 
 (defmethod process-change :del-component
   [data {:keys [id skip-undelete?]}]
