@@ -52,7 +52,9 @@
 
    :default-blob-version 5
    :loggers-zmq-uri "tcp://localhost:45556"
+
    :rpc-rlimit-config (fs/path "resources/rlimit.edn")
+   :rpc-climit-config (fs/path "resources/climit.edn")
 
    :file-change-snapshot-every 5
    :file-change-snapshot-timeout "3h"
@@ -90,6 +92,7 @@
 
 (s/def ::default-rpc-rlimit ::us/vector-of-strings)
 (s/def ::rpc-rlimit-config ::fs/path)
+(s/def ::rpc-climit-config ::fs/path)
 
 (s/def ::media-max-file-size ::us/integer)
 
@@ -148,7 +151,6 @@
 (s/def ::http-server-max-multipart-body-size ::us/integer)
 (s/def ::http-server-io-threads ::us/integer)
 (s/def ::http-server-worker-threads ::us/integer)
-(s/def ::initial-project-skey ::us/string)
 (s/def ::ldap-attrs-email ::us/string)
 (s/def ::ldap-attrs-fullname ::us/string)
 (s/def ::ldap-attrs-username ::us/string)
@@ -171,11 +173,6 @@
 (s/def ::public-uri ::us/string)
 (s/def ::redis-uri ::us/string)
 (s/def ::registration-domain-whitelist ::us/set-of-strings)
-
-(s/def ::semaphore-process-font ::us/integer)
-(s/def ::semaphore-process-image ::us/integer)
-(s/def ::semaphore-update-file ::us/integer)
-(s/def ::semaphore-auth ::us/integer)
 
 (s/def ::smtp-default-from ::us/string)
 (s/def ::smtp-default-reply-to ::us/string)
@@ -250,7 +247,6 @@
                    ::http-server-max-multipart-body-size
                    ::http-server-io-threads
                    ::http-server-worker-threads
-                   ::initial-project-skey
                    ::ldap-attrs-email
                    ::ldap-attrs-fullname
                    ::ldap-attrs-username

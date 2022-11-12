@@ -11,18 +11,23 @@
    [app.common.spec :as us]
    [app.db :as db]
    [app.http :as-alias http]
+   [app.http.session :as-alias session]
    [app.loggers.audit :as audit]
    [app.metrics :as mtx]
    [app.msgbus :as-alias mbus]
+   [app.rpc.climit :as climit]
+   [app.rpc.cond :as cond]
+   [app.rpc.helpers :as rph]
    [app.rpc.retry :as retry]
    [app.rpc.rlimit :as rlimit]
-   [app.rpc.semaphore :as-alias rsem]
+   [app.storage :as-alias sto]
    [app.util.services :as sv]
    [app.util.time :as ts]
    [clojure.spec.alpha :as s]
    [integrant.core :as ig]
    [promesa.core :as p]
    [promesa.exec :as px]
+   [yetti.request :as yrq]
    [yetti.response :as yrs]))
 
 (defn- default-handler
@@ -31,23 +36,29 @@
 
 (defn- handle-response-transformation
   [response request mdata]
-  (let [response (if (sv/wrapped? response) @response response)]
-    (if-let [transform-fn (::transform-response mdata)]
-      (p/do (transform-fn request response))
-      (p/resolved response))))
+  (let [transform-fn (reduce (fn [res-fn transform-fn]
+                               (fn [request response]
+                                 (p/then (res-fn request response) #(transform-fn request %))))
+                             (constantly response)
+                             (::response-transform-fns mdata))]
+    (transform-fn request response)))
 
 (defn- handle-before-comple-hook
   [response mdata]
-  (when-let [hook-fn (::before-complete mdata)]
+  (doseq [hook-fn (::before-complete-fns mdata)]
     (ex/ignoring (hook-fn)))
   response)
 
 (defn- handle-response
   [request result]
-  (let [mdata (meta result)]
-    (p/-> (yrs/response 200 result (::http/headers mdata {}))
-          (handle-response-transformation request mdata)
-          (handle-before-comple-hook mdata))))
+  (if (fn? result)
+    (p/wrap (result request))
+    (let [mdata (meta result)]
+      (p/-> (yrs/response {:status  (::http/status mdata 200)
+                           :headers (::http/headers mdata {})
+                           :body    (rph/unwrap result)})
+            (handle-response-transformation request mdata)
+            (handle-before-comple-hook mdata)))))
 
 (defn- rpc-query-handler
   "Ring handler that dispatches query requests and convert between
@@ -90,18 +101,20 @@
   internal async flow into ring async flow."
   [methods {:keys [profile-id session-id params] :as request} respond raise]
   (let [cmd    (keyword (:command params))
-        data   (into {::request request} params)
+        etag   (yrq/get-header request "if-none-match")
+        data   (into {::request request ::cond/key etag} params)
         data   (if profile-id
                  (assoc data :profile-id profile-id ::session-id session-id)
                  (dissoc data :profile-id))
 
         method (get methods cmd default-handler)]
-    (-> (method data)
-        (p/then (partial handle-response request))
-        (p/then respond)
-        (p/catch (fn [cause]
-                   (let [context {:profile-id profile-id}]
-                     (raise (ex/wrap-with-context cause context))))))))
+    (binding [cond/*enabled* true]
+      (-> (method data)
+          (p/then (partial handle-response request))
+          (p/then respond)
+          (p/catch (fn [cause]
+                     (let [context {:profile-id profile-id}]
+                       (raise (ex/wrap-with-context cause context)))))))))
 
 (defn- wrap-metrics
   "Wrap service method with metrics measurement."
@@ -123,8 +136,9 @@
   [{:keys [executor] :as cfg} f mdata]
   (with-meta
     (fn [cfg params]
-      (-> (px/submit! executor #(f cfg params))
-          (p/bind p/wrap)))
+      (->> (px/submit! executor (px/wrap-bindings #(f cfg params)))
+           (p/mapcat p/wrap)
+           (p/map rph/wrap)))
     mdata))
 
 (defn- wrap-audit
@@ -158,9 +172,10 @@
   [cfg f mdata]
   (let [f     (as-> f $
                 (wrap-dispatch cfg $ mdata)
-                (wrap-metrics cfg $ mdata)
+                (cond/wrap cfg $ mdata)
                 (retry/wrap-retry cfg $ mdata)
-                (rsem/wrap cfg $ mdata)
+                (wrap-metrics cfg $ mdata)
+                (climit/wrap cfg $ mdata)
                 (rlimit/wrap cfg $ mdata)
                 (wrap-audit cfg $ mdata))
 
@@ -172,6 +187,7 @@
       (fn [{:keys [::request] :as params}]
         ;; Raise authentication error when rpc method requires auth but
         ;; no profile-id is found in the request.
+
         (p/do!
          (if (and auth? (not (uuid? (:profile-id params))))
            (ex/raise :type :authentication
@@ -179,7 +195,6 @@
                      :hint "authentication required for this endpoint")
            (let [params (us/conform spec (dissoc params ::request))]
              (f cfg (assoc params ::request request))))))
-
       mdata)))
 
 (defn- process-method
@@ -227,7 +242,10 @@
                      'app.rpc.commands.auth
                      'app.rpc.commands.ldap
                      'app.rpc.commands.demo
-                     'app.rpc.commands.files)
+                     'app.rpc.commands.files
+                     'app.rpc.commands.files.update
+                     'app.rpc.commands.files.create
+                     'app.rpc.commands.files.temp)
          (map (partial process-method cfg))
          (into {}))))
 
@@ -235,21 +253,22 @@
 (s/def ::http-client fn?)
 (s/def ::ldap (s/nilable map?))
 (s/def ::msgbus ::mbus/msgbus)
+(s/def ::climit (s/nilable ::climit/climit))
+(s/def ::rlimit (s/nilable ::rlimit/rlimit))
+
 (s/def ::public-uri ::us/not-empty-string)
-(s/def ::session map?)
-(s/def ::storage some?)
 (s/def ::sprops map?)
 
 (defmethod ig/pre-init-spec ::methods [_]
-  (s/keys :req-un [::storage
-                   ::session
+  (s/keys :req-un [::sto/storage
+                   ::session/session
                    ::sprops
                    ::audit
                    ::public-uri
                    ::msgbus
                    ::http-client
-                   ::rsem/semaphores
-                   ::rlimit/rlimit
+                   ::rlimit
+                   ::climit
                    ::mtx/metrics
                    ::db/pool
                    ::ldap]))

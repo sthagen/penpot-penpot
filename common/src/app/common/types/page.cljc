@@ -8,6 +8,7 @@
   (:require
    [app.common.data :as d]
    [app.common.files.features :as ffeat]
+   [app.common.spec :as us]
    [app.common.types.page.flow :as ctpf]
    [app.common.types.page.grid :as ctpg]
    [app.common.types.page.guide :as ctpu]
@@ -17,7 +18,7 @@
 
 ;; --- Background color
 
-(s/def ::background string?)
+(s/def ::background ::us/rgb-color-str)
 
 ;; --- Page options
 
@@ -49,11 +50,13 @@
 
 (defn make-empty-page
   [id name]
-  (let [wrap-fn ffeat/*wrap-objects-fn*]
+  (let [wrap-objects-fn ffeat/*wrap-with-objects-map-fn*
+        wrap-pointer-fn ffeat/*wrap-with-pointer-map-fn*]
     (-> empty-page-data
         (assoc :id id)
         (assoc :name name)
-        (update :objects wrap-fn))))
+        (update :objects wrap-objects-fn)
+        (wrap-pointer-fn))))
 
 ;; --- Helpers for flow
 

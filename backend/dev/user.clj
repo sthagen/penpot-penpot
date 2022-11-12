@@ -29,8 +29,8 @@
    [clojure.pprint :refer [pprint print-table]]
    [clojure.repl :refer :all]
    [clojure.spec.alpha :as s]
-   [clojure.spec.gen.alpha :as sgen]
    [clojure.test :as test]
+   [clojure.test.check.generators :as gen]
    [clojure.tools.namespace.repl :as repl]
    [clojure.walk :refer [macroexpand-all]]
    [criterium.core  :as crit]
@@ -63,7 +63,7 @@
 ;; --- Development Stuff
 
 (defn- run-tests
-  ([] (run-tests #"^app.*-test$"))
+  ([] (run-tests #"^backend-tests.*-test$"))
   ([o]
    (repl/refresh)
    (cond

@@ -16,15 +16,15 @@
    [app.config :as cf]
    [app.db :as db]
    [app.media :as media]
-   [app.rpc :as-alias rpc]
+   [app.rpc.commands.files :as files]
    [app.rpc.doc :as-alias doc]
-   [app.rpc.queries.files :as files]
    [app.rpc.queries.projects :as projects]
    [app.storage :as sto]
    [app.storage.tmp :as tmp]
    [app.tasks.file-gc]
    [app.util.blob :as blob]
    [app.util.fressian :as fres]
+   [app.util.pointer-map :as pmap]
    [app.util.services :as sv]
    [app.util.time :as dt]
    [clojure.spec.alpha :as s]
@@ -290,9 +290,11 @@
 
 (defn- retrieve-file
   [pool file-id]
-  (->> (db/query pool :file {:id file-id})
-       (map files/decode-row)
-       (first)))
+  (with-open [conn (db/open pool)]
+    (binding [pmap/*load-fn* (partial files/load-pointer conn file-id)]
+      (some-> (db/get* conn :file {:id file-id})
+              (files/decode-row)
+              (update :data files/process-pointers deref)))))
 
 (def ^:private sql:file-media-objects
   "SELECT * FROM file_media_object WHERE id = ANY(?)")
@@ -871,7 +873,7 @@
   {::doc/added "1.15"}
   [{:keys [pool] :as cfg} {:keys [profile-id file-id include-libraries? embed-assets?] :as params}]
   (files/check-read-permissions! pool profile-id file-id)
-  (let [resp (reify yrs/StreamableResponseBody
+  (let [body (reify yrs/StreamableResponseBody
                (-write-body-to-stream [_ _ output-stream]
                  (-> cfg
                      (assoc ::file-ids [file-id])
@@ -879,12 +881,8 @@
                      (assoc ::include-libraries? include-libraries?)
                      (export! output-stream))))]
 
-    (with-meta (sv/wrap nil)
-      {::rpc/transform-response
-       (fn [_ response]
-         (-> response
-             (assoc :body resp)
-             (assoc :headers {"content-type" "application/octet-stream"})))})))
+    (fn [_]
+      (yrs/response 200 body {"content-type" "application/octet-stream"}))))
 
 (s/def ::file ::media/upload)
 (s/def ::import-binfile

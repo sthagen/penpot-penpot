@@ -16,12 +16,12 @@
    [app.emails :as eml]
    [app.loggers.audit :as audit]
    [app.media :as media]
-   [app.rpc :as-alias rpc]
+   [app.rpc.climit :as climit]
+   [app.rpc.helpers :as rph]
    [app.rpc.mutations.projects :as projects]
    [app.rpc.permissions :as perms]
    [app.rpc.queries.profile :as profile]
    [app.rpc.queries.teams :as teams]
-   [app.rpc.semaphore :as rsem]
    [app.storage :as sto]
    [app.tokens :as tokens]
    [app.util.services :as sv]
@@ -316,13 +316,13 @@
     (assoc team :photo-id (:id photo))))
 
 (defn upload-photo
-  [{:keys [storage semaphores] :as cfg} {:keys [file]}]
+  [{:keys [storage executor climit] :as cfg} {:keys [file]}]
   (letfn [(get-info [content]
-            (rsem/with-dispatch (:process-image semaphores)
+            (climit/with-dispatch (:process-image climit)
               (media/run {:cmd :info :input content})))
 
           (generate-thumbnail [info]
-            (rsem/with-dispatch (:process-image semaphores)
+            (climit/with-dispatch (:process-image climit)
               (media/run {:cmd :profile-thumbnail
                           :format :jpeg
                           :quality 85
@@ -333,7 +333,7 @@
           ;; Function responsible of calculating cryptographyc hash of
           ;; the provided data.
           (calculate-hash [data]
-            (rsem/with-dispatch (:process-image semaphores)
+            (px/with-dispatch executor
               (sto/calculate-hash data)))]
 
     (p/let [info    (get-info file)
@@ -341,11 +341,10 @@
             hash    (calculate-hash (:data thumb))
             content (-> (sto/content (:data thumb) (:size thumb))
                         (sto/wrap-with-hash hash))]
-      (rsem/with-dispatch (:process-image semaphores)
-        (sto/put-object! storage {::sto/content content
-                                  ::sto/deduplicate? true
-                                  :bucket "profile"
-                                  :content-type (:mtype thumb)})))))
+      (sto/put-object! storage {::sto/content content
+                                ::sto/deduplicate? true
+                                :bucket "profile"
+                                :content-type (:mtype thumb)}))))
 
 ;; --- Mutation: Invite Member
 
@@ -488,18 +487,17 @@
                 :email email
                 :role role)))
 
-      (with-meta team
-        {::audit/props {:invitations (count emails)}
-
-         ::rpc/before-complete
-         #(audit-fn :cmd :submit
-                    :type "mutation"
-                    :name "invite-team-member"
-                    :profile-id profile-id
-                    :props {:emails emails
-                            :role role
-                            :profile-id profile-id
-                            :invitations (count emails)})}))))
+      (-> team
+          (vary-meta assoc ::audit/props {:invitations (count emails)})
+          (rph/with-defer
+            #(audit-fn :cmd :submit
+                       :type "mutation"
+                       :name "invite-team-member"
+                       :profile-id profile-id
+                       :props {:emails emails
+                               :role role
+                               :profile-id profile-id
+                               :invitations (count emails)}))))))
 
 ;; --- Mutation: Update invitation role
 
