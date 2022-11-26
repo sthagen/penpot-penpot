@@ -19,6 +19,8 @@
    [app.main.data.workspace.interactions :as dwi]
    [app.main.data.workspace.libraries :as dwl]
    [app.main.data.workspace.selection :as dws]
+   [app.main.data.workspace.shape-layout :as dwsl]
+   [app.main.data.workspace.shapes :as dwsh]
    [app.main.data.workspace.shortcuts :as sc]
    [app.main.features :as features]
    [app.main.refs :as refs]
@@ -212,7 +214,7 @@
 
   (let [multiple? (> (count shapes) 1)
         single?   (= (count shapes) 1)
-        do-create-artboard-from-selection #(st/emit! (dw/create-artboard-from-selection))
+        do-create-artboard-from-selection #(st/emit! (dwsh/create-artboard-from-selection))
 
         has-frame? (->> shapes (d/seek cph/frame-shape?))
         has-group? (->> shapes (d/seek cph/group-shape?))
@@ -364,6 +366,33 @@
 
           [:& menu-entry {:title (tr "workspace.shape.menu.flow-start")
                           :on-click do-add-flow}])))))
+(mf/defc context-menu-flex
+  [{:keys [shapes]}]
+  (let [single?            (= (count shapes) 1)
+        has-frame?         (->> shapes (d/seek cph/frame-shape?))
+        is-frame?          (and single? has-frame?)
+        is-flex-container? (and is-frame? (= :flex (:layout (first shapes))))
+        has-group?         (->> shapes (d/seek cph/group-shape?))
+        is-group?          (and single? has-group?)
+        ids                (->> shapes (map :id))
+        add-flex           #(st/emit! (if is-frame?
+                                        (dwsl/create-layout-from-id ids :flex)
+                                        (dwsl/create-layout-from-selection :flex)))
+        remove-flex        #(st/emit! (dwsl/remove-layout ids))]
+    (cond
+      (or (not single?) (and is-frame? (not is-flex-container?)) is-group?)
+      [:*
+       [:& menu-separator]
+       [:& menu-entry {:title (tr "workspace.shape.menu.add-flex")
+                       :shortcut (sc/get-tooltip :toogle-layout-flex)
+                       :on-click add-flex}]]
+      
+      is-flex-container?
+      [:*
+       [:& menu-separator]
+       [:& menu-entry {:title (tr "workspace.shape.menu.remove-flex")
+                       :shortcut (sc/get-tooltip :toogle-layout-flex)
+                       :on-click remove-flex}]])))
 
 (mf/defc context-menu-component
   [{:keys [shapes]}]
@@ -395,6 +424,9 @@
         do-detach-component-in-bulk #(st/emit! dwl/detach-selected-components)
         do-reset-component #(st/emit! (dwl/reset-component shape-id))
         do-show-component #(st/emit! (dw/go-to-component component-id))
+        do-show-in-assets #(st/emit! (if components-v2
+                                       (dw/show-component-in-assets component-id)
+                                       (dw/go-to-component component-id)))
         do-navigate-component-file #(st/emit! (dwl/nav-to-component-file component-file))
         do-update-component #(st/emit! (dwl/update-component-sync shape-id component-file))
         do-update-component-in-bulk #(st/emit! (dwl/update-component-in-bulk component-shapes component-file))
@@ -445,16 +477,15 @@
         [:& menu-separator]
         (if main-component?
           [:& menu-entry {:title (tr "workspace.shape.menu.show-in-assets")
-                          :on-click do-show-component}]
+                          :on-click do-show-in-assets}]
           (if local-component?
             (if is-dangling?
               [:*
                [:& menu-entry {:title (tr "workspace.shape.menu.detach-instance")
                                :shortcut (sc/get-tooltip :detach-component)
                                :on-click do-detach-component}]
-               ;; This is commented due this functionality is not yet available
-               ;; [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
-               ;;                 :on-click do-reset-component}]
+               [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
+                               :on-click do-reset-component}]
                (when components-v2
                  [:& menu-entry {:title (tr "workspace.shape.menu.restore-main")
                                  :on-click do-restore-component}])]
@@ -473,9 +504,8 @@
                [:& menu-entry {:title (tr "workspace.shape.menu.detach-instance")
                                :shortcut (sc/get-tooltip :detach-component)
                                :on-click do-detach-component}]
-               ;; This is commented due this functionality is not yet available
-               ;; [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
-               ;;                 :on-click do-reset-component}]
+               [:& menu-entry {:title (tr "workspace.shape.menu.reset-overrides")
+                               :on-click do-reset-component}]
                (when components-v2
                  [:& menu-entry {:title (tr "workspace.shape.menu.restore-main")
                                  :on-click do-restore-component}])]
@@ -517,6 +547,7 @@
        [:> context-menu-path props]
        [:> context-menu-layer-options props]
        [:> context-menu-prototype props]
+       [:> context-menu-flex props]
        [:> context-menu-component props]
        [:> context-menu-delete props]])))
 

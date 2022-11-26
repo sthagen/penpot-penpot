@@ -4,6 +4,12 @@
 
 ### :boom: Breaking changes & Deprecations
 ### :sparkles: New features
+
+- Adds layout flex functionality for boards
+- Better overlays interactions on boards inside boards [Taiga #4386](https://tree.taiga.io/project/penpot/us/4386)
+- Show board miniature in manual overlay setting [Taiga #4475](https://tree.taiga.io/project/penpot/issue/4475)
+- Handoff visual improvements [Taiga #3124](https://tree.taiga.io/project/penpot/us/3124)
+
 ### :bug: Bugs fixed
 
 - Add title to color bullets [Taiga #4218](https://tree.taiga.io/project/penpot/task/4218)
@@ -15,6 +21,7 @@
 
 ### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
+## 1.16.2-beta
 
 ## 1.16.1-beta
 
@@ -32,7 +39,9 @@
 - Fix join nodes icon is active when 2 already joined nodes are selected [Taiga #4370](https://tree.taiga.io/project/penpot/issue/4370)
 - Fix path nodes panel. "To curve" and "To corner" icons are active if node is already curved/cornered [Taiga #4371](https://tree.taiga.io/project/penpot/issue/4371)
 - Fix displaying comments settings are not applied via "Comments" menu drop-down on the top navbar on view mode [Taiga #4389](https://tree.taiga.io/project/penpot/issue/4389)
-- Fix bad behaviour on hovering and click nested artboards[Taiga #4018](https://tree.taiga.io/project/penpot/issue/4018) and [Taiga #4269](https://tree.taiga.io/project/penpot/us/4269)
+- Fix bad behaviour on hovering and click nested artboards [Taiga #4018](https://tree.taiga.io/project/penpot/issue/4018) and [Taiga #4269](https://tree.taiga.io/project/penpot/us/4269)
+- Fix lang autodetect issue [Taiga #4277](https://tree.taiga.io/project/penpot/issue/4277)
+- Fix colorpicker does not close upon switching to Dashboard [Taiga #4408](https://tree.taiga.io/project/penpot/issue/4408)
 
 ## 1.16.0-beta
 

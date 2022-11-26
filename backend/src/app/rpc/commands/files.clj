@@ -17,7 +17,6 @@
    [app.common.types.shape-tree :as ctt]
    [app.db :as db]
    [app.db.sql :as sql]
-   [app.rpc :as-alias rpc]
    [app.rpc.commands.files.thumbnails :as-alias thumbs]
    [app.rpc.cond :as-alias cond]
    [app.rpc.doc :as-alias doc]
@@ -55,6 +54,11 @@
 (s/def ::project-id ::us/uuid)
 (s/def ::search-term ::us/string)
 (s/def ::team-id ::us/uuid)
+
+;; --- HELPERS
+
+(def long-cache-duration
+  (dt/duration {:days 7}))
 
 (defn decode-row
   [{:keys [data changes features] :as row}]
@@ -112,6 +116,7 @@
         :can-edit (or is-owner is-admin can-edit)
         :can-read true
         :is-logged (some? profile-id)})))
+
   ([conn profile-id file-id share-id]
    (let [perms  (get-permissions conn profile-id file-id)
          ldata  (retrieve-share-link conn file-id share-id)]
@@ -124,6 +129,7 @@
        (some? perms) perms
        (some? ldata) {:type :share-link
                       :can-read true
+                      :pages (:pages ldata)
                       :is-logged (some? profile-id)
                       :who-comment (:who-comment ldata)
                       :who-inspect (:who-inspect ldata)}))))
@@ -208,6 +214,25 @@
 ;; QUERY COMMANDS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn handle-file-features
+  [{:keys [features] :as file} client-features]
+  (when (and (contains? features "components/v2")
+             (not (contains? client-features "components/v2")))
+    (ex/raise :type :restriction
+              :code :feature-mismatch
+              :feature "components/v2"
+              :hint "file has 'components/v2' feature enabled but frontend didn't specifies it"))
+
+  (cond-> file
+    (and (contains? client-features "components/v2")
+         (not (contains? features "components/v2")))
+    (update :data ctf/migrate-to-components-v2)
+
+    (and (contains? features "storage/pointer-map")
+         (not (contains? client-features "storage/pointer-map")))
+    (process-pointers deref)))
+
+
 ;; --- COMMAND QUERY: get-file (by id)
 
 (defn get-file
@@ -216,33 +241,16 @@
   (check-features-compatibility! client-features)
 
   (binding [pmap/*load-fn* (partial load-pointer conn id)]
-    (let [file     (->> (db/get-by-id conn :file id)
-                        (decode-row)
-                        (pmg/migrate-file))
-          features (:features file)
-          file     (cond-> file
-                     (and (contains? client-features "components/v2")
-                          (not (contains? features "components/v2")))
-                     (update :data ctf/migrate-to-components-v2)
+    (-> (db/get-by-id conn :file id)
+        (decode-row)
+        (pmg/migrate-file)
+        (handle-file-features client-features))))
 
-                     (and (contains? features "storage/pointer-map")
-                          (not (contains? client-features "storage/pointer-map")))
-                     (process-pointers deref))]
-
-      (when (and (contains? features "components/v2")
-                 (not (contains? client-features "components/v2")))
-        (ex/raise :type :restriction
-                  :code :feature-mismatch
-                  :feature "components/v2"
-                  :hint "file has 'components/v2' feature enabled but frontend didn't specifies it"))
-
-      file)))
-
-(defn- get-minimal-file
+(defn get-minimal-file
   [{:keys [pool] :as cfg} id]
   (db/get pool :file {:id id} {:columns [:id :modified-at :revn]}))
 
-(defn- get-file-etag
+(defn get-file-etag
   [{:keys [modified-at revn]}]
   (str (dt/format-instant modified-at :iso) "-" revn))
 
@@ -263,6 +271,31 @@
                      (assoc :permissions perms))]
         (vary-meta file assoc ::cond/key (get-file-etag file))))))
 
+
+;; --- COMMAND QUERY: get-file-fragment (by id)
+
+(defn- get-file-fragment
+  [conn file-id fragment-id]
+  (some-> (db/get conn :file-data-fragment {:file-id file-id :id fragment-id})
+          (update :content blob/decode)))
+
+(s/def ::share-id ::us/uuid)
+(s/def ::fragment-id ::us/uuid)
+
+(s/def ::get-file-fragment
+  (s/keys :req-un [::file-id ::fragment-id]
+          :opt-un [::share-id ::profile-id]))
+
+(sv/defmethod ::get-file-fragment
+  "Retrieve a file by its ID. Only authenticated users."
+  {::doc/added "1.17"
+   :auth false}
+  [{:keys [pool] :as cfg} {:keys [profile-id file-id fragment-id share-id] :as params}]
+  (with-open [conn (db/open pool)]
+    (let [perms (get-permissions conn profile-id file-id share-id)]
+      (check-read-permissions! perms)
+      (-> (get-file-fragment conn file-id fragment-id)
+          (rph/with-http-cache long-cache-duration)))))
 
 ;; --- COMMAND QUERY: get-file-object-thumbnails
 
@@ -376,7 +409,7 @@
   "Given the page data, removes the `:thumbnail` prop from all
   shapes."
   [page]
-  (update page :objects d/update-vals #(dissoc % :thumbnail)))
+  (update page :objects update-vals #(dissoc % :thumbnail)))
 
 (defn get-page
   [conn {:keys [file-id page-id object-id features]}]
@@ -484,6 +517,7 @@
    )
    SELECT l.id,
           l.data,
+          l.features,
           l.project_id,
           l.created_at,
           l.modified_at,
@@ -495,22 +529,27 @@
     WHERE l.deleted_at IS NULL OR l.deleted_at > now();")
 
 (defn get-file-libraries
-  [conn is-indirect file-id]
-  (let [xform (comp
-               (map #(assoc % :is-indirect is-indirect))
-               (map decode-row))]
-    (into #{} xform (db/exec! conn [sql:file-libraries file-id]))))
+  [conn file-id client-features]
+  (check-features-compatibility! client-features)
+  (->> (db/exec! conn [sql:file-libraries file-id])
+       (mapv (fn [{:keys [id] :as row}]
+               (binding [pmap/*load-fn* (partial load-pointer conn id)]
+                 (-> (decode-row row)
+                     (assoc :is-indirect false)
+                     (update :data dissoc :pages-index)
+                     (handle-file-features client-features)))))))
 
 (s/def ::get-file-libraries
-  (s/keys :req-un [::profile-id ::file-id]))
+  (s/keys :req-un [::profile-id ::file-id]
+          :opt-un [::features]))
 
 (sv/defmethod ::get-file-libraries
   "Get libraries used by the specified file."
   {::doc/added "1.17"}
-  [{:keys [pool] :as cfg} {:keys [profile-id file-id] :as params}]
+  [{:keys [pool] :as cfg} {:keys [profile-id file-id features] :as params}]
   (with-open [conn (db/open pool)]
     (check-read-permissions! conn profile-id file-id)
-    (get-file-libraries conn false file-id)))
+    (get-file-libraries conn file-id features)))
 
 
 ;; --- COMMAND QUERY: Files that use this File library
@@ -607,7 +646,7 @@
   (with-open [conn (db/open pool)]
     (check-read-permissions! conn profile-id file-id)
     (-> (get-file-thumbnail conn file-id revn)
-        (with-meta {::rpc/transform-response (rph/http-cache {:max-age (* 1000 60 60)})}))))
+        (rph/with-http-cache long-cache-duration))))
 
 
 ;; --- COMMAND QUERY: get-file-data-for-thumbnail

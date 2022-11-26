@@ -9,6 +9,7 @@
    [app.common.colors :as clr]
    [app.common.data.macros :as dm]
    [app.main.data.messages :as msg]
+   [app.main.data.modal :as modal]
    [app.main.data.workspace :as dw]
    [app.main.data.workspace.persistence :as dwp]
    [app.main.features :as features]
@@ -89,7 +90,7 @@
                            :selected selected
                            :layout layout}]])]))
 
-(def trimmed-page-ref (l/derived :trimmed-page st/state =))
+(def trimmed-page-ref (l/derived :workspace-trimmed-page st/state =))
 
 (mf/defc workspace-page
   [{:keys [file layout page-id wglobal] :as props}]
@@ -120,6 +121,7 @@
         project (mf/deref refs/workspace-project)
         layout  (mf/deref refs/workspace-layout)
         wglobal (mf/deref refs/workspace-global)
+        ready?  (mf/deref refs/workspace-ready?)
 
         components-v2 (features/use-feature :components-v2)
 
@@ -127,7 +129,7 @@
 
     ;; Setting the layout preset by its name
     (mf/with-effect [layout-name]
-      (st/emit! (dw/initialize layout-name)))
+      (st/emit! (dw/initialize-layout layout-name)))
 
     (mf/with-effect [project-id file-id]
       (st/emit! (dw/initialize-file project-id file-id))
@@ -159,8 +161,7 @@
 
           [:& context-menu]
 
-          (if (and (and file project)
-                   (:initialized file))
+          (if ready?
             [:& workspace-page {:key (dm/str "page-" page-id)
                                 :page-id page-id
                                 :file file
@@ -168,3 +169,40 @@
                                 :layout layout}]
             [:& workspace-loader])]]]]]]))
 
+(mf/defc remove-graphics-dialog
+  {::mf/register modal/components
+   ::mf/register-as :remove-graphics-dialog}
+  [{:keys [] :as ctx}]
+  (let [remove-state (mf/deref refs/remove-graphics)
+        close #(modal/hide!)
+        reload-file #(dom/reload-current-window)]
+    (mf/use-effect
+      (fn []
+        #(st/emit! (dw/clear-remove-graphics))))
+    [:div.modal-overlay
+     [:div.modal-container.remove-graphics-dialog
+      [:div.modal-header
+       [:div.modal-header-title
+        [:h2 (tr "workspace.remove-graphics.title" (:file-name ctx))]]
+       (when (and (:completed remove-state) (:error remove-state))
+         [:div.modal-close-button
+          {:on-click close} i/close])]
+      (if-not (and (:completed remove-state) (:error remove-state))
+        [:div.modal-content
+         [:p (tr "workspace.remove-graphics.text1")]
+         [:p (tr "workspace.remove-graphics.text2")]
+         [:p.progress-message (tr "workspace.remove-graphics.progress"
+                                  (:current remove-state)
+                                  (:total remove-state))]]
+        [:*
+         [:div.modal-content
+          [:p.error-message [:span i/close] (tr "workspace.remove-graphics.error-msg")]
+          [:p (tr "workspace.remove-graphics.error-hint")]]
+         [:div.modal-footer
+          [:div.action-buttons
+           [:input.button-secondary {:type "button"
+                                     :value (tr "labels.close")
+                                     :on-click close}]
+           [:input.button-primary {:type "button"
+                                   :value (tr "labels.reload-file")
+                                   :on-click reload-file}]]]])]]))

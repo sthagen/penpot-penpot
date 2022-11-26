@@ -11,6 +11,7 @@
    [app.common.data.macros :as dm]
    [app.common.pages.helpers :as cph]
    [app.common.types.shape-tree :as ctt]
+   [app.common.types.shape.layout :as ctl]
    [app.main.data.workspace.state-helpers :as wsh]
    [app.main.store :as st]
    [okulary.core :as l]))
@@ -99,6 +100,9 @@
 
 (def workspace-drawing
   (l/derived :workspace-drawing st/state))
+
+(def workspace-ready?
+  (l/derived :workspace-ready? st/state))
 
 ;; TODO: rename to workspace-selected (?)
 ;; Don't use directly from components, this is a proxy to improve performance of selected-shapes
@@ -265,6 +269,14 @@
   [ids]
   (l/derived #(into [] (keep (d/getf %)) ids) workspace-page-objects =))
 
+(defn parents-by-ids
+  [ids]
+  (l/derived
+   (fn [objects]
+     (let [parent-ids (into #{} (keep #(get-in objects [% :parent-id])) ids)]
+       (into [] (keep #(get objects %)) parent-ids)))
+   workspace-page-objects =))
+
 (defn children-objects
   [id]
   (l/derived
@@ -299,7 +311,6 @@
 (defn workspace-modifiers-by-id
   [ids]
   (l/derived #(select-keys % ids) workspace-modifiers))
-
 
 (def workspace-modifiers-with-objects
   (l/derived
@@ -361,6 +372,10 @@
 (def workspace-focus-selected
   (l/derived :workspace-focus-selected st/state))
 
+;; Remove this when deprecating components-v2
+(def remove-graphics
+  (l/derived :remove-graphics st/state))
+
 ;; ---- Viewer refs
 
 (defn lookup-viewer-objects-by-id
@@ -384,6 +399,9 @@
 
 (def viewer-local
   (l/derived :viewer-local st/state))
+
+(def viewer-overlays
+  (l/derived :viewer-overlays st/state))
 
 (def comment-threads
   (l/derived :comment-threads st/state))
@@ -428,15 +446,19 @@
   (l/derived
    (fn [objects]
      (->> ids
-          (some #(-> (cph/get-parent objects %) :layout))))
+          (map (d/getf objects))
+          (some (partial ctl/layout-child? objects))))
    workspace-page-objects))
 
-(defn get-flex-child-viewer?
+(defn get-flex-child-viewer
   [ids page-id]
   (l/derived
    (fn [state]
      (let [objects (wsh/lookup-viewer-objects state page-id)]
-       (filterv #(= :flex (:layout (cph/get-parent objects %))) ids)))
+       (into []
+             (comp (map (d/getf objects))
+                   (filter (partial ctl/layout-child? objects)))
+             ids)))
    st/state =))
 
 (def colorpicker

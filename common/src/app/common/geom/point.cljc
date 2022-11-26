@@ -5,7 +5,7 @@
 ;; Copyright (c) KALEIDOS INC
 
 (ns app.common.geom.point
-  (:refer-clojure :exclude [divide min max])
+  (:refer-clojure :exclude [divide min max abs])
   (:require
    #?(:cljs [cljs.pprint :as pp]
       :clj  [clojure.pprint :as pp])
@@ -189,6 +189,10 @@
 (defn angle-sign [v1 v2]
   (if (> (* (:y v1) (:x v2)) (* (:x v1) (:y v2))) -1 1))
 
+(defn signed-angle-with-other
+  [v1 v2]
+  (* (angle-sign v1 v2) (angle-with-other v1 v2)))
+
 (defn update-angle
   "Update the angle of the point."
   [p angle]
@@ -327,6 +331,13 @@
   (-> point
       (update :x #(if (mth/almost-zero? %) 0.001 %))
       (update :y #(if (mth/almost-zero? %) 0.001 %))))
+
+
+(defn abs
+  [point]
+  (-> point
+      (update :x mth/abs)
+      (update :y mth/abs)))
 
 ;; --- Debug
 

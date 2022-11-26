@@ -460,7 +460,7 @@ msgstr "Uploading file: %s"
 
 #: src/app/main/ui/dashboard/team.cljs
 msgid "dashboard.invite-profile"
-msgstr "Invite to team"
+msgstr "Invite people"
 
 #: src/app/main/ui/dashboard/sidebar.cljs, src/app/main/ui/dashboard/sidebar.cljs
 msgid "dashboard.leave-team"
@@ -813,7 +813,7 @@ msgstr "Unknown token"
 
 #: src/app/main/ui/auth/login.cljs
 msgid "errors.wrong-credentials"
-msgstr "Username or password seems to be wrong."
+msgstr "Email or password is incorrect."
 
 #: src/app/main/ui/settings/password.cljs
 msgid "errors.wrong-old-password"
@@ -1285,11 +1285,11 @@ msgstr "You have no pending comment notifications"
 
 #: src/app/main/ui/dashboard/team.cljs
 msgid "labels.no-invitations"
-msgstr "There are no invitations."
+msgstr "No pending invitations."
 
 #: src/app/main/ui/dashboard/team.cljs
 msgid "labels.no-invitations-hint"
-msgstr "Press the button \"Invite to team\" to invite more members to this team."
+msgstr "Click the **Invite people** button to invite people to this team."
 
 #: src/app/main/ui/static.cljs
 msgid "labels.not-found.desc-message"
@@ -1350,6 +1350,10 @@ msgstr "Projects"
 #: src/app/main/ui/settings/sidebar.cljs
 msgid "labels.release-notes"
 msgstr "Release notes"
+
+#: src/app/main/ui/workspace.cljs
+msgid "labels.reload-file"
+msgstr "Reload file"
 
 #: src/app/main/ui/workspace/libraries.cljs, src/app/main/ui/dashboard/team.cljs
 msgid "labels.remove"
@@ -2699,6 +2703,9 @@ msgstr "Line Height"
 msgid "workspace.assets.typography.sample"
 msgstr "Ag"
 
+msgid "workspace.assets.typography.text-styles"
+msgstr "Text styles"
+
 #: src/app/main/ui/workspace/sidebar/options/menus/typography.cljs
 msgid "workspace.assets.typography.text-transform"
 msgstr "Text Transform"
@@ -3222,6 +3229,9 @@ msgstr "Push"
 msgid "workspace.options.interaction-animation-slide"
 msgstr "Slide"
 
+msgid "workspace.options.interaction-auto"
+msgstr "auto"
+
 #: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
 msgid "workspace.options.interaction-background"
 msgstr "Add background overlay"
@@ -3363,6 +3373,10 @@ msgid "workspace.options.interaction-position"
 msgstr "Position"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
+msgid "workspace.options.interaction-relative-to"
+msgstr "Relative to"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs
 msgid "workspace.options.interaction-preserve-scroll"
 msgstr "Preserve scroll position"
 
@@ -3483,35 +3497,35 @@ msgid "workspace.options.layout-item.advanced-ops"
 msgstr "Advanced options"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/layout_item.cljs
-msgid "workspace.options.layout-item.layout-max-h"
+msgid "workspace.options.layout-item.layout-item-max-h"
 msgstr "Max.Height"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/layout_item.cljs
-msgid "workspace.options.layout-item.layout-max-w"
+msgid "workspace.options.layout-item.layout-item-max-w"
 msgstr "Max.Width"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/layout_item.cljs
-msgid "workspace.options.layout-item.layout-min-h"
+msgid "workspace.options.layout-item.layout-item-min-h"
 msgstr "Min.Height"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/layout_item.cljs
-msgid "workspace.options.layout-item.layout-min-w"
+msgid "workspace.options.layout-item.layout-item-min-w"
 msgstr "Min.Width"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/layout_item.cljs
-msgid "workspace.options.layout-item.title.layout-max-h"
+msgid "workspace.options.layout-item.title.layout-item-max-h"
 msgstr "Maximum height"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/layout_item.cljs
-msgid "workspace.options.layout-item.title.layout-max-w"
+msgid "workspace.options.layout-item.title.layout-item-max-w"
 msgstr "Maximum width"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/layout_item.cljs
-msgid "workspace.options.layout-item.title.layout-min-h"
+msgid "workspace.options.layout-item.title.layout-item-min-h"
 msgstr "Minimum height"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/layout_item.cljs
-msgid "workspace.options.layout-item.title.layout-min-w"
+msgid "workspace.options.layout-item.title.layout-item-min-w"
 msgstr "Minimum width"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/layout.cljs
@@ -3614,7 +3628,7 @@ msgstr "All corners"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/measures.cljs
 msgid "workspace.options.radius.single-corners"
-msgstr "Single corners"
+msgstr "Individual corners"
 
 msgid "workspace.options.recent-fonts"
 msgstr "Recent"
@@ -3905,6 +3919,32 @@ msgstr "Separate nodes (%s)"
 msgid "workspace.path.actions.snap-nodes"
 msgstr "Snap nodes (%s)"
 
+#: src/app/main/ui/workspace.cljs
+msgid "workspace.remove-graphics.title"
+msgstr "Updating %s..."
+
+#: src/app/main/ui/workspace.cljs
+msgid "workspace.remove-graphics.text1"
+msgstr "Library Graphics are Components from now on, which will make them much more powerful."
+
+#: src/app/main/ui/workspace.cljs
+msgid "workspace.remove-graphics.text2"
+msgstr "This update is a one time action."
+
+#: src/app/main/ui/workspace.cljs
+msgid "workspace.remove-graphics.error-msg"
+msgstr "Some graphics could not be updated."
+
+#: src/app/main/ui/workspace.cljs
+msgid "workspace.remove-graphics.error-hint"
+msgstr ""
+"To try it again, you can reload this file. If the problem persists, we suggest you to take"
+" a look at the list and consider to delete broken graphics."
+
+#: src/app/main/ui/workspace.cljs
+msgid "workspace.remove-graphics.progress"
+msgstr "Converting %s/%s"
+
 #: src/app/main/ui/workspace/context_menu.cljs
 msgid "workspace.shape.menu.back"
 msgstr "Send to back"
@@ -4069,6 +4109,14 @@ msgstr "Update main components"
 #: src/app/main/ui/workspace/sidebar/options/menus/component.cljs, src/app/main/ui/workspace/sidebar/options/menus/component.cljs, src/app/main/ui/workspace/context_menu.cljs, src/app/main/ui/workspace/context_menu.cljs
 msgid "workspace.shape.menu.update-main"
 msgstr "Update main component"
+
+#: src/app/main/ui/workspace/context_menu.cljs
+msgid "workspace.shape.menu.add-flex"
+msgstr "Add layout flex"
+
+#: src/app/main/ui/workspace/context_menu.cljs
+msgid "workspace.shape.menu.remove-flex"
+msgstr "Remove layout flex"
 
 msgid "workspace.sidebar.collapse"
 msgstr "Collapse sidebar"

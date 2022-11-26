@@ -8,9 +8,10 @@
   (:require
    [app.common.data :as d]
    [app.common.data.macros :as dm]
-   [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
+   [app.common.geom.shapes :as gsh]
    [app.common.pages.helpers :as cph]
+   [app.common.types.modifiers :as ctm]
    [app.common.types.page :as ctp]
    [app.common.uuid :as uuid]
    [app.main.data.comments :as dcm]
@@ -29,14 +30,10 @@
 
 (defn prepare-objects
   [frame size objects]
-  (let [
-        frame-id  (:id frame)
-        modifier  (-> (gpt/point (:x size) (:y size))
-                      (gpt/negate)
-                      (gmt/translate-matrix))
-
-        update-fn #(d/update-when %1 %2 assoc-in [:modifiers :displacement] modifier)]
-
+  (let [frame-id  (:id frame)
+        vector  (-> (gpt/point (:x size) (:y size))
+                    (gpt/negate))
+        update-fn #(d/update-when %1 %2 gsh/transform-shape (ctm/move-modifiers vector))]
     (->> (cph/get-children-ids objects frame-id)
          (into [frame-id])
          (reduce update-fn objects))))
@@ -84,7 +81,14 @@
 
         ;; Retrieve frames again with correct modifier
         frame   (get objects-not-fixed (:id frame))
-        base    (get objects-not-fixed (:id base))]
+        base    (get objects-not-fixed (:id base))
+
+        non-delay-interactions (->> (:interactions frame)
+                                    (filterv #(not= (:event-type %) :after-delay)))
+
+        fixed-frame (-> frame
+                        (dissoc :fills)
+                        (assoc :interactions non-delay-interactions))]
 
     [:& (mf/provider shapes/base-frame-ctx) {:value base}
      [:& (mf/provider shapes/frame-offset-ctx) {:value offset}
@@ -106,7 +110,7 @@
                    :fill "none"
                    :style {:width (:width size)
                            :height (:height size)}}
-       [:& wrapper-fixed {:shape (dissoc frame :fills) :view-box vbox}]]]]))
+       [:& wrapper-fixed {:shape fixed-frame :view-box vbox}]]]]))
 
 (mf/defc viewport
   {::mf/wrap [mf/memo]
