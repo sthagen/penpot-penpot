@@ -37,12 +37,12 @@
 
 (defn position-pixel-precision
   [modifiers _ points]
-  (let [bounds        (gpr/points->rect points)
+  (let [bounds        (gpr/bounds->rect points)
         corner        (gpt/point bounds)
         target-corner (gpt/round corner)
         deltav        (gpt/to-vec corner target-corner)]
-    (-> modifiers
-        (ctm/move deltav))))
+
+    (ctm/move modifiers deltav)))
 
 (defn set-pixel-precision
   "Adjust modifiers so they adjust to the pixel grid"

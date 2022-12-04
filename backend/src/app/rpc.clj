@@ -23,6 +23,7 @@
    [app.storage :as-alias sto]
    [app.util.services :as sv]
    [app.util.time :as ts]
+   [app.worker :as-alias wrk]
    [clojure.spec.alpha :as s]
    [integrant.core :as ig]
    [promesa.core :as p]
@@ -239,6 +240,7 @@
                      'app.rpc.commands.comments
                      'app.rpc.commands.management
                      'app.rpc.commands.verify-token
+                     'app.rpc.commands.search
                      'app.rpc.commands.auth
                      'app.rpc.commands.ldap
                      'app.rpc.commands.demo
@@ -269,6 +271,7 @@
                    ::http-client
                    ::rlimit
                    ::climit
+                   ::wrk/executor
                    ::mtx/metrics
                    ::db/pool
                    ::ldap]))

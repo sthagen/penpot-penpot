@@ -80,7 +80,8 @@
         modifiers         (mf/deref refs/workspace-modifiers)
 
         objects-modified  (mf/with-memo [base-objects modifiers]
-                            (gsh/apply-objects-modifiers base-objects modifiers))
+                            (gsh/apply-objects-modifiers base-objects modifiers selected))
+
         background        (get options :background clr/canvas)
 
         ;; STATE
@@ -130,22 +131,26 @@
         node-editing?     (and edition (not= :text (get-in base-objects [edition :type])))
         text-editing?     (and edition (= :text (get-in base-objects [edition :type])))
 
+        workspace-read-only? (mf/use-ctx ctx/workspace-read-only?)
+        mode-inspect?       (= options-mode :inspect)
+
         on-click          (actions/on-click hover selected edition drawing-path? drawing-tool space? selrect)
-        on-context-menu   (actions/on-context-menu hover hover-ids)
-        on-double-click   (actions/on-double-click hover hover-ids drawing-path? base-objects edition)
+        on-context-menu   (actions/on-context-menu hover hover-ids workspace-read-only?)
+        on-double-click   (actions/on-double-click hover hover-ids drawing-path? base-objects edition workspace-read-only?)
         on-drag-enter     (actions/on-drag-enter)
         on-drag-over      (actions/on-drag-over)
         on-drop           (actions/on-drop file viewport-ref zoom)
         on-mouse-down     (actions/on-mouse-down @hover selected edition drawing-tool text-editing? node-editing?
-                                                 drawing-path? create-comment? space? viewport-ref zoom panning)
+                                                 drawing-path? create-comment? space? viewport-ref zoom panning
+                                                 workspace-read-only?)
         on-mouse-up       (actions/on-mouse-up disable-paste)
         on-pointer-down   (actions/on-pointer-down)
         on-pointer-enter  (actions/on-pointer-enter in-viewport?)
         on-pointer-leave  (actions/on-pointer-leave in-viewport?)
         on-pointer-move   (actions/on-pointer-move viewport-ref zoom move-stream)
         on-pointer-up     (actions/on-pointer-up)
-        on-move-selected  (actions/on-move-selected hover hover-ids selected space?)
-        on-menu-selected  (actions/on-menu-selected hover hover-ids selected)
+        on-move-selected  (actions/on-move-selected hover hover-ids selected space? workspace-read-only?)
+        on-menu-selected  (actions/on-menu-selected hover hover-ids selected workspace-read-only?)
 
         on-frame-enter    (actions/on-frame-enter frame-hover)
         on-frame-leave    (actions/on-frame-leave frame-hover)
@@ -177,16 +182,18 @@
                                           (contains? layout :snap-grid))
                                       (or drawing-obj transform))
         show-selrect?            (and selrect (empty? drawing) (not text-editing?))
-        show-measures?           (and (not transform) (not node-editing?) show-distances?)
+        show-measures?           (and (not transform)
+                                      (not node-editing?)
+                                      (or show-distances? mode-inspect?))
         show-artboard-names?     (contains? layout :display-artboard-names)
         show-rules?              (and (contains? layout :rules) (not (contains? layout :hide-ui)))
 
 
         disabled-guides?         (or drawing-tool transform)]
 
-    (hooks/setup-dom-events viewport-ref zoom disable-paste in-viewport?)
+    (hooks/setup-dom-events viewport-ref zoom disable-paste in-viewport? workspace-read-only?)
     (hooks/setup-viewport-size viewport-ref)
-    (hooks/setup-cursor cursor alt? mod? space? panning drawing-tool drawing-path? node-editing?)
+    (hooks/setup-cursor cursor alt? mod? space? panning drawing-tool drawing-path? node-editing? workspace-read-only?)
     (hooks/setup-keyboard alt? mod? space?)
     (hooks/setup-hover-shapes page-id move-stream base-objects transform selected mod? hover hover-ids hover-top-frame-id @hover-disabled? focus zoom)
     (hooks/setup-viewport-modifiers modifiers base-objects)
@@ -197,9 +204,9 @@
      [:div.viewport-overlays
       ;; The behaviour inside a foreign object is a bit different that in plain HTML so we wrap
       ;; inside a foreign object "dummy" so this awkward behaviour is take into account
-      [:svg {:style {:top 0 :left 0 :position "fixed" :width "100%" :height "100%" :opacity 0}}
+      [:svg {:style {:top 0 :left 0 :position "fixed" :width "100%" :height "100%" :opacity (when-not (debug? :html-text) 0)}}
        [:foreignObject {:x 0 :y 0 :width "100%" :height "100%"}
-        [:div {:style {:pointer-events "none"}}
+        [:div {:style {:pointer-events (when-not (debug? :html-text) "none")}}
          [:& stvh/viewport-texts
           {:key (dm/str "texts-" page-id)
            :page-id page-id
@@ -282,7 +289,8 @@
 
       [:g {:style {:pointer-events (if disable-events? "none" "auto")}}
        (when show-text-editor?
-         [:& editor/text-editor-svg {:shape editing-shape}])
+         [:& editor/text-editor-svg {:shape editing-shape
+                                     :modifiers modifiers}])
 
        (when show-frame-outline?
          [:& outline/shape-outlines
@@ -291,7 +299,8 @@
                          (filter #(cph/frame-shape? (get base-objects %)))
                          (remove selected)
                          (first))}
-           :zoom zoom}])
+           :zoom zoom
+           :modifiers modifiers}])
 
        (when show-outlines?
          [:& outline/shape-outlines
@@ -300,7 +309,8 @@
            :hover #{(:id @hover) @frame-hover}
            :highlighted highlighted
            :edition edition
-           :zoom zoom}])
+           :zoom zoom
+           :modifiers modifiers}])
 
        (when show-selection-handlers?
          [:& selection/selection-area
@@ -314,7 +324,8 @@
        (when show-text-editor?
          [:& text-edition-outline
           {:shape (get base-objects edition)
-           :zoom zoom}])
+           :zoom zoom
+           :modifiers modifiers}])
 
        (when show-measures?
          [:& msr/measurement
@@ -423,11 +434,17 @@
                                    :hover-top-frame-id @hover-top-frame-id
                                    :zoom zoom}])
 
+       (when (debug? :layout-content-bounds)
+         [:& wvd/debug-content-bounds {:selected-shapes selected-shapes
+                                       :objects objects-modified
+                                       :hover-top-frame-id @hover-top-frame-id
+                                       :zoom zoom}])
+
        (when (debug? :layout-lines)
-         [:& wvd/debug-layout {:selected-shapes selected-shapes
-                               :objects objects-modified
-                               :hover-top-frame-id @hover-top-frame-id
-                               :zoom zoom}])
+         [:& wvd/debug-layout-lines {:selected-shapes selected-shapes
+                                     :objects objects-modified
+                                     :hover-top-frame-id @hover-top-frame-id
+                                     :zoom zoom}])
 
        (when (debug? :parent-bounds)
          [:& wvd/debug-parent-bounds {:selected-shapes selected-shapes

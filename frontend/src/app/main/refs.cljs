@@ -165,6 +165,12 @@
 (def options-mode
   (l/derived :options-mode workspace-local))
 
+(def options-mode-global
+  (l/derived :options-mode workspace-global))
+
+(def inspect-expanded
+  (l/derived :inspect-expanded workspace-local))
+
 (def vbox
   (l/derived :vbox workspace-local))
 
@@ -260,6 +266,9 @@
 ;; on large pages, we are using this for some reason?
 (def workspace-page-objects
   (l/derived wsh/lookup-page-objects st/state =))
+
+(def workspace-read-only?
+  (l/derived :read-only? workspace-global))
 
 (defn object-by-id
   [id]

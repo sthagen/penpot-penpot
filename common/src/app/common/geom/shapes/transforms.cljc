@@ -369,16 +369,6 @@
                    (update :width + (:width deltas))
                    (update :height + (:height deltas)))))))
 
-(defn group-bounds
-  [group children-bounds]
-  (let [shape-center (gco/center-shape group)
-        points (flatten children-bounds)
-        points (if (empty? points) (:points group) points)]
-    (-> points
-        (gco/transform-points shape-center (:transform-inverse group (gmt/matrix)))
-        (gpr/squared-points)
-        (gco/transform-points shape-center (:transform group (gmt/matrix))))))
-
 (defn update-group-selrect
   [group children]
   (let [shape-center (gco/center-shape group)
@@ -463,18 +453,19 @@
        (apply-modifiers modifiers)))))
 
 (defn apply-objects-modifiers
-  [objects modifiers]
+  ([objects modifiers]
+   (apply-objects-modifiers objects modifiers (keys modifiers)))
 
-  (loop [objects objects
-         entry (first modifiers)
-         modifiers (rest modifiers)]
+  ([objects modifiers ids]
+   (loop [objects objects
+          ids (seq ids)]
+     (if (empty? ids)
+       objects
 
-    (if (nil? entry)
-      objects
-      (let [[id modifier] entry]
-        (recur (d/update-when objects id transform-shape (:modifiers modifier))
-               (first modifiers)
-               (rest modifiers))))))
+       (let [id (first ids)
+             modifier (dm/get-in modifiers [id :modifiers])]
+         (recur (d/update-when objects id transform-shape modifier)
+                (rest ids)))))))
 
 (defn transform-bounds
   ([points modifiers]
@@ -482,9 +473,9 @@
 
   ([points center modifiers]
    (let [transform (ctm/modifiers->transform modifiers)]
-    (cond-> points
-      (some? transform)
-      (gco/transform-points center transform)))))
+     (cond-> points
+       (some? transform)
+       (gco/transform-points center transform)))))
 
 (defn transform-selrect
   [selrect modifiers]

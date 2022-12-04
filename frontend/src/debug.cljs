@@ -8,6 +8,7 @@
   (:require
    [app.common.data :as d]
    [app.common.logging :as l]
+   [app.common.math :as mth]
    [app.common.transit :as t]
    [app.common.types.file :as ctf]
    [app.common.uuid :as uuid]
@@ -74,11 +75,17 @@
     ;; Display the layout lines
     :layout-lines
 
+    ;; Display the bounds for the hug content adjust
+    :layout-content-bounds
+
     ;; Makes the pixel grid red so its more visibile
     :pixel-grid
 
     ;; Show the bounds relative to the parent
     :parent-bounds
+
+    ;; Show html text
+    :html-text
     })
 
 ;; These events are excluded when we activate the :events flag
@@ -117,16 +124,27 @@
        (effect-fn input)
        (rf result input)))))
 
+(defn prettify
+  "Prepare x fror cleaner output when logged."
+  [x]
+  (cond
+    (map? x) (d/mapm #(prettify %2) x)
+    (vector? x) (mapv prettify x)
+    (seq? x) (map prettify x)
+    (set? x) (into #{} (map prettify x))
+    (number? x) (mth/precision x 4)
+    (uuid? x) (str "#uuid " x)
+    :else x))
+
 (defn ^:export logjs
   ([str] (tap (partial logjs str)))
   ([str val]
-   (js/console.log str (clj->js val))
+   (js/console.log str (clj->js (prettify val)))
    val))
 
 (when (exists? js/window)
   (set! (.-dbg ^js js/window) clj->js)
   (set! (.-pp ^js js/window) pprint))
-
 
 (defonce widget-style "
   background: black;
@@ -319,3 +337,8 @@
         objects (get-in @st/state [:workspace-data :pages-index page-id :objects])]
     (.log js/console (modif->js (:workspace-modifiers @st/state) objects)))
   nil)
+
+(defn ^:export set-workspace-read-only
+  [read-only?]
+  (st/emit! (dw/set-workspace-read-only read-only?)))
+

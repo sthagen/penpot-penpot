@@ -32,14 +32,14 @@
    [rumext.v2 :as mf])
   (:import goog.events.EventType))
 
-(defn setup-dom-events [viewport-ref zoom disable-paste in-viewport?]
+(defn setup-dom-events [viewport-ref zoom disable-paste in-viewport? workspace-read-only?]
   (let [on-key-down       (actions/on-key-down)
         on-key-up         (actions/on-key-up)
         on-mouse-move     (actions/on-mouse-move viewport-ref zoom)
         on-mouse-wheel    (actions/on-mouse-wheel viewport-ref zoom)
-        on-paste          (actions/on-paste disable-paste in-viewport?)]
+        on-paste          (actions/on-paste disable-paste in-viewport? workspace-read-only?)]
     (mf/use-layout-effect
-     (mf/deps on-key-down on-key-up on-mouse-move on-mouse-wheel on-paste)
+     (mf/deps on-key-down on-key-up on-mouse-move on-mouse-wheel on-paste workspace-read-only?)
      (fn []
        (let [node (mf/ref-val viewport-ref)
              keys [(events/listen js/document EventType.KEYDOWN on-key-down)
@@ -63,16 +63,16 @@
        ;; We schedule the event so it fires after `initialize-page` event
        (timers/schedule #(st/emit! (dw/initialize-viewport size)))))))
 
-(defn setup-cursor [cursor alt? mod? space? panning drawing-tool drawing-path? path-editing?]
+(defn setup-cursor [cursor alt? mod? space? panning drawing-tool drawing-path? path-editing? workspace-read-only?]
   (mf/use-effect
-   (mf/deps @cursor @alt? @mod? @space? panning drawing-tool drawing-path? path-editing?)
+   (mf/deps @cursor @alt? @mod? @space? panning drawing-tool drawing-path? path-editing? workspace-read-only?)
    (fn []
      (let [show-pen? (or (= drawing-tool :path)
                          (and drawing-path?
                               (not= drawing-tool :curve)))
            new-cursor
            (cond
-             (and @mod? @space?)            (utils/get-cursor :zoom)
+             (and @mod? @space?)             (utils/get-cursor :zoom)
              (or panning @space?)            (utils/get-cursor :hand)
              (= drawing-tool :comments)      (utils/get-cursor :comments)
              (= drawing-tool :frame)         (utils/get-cursor :create-artboard)
@@ -81,7 +81,10 @@
              show-pen?                       (utils/get-cursor :pen)
              (= drawing-tool :curve)         (utils/get-cursor :pencil)
              drawing-tool                    (utils/get-cursor :create-shape)
-             (and @alt? (not path-editing?)) (utils/get-cursor :duplicate)
+             (and
+              @alt?
+              (not path-editing?)
+              (not workspace-read-only?))    (utils/get-cursor :duplicate)
              :else                           (utils/get-cursor :pointer-inner))]
 
        (when (not= @cursor new-cursor)
@@ -127,12 +130,15 @@
                  rect (gsh/center->rect point (/ 5 zoom) (/ 5 zoom))]
              (if (mf/ref-val hover-disabled-ref)
                (rx/of nil)
-               (uw/ask-buffered!
-                 {:cmd :selection/query
-                  :page-id page-id
-                  :rect rect
-                  :include-frames? true
-                  :clip-children? (not mod?)})))))
+               (->> (uw/ask-buffered!
+                     {:cmd :selection/query
+                      :page-id page-id
+                      :rect rect
+                      :include-frames? true
+                      :clip-children? (not mod?)})
+                    ;; When the ask-buffered is canceled returns null. We filter them
+                    ;; to improve the behavior
+                    (rx/filter some?))))))
 
         over-shapes-stream
         (mf/use-memo

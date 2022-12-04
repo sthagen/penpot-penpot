@@ -39,6 +39,7 @@
    [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.collapse :as dwco]
    [app.main.data.workspace.drawing :as dwd]
+   [app.main.data.workspace.drawing.common :as dwdc]
    [app.main.data.workspace.edition :as dwe]
    [app.main.data.workspace.fix-bool-contents :as fbc]
    [app.main.data.workspace.groups :as dwg]
@@ -1317,7 +1318,6 @@
     (watch [_ _ _]
       (try
         (let [clipboard-str (wapi/read-from-clipboard)
-
               paste-transit-str
               (->> clipboard-str
                    (rx/filter t/transit?)
@@ -1577,6 +1577,19 @@
     {:type "root"
      :children [{:type "paragraph-set" :children paragraphs}]}))
 
+(defn calculate-paste-position [state]
+  (cond
+    ;; Pasting inside a frame
+    (selected-frame? state)
+    (let [page-selected (wsh/lookup-selected state)
+          page-objects  (wsh/lookup-page-objects state)
+          frame-id (first page-selected)
+          frame-object (get page-objects frame-id)]
+      (gsh/center-shape frame-object))
+
+    :else
+    (deref ms/mouse-position)))
+
 (defn paste-text
   [text]
   (us/assert! (string? text) "expected string as first argument")
@@ -1584,27 +1597,23 @@
     ptk/WatchEvent
     (watch [_ state _]
       (let [id (uuid/next)
-            {:keys [x y]} @ms/mouse-position
             width (max 8 (min (* 7 (count text)) 700))
             height 16
-            page-id (:current-page-id state)
-            frame-id (-> (wsh/lookup-page-objects state page-id)
-                         (ctst/top-nested-frame @ms/mouse-position))
-            shape (cts/setup-rect-selrect
-                   {:id id
-                    :type :text
-                    :name "Text"
-                    :x x
-                    :y y
-                    :frame-id frame-id
-                    :width width
-                    :height height
-                    :grow-type (if (> (count text) 100) :auto-height :auto-width)
-                    :content (as-content text)})
+            {:keys [x y]} (calculate-paste-position state)
+
+            shape {:id id
+                   :type :text
+                   :name "Text"
+                   :x x
+                   :y y
+                   :width width
+                   :height height
+                   :grow-type (if (> (count text) 100) :auto-height :auto-width)
+                   :content (as-content text)}
             undo-id (uuid/next)]
+
         (rx/of (dwu/start-undo-transaction undo-id)
-               (dws/deselect-all)
-               (dwsh/add-shape shape)
+               (dwsh/create-and-add-shape :text x y shape)
                (dwu/commit-undo-transaction undo-id))))))
 
 ;; TODO: why not implement it in terms of upload-media-workspace?
@@ -1614,7 +1623,7 @@
   (ptk/reify ::paste-svg
     ptk/WatchEvent
     (watch [_ state _]
-      (let [position (deref ms/mouse-position)
+      (let [position (calculate-paste-position state)
             file-id  (:current-file-id state)]
         (->> (dwm/svg->clj ["svg" text])
              (rx/map #(dwm/svg-uploaded % file-id position)))))))
@@ -1625,9 +1634,10 @@
     ptk/WatchEvent
     (watch [_ state _]
       (let [file-id (get-in state [:workspace-file :id])
+            position (calculate-paste-position state)
             params  {:file-id file-id
                      :blobs [image]
-                     :position @ms/mouse-position}]
+                     :position position}]
         (rx/of (dwm/upload-media-workspace params))))))
 
 (defn toggle-distances-display [value]
@@ -1794,6 +1804,41 @@
           (rx/mapcat (partial remove-graphic it file-data' page)
                      (rx/from (d/enumerate (d/zip media shape-grid))))
           (rx/of (complete-remove-graphics)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Read only
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defn set-workspace-read-only
+  [read-only?]
+  (ptk/reify ::set-workspace-read-only
+    ptk/UpdateEvent
+    (update [_ state]
+      (assoc-in state [:workspace-global :read-only?] read-only?))
+
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (if read-only?
+        (rx/of :interrupt
+               (dwdc/clear-drawing)
+               (remove-layout-flag :colorpalette)
+               (remove-layout-flag :textpalette))
+        (rx/empty)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Inspect
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defn set-inspect-expanded
+  [expanded?]
+  (ptk/reify ::set-inspect-expanded
+    ptk/UpdateEvent
+    (update [_ state]
+      (assoc-in state [:workspace-local :inspect-expanded] expanded?))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Exports
