@@ -11,6 +11,7 @@
    [app.common.data.macros :as dm]
    [app.common.geom.shapes :as gsh]
    [app.common.pages.helpers :as cph]
+   [app.common.types.shape.layout :as ctl]
    [app.main.refs :as refs]
    [app.main.ui.context :as ctx]
    [app.main.ui.hooks :as ui-hooks]
@@ -154,7 +155,7 @@
 
         on-frame-enter    (actions/on-frame-enter frame-hover)
         on-frame-leave    (actions/on-frame-leave frame-hover)
-        on-frame-select   (actions/on-frame-select selected)
+        on-frame-select   (actions/on-frame-select selected workspace-read-only?)
 
         disable-events?          (contains? layout :comments)
         show-comments?           (= drawing-tool :comments)
@@ -293,14 +294,25 @@
                                      :modifiers modifiers}])
 
        (when show-frame-outline?
-         [:& outline/shape-outlines
-          {:objects objects-modified
-           :hover #{(->> @hover-ids
-                         (filter #(cph/frame-shape? (get base-objects %)))
-                         (remove selected)
-                         (first))}
-           :zoom zoom
-           :modifiers modifiers}])
+         (let [outlined-frame-id
+               (->> @hover-ids
+                    (filter #(cph/frame-shape? (get base-objects %)))
+                    (remove selected)
+                    (first))
+               outlined-frame (get objects outlined-frame-id)]
+           [:*
+            [:& outline/shape-outlines
+             {:objects objects-modified
+              :hover #{outlined-frame-id}
+              :zoom zoom
+              :modifiers modifiers}]
+
+            (when (ctl/layout? outlined-frame)
+              [:g.ghost-outline
+               [:& outline/shape-outlines
+                {:objects base-objects
+                 :selected selected
+                 :zoom zoom}]])]))
 
        (when show-outlines?
          [:& outline/shape-outlines

@@ -6,13 +6,17 @@
 
 (ns app.rpc
   (:require
+   [app.common.data :as d]
    [app.common.exceptions :as ex]
    [app.common.logging :as l]
    [app.common.spec :as us]
+   [app.common.uuid :as uuid]
    [app.db :as db]
    [app.http :as-alias http]
-   [app.http.session :as-alias session]
+   [app.http.client :as-alias http.client]
+   [app.http.session :as-alias http.session]
    [app.loggers.audit :as audit]
+   [app.loggers.webhooks :as-alias webhooks]
    [app.metrics :as mtx]
    [app.msgbus :as-alias mbus]
    [app.rpc.climit :as climit]
@@ -84,7 +88,7 @@
   internal async flow into ring async flow."
   [methods {:keys [profile-id session-id params] :as request} respond raise]
   (let [type   (keyword (:type params))
-        data   (into {::request request} params)
+        data   (into {::http/request request} params)
         data   (if profile-id
                  (assoc data :profile-id profile-id ::session-id session-id)
                  (dissoc data :profile-id))
@@ -101,9 +105,9 @@
   "Ring handler that dispatches cmd requests and convert between
   internal async flow into ring async flow."
   [methods {:keys [profile-id session-id params] :as request} respond raise]
-  (let [cmd    (keyword (:command params))
+  (let [cmd    (keyword (:type params))
         etag   (yrq/get-header request "if-none-match")
-        data   (into {::request request ::cond/key etag} params)
+        data   (into {::http/request request ::cond/key etag} params)
         data   (if profile-id
                  (assoc data :profile-id profile-id ::session-id session-id)
                  (dissoc data :profile-id))
@@ -143,30 +147,54 @@
     mdata))
 
 (defn- wrap-audit
-  [{:keys [audit] :as cfg} f mdata]
-  (if audit
-    (with-meta
-      (fn [cfg {:keys [::request] :as params}]
-        (p/finally (f cfg params)
-                   (fn [result _]
-                     (when result
-                       (let [resultm    (meta result)
-                             profile-id (or (::audit/profile-id resultm)
-                                            (:profile-id result)
-                                            (:profile-id params))
-                             props      (or (::audit/replace-props resultm)
-                                            (-> params
-                                                (merge (::audit/props resultm))
-                                                (dissoc :type)))]
-                         (audit :cmd :submit
-                                :type (or (::audit/type resultm)
+  [cfg f mdata]
+  (if-let [collector (::audit/collector cfg)]
+    (letfn [(handle-audit [params result]
+              (let [resultm    (meta result)
+                    request    (::http/request params)
+                    profile-id (or (::audit/profile-id resultm)
+                                   (:profile-id result)
+                                   (:profile-id params)
+                                   uuid/zero)
+
+                    props      (-> (or (::audit/replace-props resultm)
+                                       (-> params
+                                           (merge (::audit/props resultm))
+                                           (dissoc :profile-id)
+                                           (dissoc :type)))
+                                   (d/without-qualified)
+                                   (d/without-nils))
+
+                    event      {:type (or (::audit/type resultm)
                                           (::type cfg))
                                 :name (or (::audit/name resultm)
                                           (::sv/name mdata))
                                 :profile-id profile-id
                                 :ip-addr (some-> request audit/parse-client-ip)
-                                :props (dissoc props ::request)))))))
-      mdata)
+                                :props props
+                                ::webhooks/batch-key
+                                (or (::webhooks/batch-key mdata)
+                                    (::webhooks/batch-key resultm))
+
+                                ::webhooks/batch-timeout
+                                (or (::webhooks/batch-timeout mdata)
+                                    (::webhooks/batch-timeout resultm))
+
+                                ::webhooks/event?
+                                (or (::webhooks/event? mdata)
+                                    (::webhooks/event? resultm)
+                                    false)}]
+
+                (audit/submit! collector event)))
+
+            (handle-request [cfg params]
+              (->> (f cfg params)
+                   (p/mcat (fn [result]
+                             (->> (handle-audit params result)
+                                  (p/map (constantly result)))))))]
+      (if-not (::audit/skip mdata)
+        (with-meta handle-request mdata)
+        f))
     f))
 
 (defn- wrap
@@ -185,7 +213,7 @@
 
     (l/debug :hint "register method" :name (::sv/name mdata))
     (with-meta
-      (fn [{:keys [::request] :as params}]
+      (fn [params]
         ;; Raise authentication error when rpc method requires auth but
         ;; no profile-id is found in the request.
 
@@ -194,8 +222,8 @@
            (ex/raise :type :authentication
                      :code :authentication-required
                      :hint "authentication required for this endpoint")
-           (let [params (us/conform spec (dissoc params ::request))]
-             (f cfg (assoc params ::request request))))))
+           (let [params (us/conform spec params)]
+             (f cfg params)))))
       mdata)))
 
 (defn- process-method
@@ -210,7 +238,6 @@
     (->> (sv/scan-ns 'app.rpc.queries.projects
                      'app.rpc.queries.files
                      'app.rpc.queries.teams
-                     'app.rpc.queries.comments
                      'app.rpc.queries.profile
                      'app.rpc.queries.viewer
                      'app.rpc.queries.fonts)
@@ -223,13 +250,10 @@
     (->> (sv/scan-ns 'app.rpc.mutations.media
                      'app.rpc.mutations.profile
                      'app.rpc.mutations.files
-                     'app.rpc.mutations.comments
                      'app.rpc.mutations.projects
                      'app.rpc.mutations.teams
-                     'app.rpc.mutations.management
                      'app.rpc.mutations.fonts
-                     'app.rpc.mutations.share-link
-                     'app.rpc.mutations.verify-token)
+                     'app.rpc.mutations.share-link)
          (map (partial process-method cfg))
          (into {}))))
 
@@ -241,9 +265,12 @@
                      'app.rpc.commands.management
                      'app.rpc.commands.verify-token
                      'app.rpc.commands.search
+                     'app.rpc.commands.teams
                      'app.rpc.commands.auth
                      'app.rpc.commands.ldap
                      'app.rpc.commands.demo
+                     'app.rpc.commands.webhooks
+                     'app.rpc.commands.audit
                      'app.rpc.commands.files
                      'app.rpc.commands.files.update
                      'app.rpc.commands.files.create
@@ -251,8 +278,6 @@
          (map (partial process-method cfg))
          (into {}))))
 
-(s/def ::audit (s/nilable fn?))
-(s/def ::http-client fn?)
 (s/def ::ldap (s/nilable map?))
 (s/def ::msgbus ::mbus/msgbus)
 (s/def ::climit (s/nilable ::climit/climit))
@@ -262,13 +287,15 @@
 (s/def ::sprops map?)
 
 (defmethod ig/pre-init-spec ::methods [_]
-  (s/keys :req-un [::sto/storage
-                   ::session/session
+  (s/keys :req [::audit/collector
+                ::http.client/client
+                ::db/pool
+                ::wrk/executor]
+          :req-un [::sto/storage
+                   ::http.session/session
                    ::sprops
-                   ::audit
                    ::public-uri
                    ::msgbus
-                   ::http-client
                    ::rlimit
                    ::climit
                    ::wrk/executor
@@ -302,7 +329,7 @@
 (defmethod ig/init-key ::routes
   [_ {:keys [methods] :as cfg}]
   [["/rpc"
-    ["/command/:command" {:handler (partial rpc-command-handler (:commands methods))}]
+    ["/command/:type" {:handler (partial rpc-command-handler (:commands methods))}]
     ["/query/:type" {:handler (partial rpc-query-handler (:queries methods))}]
     ["/mutation/:type" {:handler (partial rpc-mutation-handler (:mutations methods))
                         :allowed-methods #{:post}}]]])

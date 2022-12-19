@@ -74,6 +74,9 @@
 (def dashboard-team-invitations
   (l/derived :dashboard-team-invitations st/state))
 
+(def dashboard-team-webhooks
+  (l/derived :dashboard-team-webhooks st/state))
+
 (def dashboard-selected-project
   (l/derived (fn [state]
                (dm/get-in state [:dashboard-local :selected-project]))
@@ -380,6 +383,17 @@
 
 (def workspace-focus-selected
   (l/derived :workspace-focus-selected st/state))
+
+(defn workspace-get-flex-child
+  [ids]
+  (l/derived
+   (fn [state]
+     (let [objects  (wsh/lookup-page-objects state)]
+       (into []
+             (comp (map (d/getf objects))
+                   (filter (partial ctl/layout-child? objects)))
+             ids)))
+   st/state =))
 
 ;; Remove this when deprecating components-v2
 (def remove-graphics

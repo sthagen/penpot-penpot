@@ -25,7 +25,7 @@
    [app.main.ui.dashboard.projects :refer [projects-section]]
    [app.main.ui.dashboard.search :refer [search-page]]
    [app.main.ui.dashboard.sidebar :refer [sidebar]]
-   [app.main.ui.dashboard.team :refer [team-settings-page team-members-page team-invitations-page]]
+   [app.main.ui.dashboard.team :refer [team-settings-page team-members-page team-invitations-page team-webhooks-page]]
    [app.main.ui.hooks :as hooks]
    [app.main.ui.icons :as i]
    [app.util.dom :as dom]
@@ -145,15 +145,20 @@
 
     [:div.dashboard-templates-section {:class (when collapsed "collapsed")}
      [:div.title
-      [:div {:on-click toggle-collapse}
+      [:button {:tab-index "0"
+                :on-click toggle-collapse}
        [:span (tr "dashboard.libraries-and-templates")]
        [:span.icon (if collapsed i/arrow-up i/arrow-down)]]]
      [:div.content {:ref content-ref
                     :style {:left @card-offset :width (str container-size "px")}}
       (for [num-item (range (count templates)) :let [item (nth templates num-item)]]
-        [:div.card-container {:id (str/concat "card-container-" num-item)
-                              :key (:id item)
-                              :on-click #(import-template item)}
+        [:a.card-container {:tab-index "0"
+                            :id (str/concat "card-container-" num-item)
+                            :key (:id item)
+                            :on-click #(import-template item)
+                            :on-key-down (fn [event]
+                                           (when (kbd/enter? event)
+                                             (import-template item)))}
          [:div.template-card
           [:div.img-container
            [:img {:src (:thumbnail-uri item)
@@ -163,14 +168,16 @@
       [:div.card-container
        [:div.template-card
         [:div.img-container
-         [:a {:href "https://penpot.app/libraries-templates.html" :target "_blank" :on-click handle-template-link}
+         [:a {:tab-index "0"
+              :href "https://penpot.app/libraries-templates.html" :target "_blank" :on-click handle-template-link}
           [:div.template-link
            [:div.template-link-title (tr "dashboard.libraries-and-templates")]
            [:div.template-link-text (tr "dashboard.libraries-and-templates.explore")]]]]]]]
      (when (< @card-offset 0)
-       [:div.button.left {:on-click move-left} i/go-prev])
+       [:button.button.left {:on-click move-left} i/go-prev])
      (when more-cards
-       [:div.button.right {:on-click move-right} i/go-next])]))
+       [:button.button.right {:on-click move-right
+                              :aria-label (tr "labels.next")} i/go-next])]))
 
 (mf/defc dashboard-content
   [{:keys [team projects project section search-term profile] :as props}]
@@ -236,6 +243,9 @@
        :dashboard-team-invitations
        [:& team-invitations-page {:team team}]
 
+       :dashboard-team-webhooks
+       [:& team-webhooks-page {:team team}]
+
        :dashboard-team-settings
        [:& team-settings-page {:team team :profile profile}]
 
@@ -282,7 +292,7 @@
       ;; components on team change. Many components assumes that the
       ;; team is already set so don't put the team into mf/deps.
       (when team
-        [:section.dashboard-layout {:key (:id team)}
+        [:main.dashboard-layout {:key (:id team)}
          [:& sidebar
           {:team team
            :projects projects

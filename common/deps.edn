@@ -23,7 +23,7 @@
   com.cognitect/transit-cljs {:mvn/version "0.8.280"}
   java-http-clj/java-http-clj {:mvn/version "0.4.3"}
 
-  funcool/promesa {:mvn/version "9.2.542"}
+  funcool/promesa {:mvn/version "10.0.571"}
   funcool/cuerdas {:mvn/version "2022.06.16-403"}
 
   lambdaisland/uri {:mvn/version "1.13.95"
@@ -33,6 +33,7 @@
 
   funcool/datoteka {:mvn/version "3.0.66"}
   com.sun.mail/jakarta.mail {:mvn/version "2.0.1"}
+  org.la4j/la4j {:mvn/version "0.6.0"}
 
   ;; exception printing
   fipp/fipp {:mvn/version "0.6.26"}

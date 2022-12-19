@@ -6,10 +6,17 @@
 
 (ns app.main
   (:require
-   [app.auth.oidc]
+   [app.auth.oidc :as-alias oidc]
+   [app.auth.oidc.providers :as-alias oidc.providers]
    [app.common.logging :as l]
    [app.config :as cf]
    [app.db :as-alias db]
+   [app.http.client :as-alias http.client]
+   [app.http.session :as-alias http.session]
+   [app.loggers.audit :as-alias audit]
+   [app.loggers.audit.tasks :as-alias audit.tasks]
+   [app.loggers.webhooks :as-alias webhooks]
+   [app.loggers.zmq :as-alias lzmq]
    [app.metrics :as-alias mtx]
    [app.metrics.definition :as-alias mdef]
    [app.redis :as-alias rds]
@@ -100,6 +107,24 @@
     ::mdef/labels ["name"]
     ::mdef/type :summary}
 
+   :audit-http-handler-queue-size
+   {::mdef/name "penpot_audit_http_handler_queue_size"
+    ::mdef/help "Current number of queued submissions on the audit log http handler"
+    ::mdef/labels []
+    ::mdef/type :gauge}
+
+   :audit-http-handler-concurrency
+   {::mdef/name "penpot_audit_http_handler_concurrency"
+    ::mdef/help "Current number of used concurrency capacity on the audit log http handler"
+    ::mdef/labels []
+    ::mdef/type :gauge}
+
+   :audit-http-handler-timing
+   {::mdef/name "penpot_audit_http_handler_timing"
+    ::mdef/help "Summary of the time between queuing and executing on the audit log http handler"
+    ::mdef/labels []
+    ::mdef/type :summary}
+
    :executors-active-threads
    {::mdef/name "penpot_executors_active_threads"
     ::mdef/help "Current number of threads available in the executor service."
@@ -178,23 +203,23 @@
    ::sto/gc-touched-task
    {:pool (ig/ref ::db/pool)}
 
-   :app.http/client
-   {:executor (ig/ref ::wrk/executor)}
+   ::http.client/client
+   {::wrk/executor (ig/ref ::wrk/executor)}
 
    :app.http.session/manager
-   {:pool     (ig/ref ::db/pool)
-    :sprops   (ig/ref :app.setup/props)
-    :executor (ig/ref ::wrk/executor)}
+   {::db/pool      (ig/ref ::db/pool)
+    ::wrk/executor (ig/ref ::wrk/executor)
+    ::props        (ig/ref :app.setup/props)}
 
    :app.http.session/gc-task
    {:pool        (ig/ref ::db/pool)
     :max-age     (cf/get :auth-token-cookie-max-age)}
 
    :app.http.awsns/handler
-   {:sprops      (ig/ref :app.setup/props)
-    :pool        (ig/ref ::db/pool)
-    :http-client (ig/ref :app.http/client)
-    :executor    (ig/ref ::wrk/executor)}
+   {::props              (ig/ref :app.setup/props)
+    ::db/pool            (ig/ref ::db/pool)
+    ::http.client/client (ig/ref ::http.client/client)
+    ::wrk/executor       (ig/ref ::wrk/executor)}
 
    :app.http/server
    {:port        (cf/get :http-server-port)
@@ -220,51 +245,30 @@
     :bind-password  (cf/get :ldap-bind-password)
     :enabled?       (contains? cf/flags :login-with-ldap)}
 
-   :app.auth.oidc/google-provider
-   {:enabled?      (contains? cf/flags :login-with-google)
-    :client-id     (cf/get :google-client-id)
-    :client-secret (cf/get :google-client-secret)}
+   ::oidc.providers/google
+   {}
 
-   :app.auth.oidc/github-provider
-   {:enabled?      (contains? cf/flags :login-with-github)
-    :http-client   (ig/ref :app.http/client)
-    :client-id     (cf/get :github-client-id)
-    :client-secret (cf/get :github-client-secret)}
+   ::oidc.providers/github
+   {::http.client/client (ig/ref ::http.client/client)}
 
-   :app.auth.oidc/gitlab-provider
-   {:enabled?      (contains? cf/flags :login-with-gitlab)
-    :base-uri      (cf/get :gitlab-base-uri "https://gitlab.com")
-    :client-id     (cf/get :gitlab-client-id)
-    :client-secret (cf/get :gitlab-client-secret)}
+   ::oidc.providers/gitlab
+   {}
 
-   :app.auth.oidc/generic-provider
-   {:enabled?      (contains? cf/flags :login-with-oidc)
-    :http-client   (ig/ref :app.http/client)
+   ::oidc.providers/generic
+   {::http.client/client (ig/ref ::http.client/client)}
 
-    :client-id     (cf/get :oidc-client-id)
-    :client-secret (cf/get :oidc-client-secret)
+   ::oidc/routes
+   {::http.client/client   (ig/ref ::http.client/client)
+    ::db/pool              (ig/ref ::db/pool)
+    ::props                (ig/ref :app.setup/props)
+    ::wrk/executor         (ig/ref ::wrk/executor)
+    ::oidc/providers       {:google (ig/ref ::oidc.providers/google)
+                            :github (ig/ref ::oidc.providers/github)
+                            :gitlab (ig/ref ::oidc.providers/gitlab)
+                            :oidc   (ig/ref ::oidc.providers/generic)}
+    ::audit/collector      (ig/ref ::audit/collector)
+    ::http.session/session (ig/ref :app.http.session/manager)}
 
-    :base-uri      (cf/get :oidc-base-uri)
-
-    :token-uri     (cf/get :oidc-token-uri)
-    :auth-uri      (cf/get :oidc-auth-uri)
-    :user-uri      (cf/get :oidc-user-uri)
-
-    :scopes        (cf/get :oidc-scopes)
-    :roles-attr    (cf/get :oidc-roles-attr)
-    :roles         (cf/get :oidc-roles)}
-
-   :app.auth.oidc/routes
-   {:providers   {:google (ig/ref :app.auth.oidc/google-provider)
-                  :github (ig/ref :app.auth.oidc/github-provider)
-                  :gitlab (ig/ref :app.auth.oidc/gitlab-provider)
-                  :oidc   (ig/ref :app.auth.oidc/generic-provider)}
-    :sprops      (ig/ref :app.setup/props)
-    :http-client (ig/ref :app.http/client)
-    :pool        (ig/ref ::db/pool)
-    :session     (ig/ref :app.http.session/manager)
-    :public-uri  (cf/get :public-uri)
-    :executor    (ig/ref ::wrk/executor)}
 
    ;; TODO: revisit the dependencies of this service, looks they are too much unused of them
    :app.http/router
@@ -273,12 +277,11 @@
     :session       (ig/ref :app.http.session/manager)
     :awsns-handler (ig/ref :app.http.awsns/handler)
     :debug-routes  (ig/ref :app.http.debug/routes)
-    :oidc-routes   (ig/ref :app.auth.oidc/routes)
+    :oidc-routes   (ig/ref ::oidc/routes)
     :ws            (ig/ref :app.http.websocket/handler)
     :metrics       (ig/ref ::mtx/metrics)
     :public-uri    (cf/get :public-uri)
     :storage       (ig/ref ::sto/storage)
-    :audit-handler (ig/ref :app.loggers.audit/http-handler)
     :rpc-routes    (ig/ref :app.rpc/routes)
     :doc-routes    (ig/ref :app.rpc.doc/routes)
     :executor      (ig/ref ::wrk/executor)}
@@ -315,21 +318,25 @@
     :scheduled-executor (ig/ref ::wrk/scheduled-executor)}
 
    :app.rpc/methods
-   {:pool        (ig/ref ::db/pool)
-    :session     (ig/ref :app.http.session/manager)
-    :sprops      (ig/ref :app.setup/props)
-    :metrics     (ig/ref ::mtx/metrics)
-    :storage     (ig/ref ::sto/storage)
-    :msgbus      (ig/ref :app.msgbus/msgbus)
-    :public-uri  (cf/get :public-uri)
-    :redis       (ig/ref ::rds/redis)
-    :audit       (ig/ref :app.loggers.audit/collector)
-    :ldap        (ig/ref :app.auth.ldap/provider)
-    :http-client (ig/ref :app.http/client)
-    :climit      (ig/ref :app.rpc/climit)
-    :rlimit      (ig/ref :app.rpc/rlimit)
-    :executor    (ig/ref ::wrk/executor)
-    :templates   (ig/ref :app.setup/builtin-templates)
+   {::audit/collector    (ig/ref ::audit/collector)
+    ::http.client/client (ig/ref ::http.client/client)
+    ::db/pool            (ig/ref ::db/pool)
+    ::wrk/executor       (ig/ref ::wrk/executor)
+    ::props              (ig/ref :app.setup/props)
+    :pool                (ig/ref ::db/pool)
+    :session             (ig/ref :app.http.session/manager)
+    :sprops              (ig/ref :app.setup/props)
+    :metrics             (ig/ref ::mtx/metrics)
+    :storage             (ig/ref ::sto/storage)
+    :msgbus              (ig/ref :app.msgbus/msgbus)
+    :public-uri          (cf/get :public-uri)
+    :redis               (ig/ref ::rds/redis)
+    :ldap                (ig/ref :app.auth.ldap/provider)
+    :http-client         (ig/ref ::http.client/client)
+    :climit              (ig/ref :app.rpc/climit)
+    :rlimit              (ig/ref :app.rpc/rlimit)
+    :executor            (ig/ref ::wrk/executor)
+    :templates           (ig/ref :app.setup/builtin-templates)
     }
 
    :app.rpc.doc/routes
@@ -350,8 +357,13 @@
      :tasks-gc           (ig/ref :app.tasks.tasks-gc/handler)
      :telemetry          (ig/ref :app.tasks.telemetry/handler)
      :session-gc         (ig/ref :app.http.session/gc-task)
-     :audit-log-archive  (ig/ref :app.loggers.audit/archive-task)
-     :audit-log-gc       (ig/ref :app.loggers.audit/gc-task)}}
+     :audit-log-archive  (ig/ref ::audit.tasks/archive)
+     :audit-log-gc       (ig/ref ::audit.tasks/gc)
+
+     :process-webhook-event
+     (ig/ref ::webhooks/process-event-handler)
+     :run-webhook
+     (ig/ref ::webhooks/run-webhook-handler)}}
 
 
    :app.emails/sendmail
@@ -383,52 +395,52 @@
    {:pool (ig/ref ::db/pool)}
 
    :app.tasks.telemetry/handler
-   {:pool        (ig/ref ::db/pool)
-    :version     (:full cf/version)
-    :uri         (cf/get :telemetry-uri)
-    :sprops      (ig/ref :app.setup/props)
-    :http-client (ig/ref :app.http/client)}
+   {::db/pool            (ig/ref ::db/pool)
+    ::http.client/client (ig/ref ::http.client/client)
+    ::props              (ig/ref :app.setup/props)}
 
    :app.srepl/server
    {:port (cf/get :srepl-port)
     :host (cf/get :srepl-host)}
 
    :app.setup/builtin-templates
-   {:http-client (ig/ref :app.http/client)}
+   {::http.client/client (ig/ref ::http.client/client)}
 
    :app.setup/props
    {:pool (ig/ref ::db/pool)
     :key  (cf/get :secret-key)}
 
-   :app.loggers.zmq/receiver
-   {:endpoint (cf/get :loggers-zmq-uri)}
+   ::lzmq/receiver
+   {}
 
-   :app.loggers.audit/http-handler
-   {:pool     (ig/ref ::db/pool)
-    :executor (ig/ref ::wrk/executor)}
+   ::audit/collector
+   {::db/pool           (ig/ref ::db/pool)
+    ::wrk/executor      (ig/ref ::wrk/executor)
+    ::mtx/metrics       (ig/ref ::mtx/metrics)}
 
-   :app.loggers.audit/collector
-   {:pool     (ig/ref ::db/pool)
-    :executor (ig/ref ::wrk/executor)}
+   ::audit.tasks/archive
+   {::props              (ig/ref :app.setup/props)
+    ::db/pool            (ig/ref ::db/pool)
+    ::http.client/client (ig/ref ::http.client/client)}
 
-   :app.loggers.audit/archive-task
-   {:uri         (cf/get :audit-log-archive-uri)
-    :sprops      (ig/ref :app.setup/props)
-    :pool        (ig/ref ::db/pool)
-    :http-client (ig/ref :app.http/client)}
+   ::audit.tasks/gc
+   {::db/pool (ig/ref ::db/pool)}
 
-   :app.loggers.audit/gc-task
-   {:pool (ig/ref ::db/pool)}
+   ::webhooks/process-event-handler
+   {::db/pool            (ig/ref ::db/pool)
+    ::http.client/client (ig/ref ::http.client/client)}
+
+   ::webhooks/run-webhook-handler
+   {::db/pool            (ig/ref ::db/pool)
+    ::http.client/client (ig/ref ::http.client/client)}
 
    :app.loggers.loki/reporter
-   {:uri         (cf/get :loggers-loki-uri)
-    :receiver    (ig/ref :app.loggers.zmq/receiver)
-    :http-client (ig/ref :app.http/client)}
+   {::lzmq/receiver      (ig/ref ::lzmq/receiver)
+    ::http.client/client (ig/ref ::http.client/client)}
 
    :app.loggers.mattermost/reporter
-   {:uri         (cf/get :error-report-webhook)
-    :receiver    (ig/ref :app.loggers.zmq/receiver)
-    :http-client (ig/ref :app.http/client)}
+   {::lzmq/receiver      (ig/ref ::lzmq/receiver)
+    ::http.client/client (ig/ref ::http.client/client)}
 
    :app.loggers.database/reporter
    {:receiver (ig/ref :app.loggers.zmq/receiver)
@@ -496,18 +508,27 @@
        {:cron #app/cron "30 */5 * * * ?" ;; every 5m
         :task :audit-log-gc})]}
 
-   ::wrk/scheduler
+   ::wrk/dispatcher
    {::rds/redis   (ig/ref ::rds/redis)
     ::mtx/metrics (ig/ref ::mtx/metrics)
     ::db/pool     (ig/ref ::db/pool)}
 
-   ::wrk/worker
-   {::wrk/parallelism (cf/get ::worker-parallelism 3)
-    ::wrk/queue       "default"
+   [::default ::wrk/worker]
+   {::wrk/parallelism (cf/get ::worker-default-parallelism 1)
+    ::wrk/queue       :default
+    ::rds/redis       (ig/ref ::rds/redis)
+    ::wrk/registry    (ig/ref ::wrk/registry)
+    ::mtx/metrics     (ig/ref ::mtx/metrics)
+    ::db/pool         (ig/ref ::db/pool)}
+
+   [::webhook ::wrk/worker]
+   {::wrk/parallelism (cf/get ::worker-webhook-parallelism 1)
+    ::wrk/queue       :webhooks
     ::rds/redis       (ig/ref ::rds/redis)
     ::wrk/registry    (ig/ref ::wrk/registry)
     ::mtx/metrics     (ig/ref ::mtx/metrics)
     ::db/pool         (ig/ref ::db/pool)}})
+
 
 (def system nil)
 
@@ -521,7 +542,7 @@
                                    (merge worker-config))
                                  (ig/prep)
                                  (ig/init))))
-  (l/info :msg "welcome to penpot"
+  (l/info :hint "welcome to penpot"
           :flags (str/join "," (map name cf/flags))
           :worker? (contains? cf/flags :backend-worker)
           :version (:full cf/version)))
@@ -534,4 +555,9 @@
 
 (defn -main
   [& _args]
-  (start))
+  (try
+    (start)
+    (catch Throwable cause
+      (l/error :hint (ex-message cause)
+               :cause cause)
+      (System/exit -1))))

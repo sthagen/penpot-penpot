@@ -11,10 +11,13 @@
    [app.common.spec :as us]
    [app.common.uuid :as uuid]
    [app.db :as db]
+   [app.loggers.audit :as-alias audit]
+   [app.loggers.webhooks :as-alias webhooks]
    [app.media :as media]
    [app.rpc.climit :as-alias climit]
+   [app.rpc.commands.teams :as teams]
    [app.rpc.doc :as-alias doc]
-   [app.rpc.queries.teams :as teams]
+   [app.rpc.helpers :as rph]
    [app.storage :as sto]
    [app.util.services :as sv]
    [app.util.time :as dt]
@@ -41,6 +44,8 @@
                    ::font-id ::font-family ::font-weight ::font-style]))
 
 (sv/defmethod ::create-font-variant
+  {::doc/added "1.3"
+   ::webhooks/event? true}
   [{:keys [pool] :as cfg} {:keys [team-id profile-id] :as params}]
   (let [cfg (update cfg :storage media/configure-assets-storage)]
     (teams/check-edition-permissions! pool profile-id team-id)
@@ -104,29 +109,34 @@
                          :ttf-file-id (:id ttf)}))
           ]
 
-    (-> (generate-fonts data)
-        (p/then validate-data)
-        (p/then persist-fonts executor)
-        (p/then insert-into-db executor))))
+    (->> (generate-fonts data)
+         (p/fmap validate-data)
+         (p/mcat executor persist-fonts)
+         (p/fmap executor insert-into-db)
+         (p/fmap (fn [result]
+                   (let [params (update params :data (comp vec keys))]
+                     (rph/with-meta result {::audit/replace-props params})))))))
 
 ;; --- UPDATE FONT FAMILY
 
 (s/def ::update-font
   (s/keys :req-un [::profile-id ::team-id ::id ::name]))
 
-(def sql:update-font
-  "update team_font_variant
-      set font_family = ?
-    where team_id = ?
-      and font_id = ?")
-
 (sv/defmethod ::update-font
-  {::climit/queue :process-font}
+  {::doc/added "1.3"
+   ::webhooks/event? true}
   [{:keys [pool] :as cfg} {:keys [team-id profile-id id name] :as params}]
   (db/with-atomic [conn pool]
     (teams/check-edition-permissions! conn profile-id team-id)
-    (db/exec-one! conn [sql:update-font name team-id id])
-    nil))
+    (rph/with-meta
+      (db/update! conn :team-font-variant
+                  {:font-family name}
+                  {:font-id id
+                   :team-id team-id})
+      {::audit/replace-props {:id id
+                              :name name
+                              :team-id team-id
+                              :profile-id profile-id}})))
 
 ;; --- DELETE FONT
 
@@ -134,14 +144,19 @@
   (s/keys :req-un [::profile-id ::team-id ::id]))
 
 (sv/defmethod ::delete-font
+  {::doc/added "1.3"
+   ::webhooks/event? true}
   [{:keys [pool] :as cfg} {:keys [id team-id profile-id] :as params}]
   (db/with-atomic [conn pool]
     (teams/check-edition-permissions! conn profile-id team-id)
-
-    (db/update! conn :team-font-variant
-                {:deleted-at (dt/now)}
-                {:font-id id :team-id team-id})
-    nil))
+    (let [font (db/update! conn :team-font-variant
+                           {:deleted-at (dt/now)}
+                           {:font-id id :team-id team-id})]
+      (rph/with-meta (rph/wrap)
+        {::audit/props {:id id
+                        :team-id team-id
+                        :name (:font-family font)
+                        :profile-id profile-id}}))))
 
 ;; --- DELETE FONT VARIANT
 
@@ -149,12 +164,14 @@
   (s/keys :req-un [::profile-id ::team-id ::id]))
 
 (sv/defmethod ::delete-font-variant
-  {::doc/added "1.3"}
+  {::doc/added "1.3"
+   ::webhooks/event? true}
   [{:keys [pool] :as cfg} {:keys [id team-id profile-id] :as params}]
   (db/with-atomic [conn pool]
     (teams/check-edition-permissions! conn profile-id team-id)
-
-    (db/update! conn :team-font-variant
-                {:deleted-at (dt/now)}
-                {:id id :team-id team-id})
-    nil))
+    (let [variant (db/update! conn :team-font-variant
+                              {:deleted-at (dt/now)}
+                              {:id id :team-id team-id})]
+      (rph/with-meta (rph/wrap)
+        {::audit/props {:font-family (:font-family variant)
+                        :font-id (:font-id variant)}}))))

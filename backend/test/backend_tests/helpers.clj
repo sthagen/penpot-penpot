@@ -17,14 +17,13 @@
    [app.main :as main]
    [app.media]
    [app.migrations]
-   [app.rpc.helpers :as rph]
    [app.rpc.commands.auth :as cmd.auth]
    [app.rpc.commands.files :as files]
    [app.rpc.commands.files.create :as files.create]
    [app.rpc.commands.files.update :as files.update]
+   [app.rpc.commands.teams :as teams]
+   [app.rpc.helpers :as rph]
    [app.rpc.mutations.profile :as profile]
-   [app.rpc.mutations.projects :as projects]
-   [app.rpc.mutations.teams :as teams]
    [app.util.blob :as blob]
    [app.util.services :as sv]
    [app.util.time :as dt]
@@ -172,7 +171,7 @@
      (->> (merge {:id (mk-uuid "project" i)
                   :name (str "project" i)}
                  params)
-          (#'projects/create-project conn)))))
+          (#'teams/create-project conn)))))
 
 (defn create-file*
   ([i params]
@@ -254,7 +253,7 @@
   ([params] (create-project-role* *pool* params))
   ([pool {:keys [project-id profile-id role] :or {role :owner}}]
    (with-open [conn (db/open pool)]
-     (#'projects/create-project-role conn {:project-id project-id
+     (#'teams/create-project-role conn {:project-id project-id
                                            :profile-id profile-id
                                            :role role}))))
 
@@ -283,6 +282,19 @@
                                   :changes changes
                                   :session-id session-id
                                   :profile-id profile-id})))))
+
+(defn create-webhook*
+  ([params] (create-webhook* *pool* params))
+  ([pool {:keys [team-id id uri mtype is-active]
+          :or {is-active true
+               mtype "application/json"
+               uri "http://example.com/webhook"}}]
+   (db/insert! pool :webhook
+               {:id (or id (uuid/next))
+                :team-id team-id
+                :uri uri
+                :is-active is-active
+                :mtype mtype})))
 
 ;; --- RPC HELPERS
 
@@ -417,6 +429,10 @@
   [& params]
   (apply db/query *pool* params))
 
+(defn db-get
+  [& params]
+  (apply db/get* *pool* params))
+
 (defn sleep
   [ms-or-duration]
   (Thread/sleep (inst-ms (dt/duration ms-or-duration))))
@@ -431,4 +447,10 @@
 
 (defn reset-mock!
   [m]
-  (reset! m @(mk/make-mock {})))
+  (swap! m (fn [m]
+             (-> m
+                 (assoc :called? false)
+                 (assoc :call-count 0)
+                 (assoc :return-list [])
+                 (assoc :call-args nil)
+                 (assoc :call-args-list [])))))

@@ -713,6 +713,57 @@ msgstr "Tu nombre"
 msgid "dashboard.your-penpot"
 msgstr "Tu Penpot"
 
+msgid "dashboard.webhooks.description"
+msgstr "Los webhooks son una forma simple de permitir notificar a otros sitios web y aplicaciones cuando ocurren ciertos eventos en Penpot. Enviaremos una petición POST a cada una de las URLs que indiques."
+
+msgid "dashboard.webhooks.create"
+msgstr "Crear webhook"
+
+msgid "dashboard.webhooks.empty.no-webhooks"
+msgstr "No hay ningún webhook aún."
+
+msgid "dashboard.webhooks.empty.add-one"
+msgstr "Pulsa el botón \"Crear webhook\" para añadir uno."
+
+msgid "dashboard.webhooks.content-type"
+msgstr "Tipo de contenido"
+
+msgid "dashboard.webhooks.active"
+msgstr "Activo"
+
+msgid "dashboard.webhooks.active.explain"
+msgstr "Cuando se active este webhook se enviarán detalles del evento"
+
+msgid "webhooks.last-delivery.success"
+msgstr "El último envío fue correcto."
+
+msgid "dashboard.webhooks.update.success"
+msgstr "Webhook modificado con éxito"
+
+msgid "dashboard.webhooks.create.success"
+msgstr "Webhook creado con éxito"
+
+msgid "errors.webhooks.timeout"
+msgstr "Timeout"
+
+msgid "errors.webhooks.unexpected"
+msgstr "Error inesperado al validar"
+
+msgid "errors.webhooks.connection"
+msgstr "Error de conexion, la url no es alcanzable"
+
+msgid "errors.webhooks.last-delivery"
+msgstr "Hubo un problema en el último envío."
+
+msgid "errors.webhooks.ssl-validation"
+msgstr "Error en la validación SSL."
+
+msgid "errors.webhooks.unexpected-status"
+msgstr "Estado inesperado %s"
+
+msgid "errors.webhooks.invalid-uri"
+msgstr "La URL no pasa la validación."
+
 #: src/app/main/ui/alert.cljs
 msgid "ds.alert-ok"
 msgstr "Ok"
@@ -766,6 +817,10 @@ msgstr "Este fichero ya se ha usado con los Componentes V2 activados."
 #: src/app/main/ui/settings/change_email.cljs
 msgid "errors.email-already-exists"
 msgstr "Este correo ya está en uso"
+
+#: src/app/main/ui/auth/register.cljs, src/app/main/ui/auth/login.cljs, src/app/main/ui/auth/recovery_request.cljs
+msgid "errors.email-invalid"
+msgstr "Por favor, escribe un email válido"
 
 #: src/app/main/ui/auth/verify_token.cljs
 msgid "errors.email-already-validated"
@@ -1176,6 +1231,15 @@ msgstr "Texto"
 msgid "handoff.tabs.info"
 msgstr "Información"
 
+msgid "handoff.empty.select"
+msgstr "Elige una forma, tablero o grupo para inspeccionar sus propiedades y código"
+
+msgid "handoff.empty.help"
+msgstr "Si quieres saber más sobre la inspección puedes visitar el centro de ayuda de Penpot"
+
+msgid "handoff.empty.more-info"
+msgstr "Más información sobre la inspección"
+
 msgid "history.alert-message"
 msgstr "Estás viendo la versión %s"
 
@@ -1545,6 +1609,10 @@ msgstr "Renombra el equipo"
 msgid "labels.resend-invitation"
 msgstr "Reenviar invitacion"
 
+#: src/app/main/ui/dashboard/team.cljs
+msgid "labels.copy-invitation-link"
+msgstr "Copiar link de invitación"
+
 #: src/app/main/ui/static.cljs, src/app/main/ui/static.cljs
 msgid "labels.retry"
 msgstr "Reintentar"
@@ -1652,6 +1720,15 @@ msgstr "(tú)"
 #: src/app/main/ui/dashboard/sidebar.cljs
 msgid "labels.your-account"
 msgstr "Tu cuenta"
+
+msgid "labels.webhooks"
+msgstr "Webhooks"
+
+msgid "labels.active"
+msgstr "Activo"
+
+msgid "labels.inactive"
+msgstr "Inactivo"
 
 #: src/app/main/data/workspace/persistence.cljs, src/app/main/data/media.cljs
 msgid "media.loading"
@@ -1880,6 +1957,33 @@ msgstr "¿Seguro que quieres eliminar este integrante del equipo?"
 msgid "modals.delete-team-member-confirm.title"
 msgstr "Eliminar integrante del equipo"
 
+msgid "modals.delete-webhook.title"
+msgstr "Borrando webhook"
+
+msgid "modals.delete-webhook.message"
+msgstr "¿Seguro que quieres borrar este webhook?"
+
+msgid "modals.delete-webhook.accept"
+msgstr "Borrar webhook"
+
+msgid "modals.create-webhook.title"
+msgstr "Crear webhook"
+
+msgid "modals.create-webhook.submit-label"
+msgstr "Crear webhook"
+
+msgid "modals.create-webhook.url.label"
+msgstr "Payload URL"
+
+msgid "modals.create-webhook.url.placeholder"
+msgstr "https://example.com/postreceive"
+
+msgid "modals.edit-webhook.title"
+msgstr "Modificar webhook"
+
+msgid "modals.edit-webhook.submit-label"
+msgstr "Modificar webhook"
+
 #: src/app/main/ui/dashboard/team.cljs
 msgid "modals.invite-member-confirm.accept"
 msgstr "Enviar invitacion"
@@ -2074,6 +2178,11 @@ msgstr "Actualizar un componente en biblioteca"
 #: src/app/main/ui/dashboard/team.cljs
 msgid "notifications.invitation-email-sent"
 msgstr "Invitación enviada con éxito"
+
+#: src/app/main/ui/dashboard/team.cljs
+msgid "notifications.invitation-link-copied"
+msgstr "Enlace de invitacion copiado"
+
 
 #: src/app/main/ui/settings/delete_account.cljs
 msgid "notifications.profile-deletion-not-allowed"
@@ -2817,6 +2926,9 @@ msgstr "Perfil - Penpot"
 #: src/app/main/ui/dashboard/team.cljs
 msgid "title.team-invitations"
 msgstr "Invitaciones - %s - Penpot"
+
+msgid "title.team-webhooks"
+msgstr "Webhooks - %s - Penpot"
 
 #: src/app/main/ui/dashboard/team.cljs
 msgid "title.team-members"

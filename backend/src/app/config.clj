@@ -100,6 +100,7 @@
 (s/def ::telemetry-enabled ::us/boolean)
 
 (s/def ::audit-log-archive-uri ::us/string)
+(s/def ::audit-log-http-handler-concurrency ::us/integer)
 
 (s/def ::admins ::us/set-of-strings)
 (s/def ::file-change-snapshot-every ::us/integer)
@@ -107,7 +108,9 @@
 
 (s/def ::default-executor-parallelism ::us/integer)
 (s/def ::scheduled-executor-parallelism ::us/integer)
-(s/def ::worker-parallelism ::us/integer)
+
+(s/def ::worker-default-parallelism ::us/integer)
+(s/def ::worker-webhook-parallelism ::us/integer)
 
 (s/def ::authenticated-cookie-domain ::us/string)
 (s/def ::authenticated-cookie-name ::us/string)
@@ -205,6 +208,7 @@
                    ::admins
                    ::allow-demo-users
                    ::audit-log-archive-uri
+                   ::audit-log-http-handler-concurrency
                    ::auth-token-cookie-name
                    ::auth-token-cookie-max-age
                    ::authenticated-cookie-name
@@ -220,7 +224,8 @@
                    ::error-report-webhook
                    ::default-executor-parallelism
                    ::scheduled-executor-parallelism
-                   ::worker-parallelism
+                   ::worker-default-parallelism
+                   ::worker-webhook-parallelism
                    ::file-change-snapshot-every
                    ::file-change-snapshot-timeout
                    ::user-feedback-destination
@@ -340,7 +345,8 @@
       (when (ex/ex-info? e)
         (println ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;")
         (println "Error on validating configuration:")
-        (println (us/pretty-explain (ex-data e)))
+        (println (some-> e ex-data ex/explain))
+        (println (ex/explain (ex-data e)))
         (println ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;"))
       (throw e))))
 

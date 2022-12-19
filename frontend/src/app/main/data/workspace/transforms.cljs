@@ -28,6 +28,7 @@
    [app.main.data.workspace.undo :as dwu]
    [app.main.snap :as snap]
    [app.main.streams :as ms]
+   [app.util.dom :as dom]
    [beicon.core :as rx]
    [cljs.spec.alpha :as s]
    [potok.core :as ptk]))
@@ -102,7 +103,7 @@
 (defn start-resize
   "Enter mouse resize mode, until mouse button is released."
   [handler ids shape]
-  (letfn [(resize [shape objects initial layout [point lock? center? point-snap]]
+  (letfn [(resize [shape initial layout [point lock? center? point-snap]]
             (let [{:keys [width height]} (:selrect shape)
                   {:keys [rotation]} shape
 
@@ -168,22 +169,11 @@
 
                   ;; When the horizontal/vertical scale a flex children with auto/fill
                   ;; we change it too fixed
-                  layout? (ctl/layout? shape)
-                  layout-child? (ctl/layout-child? objects shape)
-                  auto-width? (ctl/auto-width? shape)
-                  fill-width? (ctl/fill-width? shape)
-                  auto-height? (ctl/auto-height? shape)
-                  fill-height? (ctl/fill-height? shape)
-
                   set-fix-width?
-                  (and (not (mth/close? (:x scalev) 1))
-                       (or (and (or layout? layout-child?) auto-width?)
-                           (and layout-child? fill-width?)))
+                  (not (mth/close? (:x scalev) 1))
 
                   set-fix-height?
-                  (and (not (mth/close? (:y scalev) 1))
-                       (or (and (or layout? layout-child?) auto-height?)
-                           (and layout-child? fill-height?)))
+                  (not (mth/close? (:y scalev) 1))
 
                   modifiers
                   (-> (ctm/empty)
@@ -192,10 +182,10 @@
                       (ctm/resize scalev resize-origin shape-transform shape-transform-inverse)
 
                       (cond-> set-fix-width?
-                        (ctm/change-property :layout-item-h-sizing :fix))
+                        (ctm/change-parent-property :layout-item-h-sizing :fix))
 
                       (cond-> set-fix-height?
-                        (ctm/change-property :layout-item-v-sizing :fix))
+                        (ctm/change-parent-property :layout-item-v-sizing :fix))
 
                       (cond-> scale-text
                         (ctm/scale-content (:x scalev))))
@@ -233,7 +223,7 @@
                 (rx/switch-map (fn [[point _ _ :as current]]
                                  (->> (snap/closest-snap-point page-id resizing-shapes objects layout zoom focus point)
                                       (rx/map #(conj current %)))))
-                (rx/mapcat (partial resize shape objects initial-position layout))
+                (rx/mapcat (partial resize shape initial-position layout))
                 (rx/take-until stoper))
            (rx/of (dwm/apply-modifiers)
                   (finish-transform))))))))
@@ -415,6 +405,14 @@
            (rx/take 1)
            (rx/map #(start-move from-position))))))
 
+(defn set-ghost-displacement
+  [move-vector]
+  (ptk/reify ::set-ghost-displacement
+    ptk/EffectEvent
+    (effect [_ _ _]
+      (when-let [node (dom/get-element-by-class "ghost-outline")]
+        (dom/set-property! node "transform" (gmt/translate-matrix move-vector))))))
+
 (defn- start-move
   ([from-position] (start-move from-position nil))
   ([from-position ids]
@@ -501,6 +499,9 @@
                           (dwm/build-change-frame-modifiers objects selected target-frame drop-index)
                           (dwm/set-modifiers)))))
 
+              (->> move-stream
+                   (rx/map (comp set-ghost-displacement first)))
+
               ;; Last event will write the modifiers creating the changes
               (->> move-stream
                    (rx/last)
@@ -508,10 +509,10 @@
                     (fn [[_ target-frame drop-index]]
                       (let [undo-id (uuid/next)]
                         (rx/of (dwu/start-undo-transaction undo-id)
-                             (move-shapes-to-frame ids target-frame drop-index)
-                             (dwm/apply-modifiers {:undo-transation? false})
-                             (finish-transform)
-                             (dwu/commit-undo-transaction undo-id))))))))))))))
+                               (move-shapes-to-frame ids target-frame drop-index)
+                               (dwm/apply-modifiers {:undo-transation? false})
+                               (finish-transform)
+                               (dwu/commit-undo-transaction undo-id))))))))))))))
 
 (s/def ::direction #{:up :down :right :left})
 
@@ -631,8 +632,10 @@
                   (recursive-find-empty-parents parents))))
 
             empty-parents
-            ;; Any parent whose children are moved should be deleted
-            (into (d/ordered-set) (find-all-empty-parents #{}))
+            ;; Any empty parent whose children are moved to another frame should be deleted
+            (if (empty? moving-shapes)
+              #{}
+              (into (d/ordered-set) (find-all-empty-parents #{})))
 
             changes
             (-> (pcb/empty-changes it page-id)

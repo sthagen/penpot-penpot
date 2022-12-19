@@ -6,7 +6,6 @@
 
 (ns app.common.geom.shapes.flex-layout.modifiers
   (:require
-   [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes.flex-layout.positions :as fpo]
    [app.common.geom.shapes.points :as gpo]
@@ -14,36 +13,11 @@
    [app.common.types.modifiers :as ctm]
    [app.common.types.shape.layout :as ctl]))
 
-(defn normalize-child-modifiers
-  "Apply the modifiers and then normalized them against the parent coordinates"
-  [modifiers {:keys [transform transform-inverse] :as parent} child-bounds parent-bounds transformed-parent-bounds]
-
-  (let [transformed-child-bounds (gtr/transform-bounds child-bounds modifiers)
-
-        child-bb-before (gpo/parent-coords-bounds child-bounds parent-bounds)
-        child-bb-after  (gpo/parent-coords-bounds transformed-child-bounds transformed-parent-bounds)
-
-        scale-x (/ (gpo/width-points child-bb-before) (gpo/width-points child-bb-after))
-        scale-y (/ (gpo/height-points child-bb-before) (gpo/height-points child-bb-after))
-
-        resize-vector (gpt/point scale-x scale-y)
-        modif-transform (or (ctm/modifiers->transform modifiers) (gmt/matrix))
-        modif-transform-inverse (gmt/inverse modif-transform)
-        resize-transform (gmt/multiply modif-transform transform)
-        resize-transform-inverse (gmt/multiply transform-inverse modif-transform-inverse)
-        resize-origin (gpo/origin transformed-child-bounds)]
-
-    (-> modifiers
-        (ctm/select-child)
-        (ctm/resize
-         resize-vector
-         resize-origin
-         resize-transform
-         resize-transform-inverse))))
-
 (defn calc-fill-width-data
   "Calculates the size and modifiers for the width of an auto-fill child"
-  [{:keys [transform transform-inverse] :as parent}
+  [parent
+   transform
+   transform-inverse
    child
    child-origin child-width
    {:keys [children-data line-width] :as layout-data}]
@@ -65,7 +39,8 @@
 
 (defn calc-fill-height-data
   "Calculates the size and modifiers for the height of an auto-fill child"
-  [{:keys [transform transform-inverse] :as parent}
+  [parent
+   transform transform-inverse
    child
    child-origin child-height
    {:keys [children-data line-height] :as layout-data}]
@@ -87,13 +62,17 @@
 
 (defn layout-child-modifiers
   "Calculates the modifiers for the layout"
-  [parent child child-bounds layout-line]
+  [parent parent-bounds child child-bounds layout-line]
   (let [child-origin (gpo/origin child-bounds)
         child-width  (gpo/width-points child-bounds)
         child-height (gpo/height-points child-bounds)
 
-        fill-width   (when (ctl/fill-width? child)  (calc-fill-width-data parent child child-origin child-width layout-line))
-        fill-height  (when (ctl/fill-height? child) (calc-fill-height-data parent child child-origin child-height layout-line))
+        [_ transform transform-inverse]
+        (when (or (ctl/fill-width? child) (ctl/fill-width? child))
+          (gtr/calculate-geometry @parent-bounds))
+
+        fill-width   (when (ctl/fill-width? child)  (calc-fill-width-data parent transform transform-inverse child child-origin child-width layout-line))
+        fill-height  (when (ctl/fill-height? child) (calc-fill-height-data parent transform transform-inverse child child-origin child-height layout-line))
 
         child-width (or (:width fill-width) child-width)
         child-height (or (:height fill-height) child-height)
@@ -107,5 +86,4 @@
             (cond-> fill-width (ctm/add-modifiers (:modifiers fill-width)))
             (cond-> fill-height (ctm/add-modifiers (:modifiers fill-height)))
             (ctm/move move-vec))]
-
     [modifiers layout-line]))

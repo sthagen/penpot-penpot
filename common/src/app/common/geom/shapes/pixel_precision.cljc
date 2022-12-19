@@ -12,15 +12,18 @@
    [app.common.geom.shapes.common :as gco]
    [app.common.geom.shapes.points :as gpo]
    [app.common.geom.shapes.rect :as gpr]
+   [app.common.geom.shapes.transforms :as gtr]
    [app.common.math :as mth]
    [app.common.pages.helpers :as cph]
    [app.common.types.modifiers :as ctm]))
 
 (defn size-pixel-precision
-  [modifiers {:keys [transform transform-inverse] :as shape} points]
+  [modifiers shape points]
   (let [origin        (gpo/origin points)
         curr-width    (gpo/width-points points)
         curr-height   (gpo/height-points points)
+
+        [_ transform transform-inverse] (gtr/calculate-geometry points)
 
         path?            (cph/path-shape? shape)
         vertical-line?   (and path? (<= curr-width 0.01))
@@ -32,6 +35,7 @@
         ratio-width  (/ target-width curr-width)
         ratio-height (/ target-height curr-height)
         scalev       (gpt/point ratio-width ratio-height)]
+
     (-> modifiers
         (ctm/resize scalev origin transform transform-inverse))))
 
@@ -41,7 +45,6 @@
         corner        (gpt/point bounds)
         target-corner (gpt/round corner)
         deltav        (gpt/to-vec corner target-corner)]
-
     (ctm/move modifiers deltav)))
 
 (defn set-pixel-precision
@@ -56,8 +59,10 @@
                 has-resize? (size-pixel-precision shape points))
 
               points
-              (cond-> (:points shape)
-                has-resize? (gco/transform-points (ctm/modifiers->transform modifiers)))]
+              (if has-resize?
+                (-> (:points shape)
+                    (gco/transform-points (ctm/modifiers->transform modifiers)) )
+                points)]
           [modifiers points])]
     (position-pixel-precision modifiers shape points)))
 

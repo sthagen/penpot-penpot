@@ -10,11 +10,14 @@
    [app.common.geom.point :as gpt]
    [app.common.spec :as us]
    [app.db :as db]
+   [app.loggers.audit :as-alias audit]
+   [app.loggers.webhooks :as-alias webhooks]
    [app.rpc.commands.files :as files]
+   [app.rpc.commands.teams :as teams]
    [app.rpc.doc :as-alias doc]
-   [app.rpc.queries.teams :as teams]
-   [app.rpc.retry :as retry]
+   [app.rpc.helpers :as rph]
    [app.util.blob :as blob]
+   [app.util.retry :as rtry]
    [app.util.services :as sv]
    [app.util.time :as dt]
    [clojure.spec.alpha :as s]))
@@ -43,6 +46,7 @@
          #(or (:file-id %) (:team-id %))))
 
 (sv/defmethod ::get-comment-threads
+  {::doc/added "1.15"}
   [{:keys [pool] :as cfg} params]
   (with-open [conn (db/open pool)]
     (retrieve-comment-threads conn params)))
@@ -84,6 +88,7 @@
   (s/keys :req-un [::profile-id ::team-id]))
 
 (sv/defmethod ::get-unread-comment-threads
+  {::doc/added "1.15"}
   [{:keys [pool] :as cfg} {:keys [profile-id team-id] :as params}]
   (with-open [conn (db/open pool)]
     (teams/check-read-permissions! conn profile-id team-id)
@@ -131,6 +136,7 @@
           :opt-un [::share-id]))
 
 (sv/defmethod ::get-comment-thread
+  {::doc/added "1.15"}
   [{:keys [pool] :as cfg} {:keys [profile-id file-id id share-id] :as params}]
   (with-open [conn (db/open pool)]
     (files/check-comment-permissions! conn profile-id file-id share-id)
@@ -158,6 +164,7 @@
           :opt-un [::share-id]))
 
 (sv/defmethod ::get-comments
+  {::doc/added "1.15"}
   [{:keys [pool] :as cfg} {:keys [profile-id thread-id share-id] :as params}]
   (with-open [conn (db/open pool)]
     (let [thread (db/get-by-id conn :comment-thread thread-id)]
@@ -243,13 +250,16 @@
           :opt-un [::share-id]))
 
 (sv/defmethod ::create-comment-thread
-  {::retry/max-retries 3
-   ::retry/matches retry/conflict-db-insert?
-   ::doc/added "1.15"}
+  {::doc/added "1.15"
+   ::webhooks/event? true}
   [{:keys [pool] :as cfg} {:keys [profile-id file-id share-id] :as params}]
   (db/with-atomic [conn pool]
     (files/check-comment-permissions! conn profile-id file-id share-id)
-    (create-comment-thread conn params)))
+
+    (rtry/with-retry {::rtry/when rtry/conflict-exception?
+                      ::rtry/max-retries 3
+                      ::rtry/label "create-comment-thread"}
+      (create-comment-thread conn params))))
 
 (defn- retrieve-next-seqn
   [conn file-id]
@@ -364,7 +374,8 @@
           :opt-un [::share-id]))
 
 (sv/defmethod ::create-comment
-  {::doc/added "1.15"}
+  {::doc/added "1.15"
+   ::webhooks/event? true}
   [{:keys [pool] :as cfg} params]
   (db/with-atomic [conn pool]
     (create-comment conn params)))
@@ -417,7 +428,9 @@
       (upsert-comment-thread-status! conn profile-id thread-id)
 
       ;; Return the created comment object.
-      comment)))
+      (rph/with-meta comment
+        {::audit/props {:file-id (:file-id thread)
+                        :share-id nil}}))))
 
 ;; --- COMMAND: Update Comment
 
@@ -529,4 +542,3 @@
                    :frame-id frame-id}
                   {:id (:id thread)})
       nil)))
-
