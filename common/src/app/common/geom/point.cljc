@@ -13,6 +13,7 @@
       :clj [clojure.core :as c])
    [app.common.data :as d]
    [app.common.data.macros :as dm]
+   [app.common.exceptions :as ex]
    [app.common.math :as mth]
    [app.common.spec :as us]
    [clojure.spec.alpha :as s]
@@ -62,7 +63,7 @@
      (map->Point v)
 
      :else
-     (throw (ex-info "Invalid arguments" {:v v}))))
+     (ex/raise :hint "invalid arguments (on pointer constructor)" :value v)))
   ([x y]
    (Point. x y)))
 
@@ -169,8 +170,7 @@
               (dm/get-prop p2 :x))
         dy (- (dm/get-prop p1 :y)
               (dm/get-prop p2 :y))]
-    (mth/sqrt (+ (mth/pow dx 2)
-                 (mth/pow dy 2)))))
+    (mth/hypot dx dy)))
 
 (defn distance-vector
   "Calculate the distance, separated x and y."
@@ -190,8 +190,7 @@
   (assert (point? pt) "point instance expected")
   (let [x (dm/get-prop pt :x)
         y (dm/get-prop pt :y)]
-    (mth/sqrt (+ (mth/pow x 2)
-                 (mth/pow y 2)))))
+    (mth/hypot x y)))
 
 (defn angle
   "Returns the smaller angle between two vectors.

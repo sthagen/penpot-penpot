@@ -20,6 +20,7 @@
    [app.loggers.webhooks :as-alias webhooks]
    [app.metrics :as mtx]
    [app.msgbus :as mbus]
+   [app.rpc :as-alias rpc]
    [app.rpc.climit :as-alias climit]
    [app.rpc.commands.files :as files]
    [app.rpc.doc :as-alias doc]
@@ -52,7 +53,8 @@
 (s/def ::revn ::us/integer)
 (s/def ::update-file
   (s/and
-   (s/keys :req-un [::files/id ::files/profile-id ::session-id ::revn]
+   (s/keys :req [::rpc/profile-id]
+           :req-un [::files/id ::session-id ::revn]
            :opt-un [::changes ::changes-with-metadata ::features])
    (fn [o]
      (or (contains? o :changes)
@@ -130,19 +132,20 @@
    ::webhooks/batch-timeout (dt/duration "2m")
    ::webhooks/batch-key :id
    ::doc/added "1.17"}
-  [{:keys [pool] :as cfg} {:keys [id profile-id] :as params}]
+  [{:keys [pool] :as cfg} {:keys [::rpc/profile-id id] :as params}]
   (db/with-atomic [conn pool]
     (files/check-edition-permissions! conn profile-id id)
     (db/xact-lock! conn id)
 
     (let [cfg    (assoc cfg :conn conn)
+          params (assoc params :profile-id profile-id)
           tpoint (dt/tpoint)]
       (-> (update-file cfg params)
           (rph/with-defer #(let [elapsed (tpoint)]
                              (l/trace :hint "update-file" :time (dt/format-duration elapsed))))))))
 
 (defn update-file
-  [{:keys [conn metrics] :as cfg} {:keys [id profile-id changes changes-with-metadata] :as params}]
+  [{:keys [conn metrics] :as cfg} {:keys [profile-id id changes changes-with-metadata] :as params}]
   (let [file     (get-file conn id)
         features (->> (concat (:features file)
                               (:features params))
@@ -165,7 +168,18 @@
                         (->> changes-with-metadata (mapcat :changes) vec)
                         (vec changes))
 
-            params    (assoc params :file file :changes changes)]
+            params    (-> params
+                          (assoc :file file)
+                          (assoc :changes changes)
+                          (assoc ::created-at (dt/now)))]
+
+        (when (> (:revn params)
+                 (:revn file))
+          (ex/raise :type :validation
+                    :code :revn-conflict
+                    :hint "The incoming revision number is greater that stored version."
+                    :context {:incoming-revn (:revn params)
+                              :stored-revn (:revn file)}))
 
         (mtx/run! metrics {:id :update-file-changes :inc (count changes)})
 
@@ -177,24 +191,15 @@
 
         (-> (update-fn cfg params)
             (vary-meta assoc ::audit/replace-props
-                       {:id (:id file)
-                        :name (:name file)
-                        :features (:features file)
+                       {:id         (:id file)
+                        :name       (:name file)
+                        :features   (:features file)
                         :project-id (:project-id file)
                         :team-id    (:team-id file)}))))))
 
 (defn- update-file*
-  [{:keys [conn] :as cfg} {:keys [file changes session-id profile-id] :as params}]
-  (when (> (:revn params)
-           (:revn file))
-    (ex/raise :type :validation
-              :code :revn-conflict
-              :hint "The incoming revision number is greater that stored version."
-              :context {:incoming-revn (:revn params)
-                        :stored-revn (:revn file)}))
-
-  (let [ts   (dt/now)
-        file (-> file
+  [{:keys [conn] :as cfg} {:keys [profile-id file changes session-id ::created-at] :as params}]
+  (let [file (-> file
                  (update :revn inc)
                  (update :data (fn [data]
                                  (cond-> data
@@ -214,7 +219,7 @@
                 {:id (uuid/next)
                  :session-id session-id
                  :profile-id profile-id
-                 :created-at ts
+                 :created-at created-at
                  :file-id (:id file)
                  :revn (:revn file)
                  :features (db/create-array conn "text" (:features file))
@@ -226,12 +231,12 @@
                 {:revn (:revn file)
                  :data (:data file)
                  :data-backend nil
-                 :modified-at ts
+                 :modified-at created-at
                  :has-media-trimmed false}
                 {:id (:id file)})
 
     (db/update! conn :project
-                {:modified-at ts}
+                {:modified-at created-at}
                 {:id (:project-id file)})
 
     (let [params (assoc params :file file)]
@@ -262,13 +267,10 @@
     order by s.created_at asc")
 
 (defn- get-lagged-changes
-  [conn params]
-  (->> (db/exec! conn [sql:lagged-changes (:id params) (:revn params)])
-       (into [] (comp (map files/decode-row)
-                      (map (fn [row]
-                             (cond-> row
-                               (= (:revn row) (:revn (:file params)))
-                               (assoc :changes []))))))))
+  [conn {:keys [id revn] :as params}]
+  (->> (db/exec! conn [sql:lagged-changes id revn])
+       (map files/decode-row)
+       (vec)))
 
 (defn- send-notifications!
   [{:keys [conn] :as cfg} {:keys [file changes session-id] :as params}]

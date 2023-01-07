@@ -408,18 +408,21 @@
                       (not (mth/close? (:height props) current-height))))
 
            (let [modif-tree (dwm/create-modif-tree [id] (ctm/reflow-modifiers))]
-             (->> (rx/of (dwm/set-modifiers modif-tree))
-                  (rx/observe-on :async)))
+             (rx/of (dwm/update-modifiers modif-tree)))
            (rx/empty)))))))
 
 (defn clean-text-modifier
   [id]
   (ptk/reify ::clean-text-modifier
     ptk/WatchEvent
-    (watch [_ _ _]
-      (->> (rx/of #(update % :workspace-text-modifier dissoc id))
-           ;; We delay a bit the change so there is no weird transition to the user
-           (rx/delay 50)))))
+    (watch [_ state _]
+      (let [current-value (dm/get-in state [:workspace-text-modifier id])]
+        ;; We only dissocc the value when hasn't change after a time
+        (->> (rx/of (fn [state]
+                      (cond-> state
+                        (identical? (dm/get-in state [:workspace-text-modifier id]) current-value)
+                        (update :workspace-text-modifier dissoc id))))
+             (rx/delay 100))))))
 
 (defn remove-text-modifier
   [id]

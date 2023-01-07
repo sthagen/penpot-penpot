@@ -150,14 +150,15 @@
 
 (defn- bundle-fetched
   [features [{:keys [id data] :as file} thumbnails project users comments-users]]
-  (letfn [(resolve-pointer [[key pointer]]
-            (->> (rp/cmd! :get-file-fragment {:file-id id :fragment-id @pointer})
+  (letfn [(resolve-pointer [file-id [key pointer]]
+            (->> (rp/cmd! :get-file-fragment {:file-id file-id :fragment-id @pointer})
                  (rx/map :content)
                  (rx/map #(vector key %))))
-          (resolve-pointers [in-to coll]
+
+          (resolve-pointers [file-id coll]
             (->> (rx/from (seq coll))
-                 (rx/merge-map resolve-pointer)
-                 (rx/reduce conj in-to)))]
+                 (rx/merge-map (partial resolve-pointer file-id))
+                 (rx/reduce conj {})))]
 
     (ptk/reify ::bundle-fetched
       ptk/UpdateEvent
@@ -186,7 +187,7 @@
                      (rx/merge-map
                       (fn [[_ page :as kp]]
                         (if (t/pointer? page)
-                          (resolve-pointer kp)
+                          (resolve-pointer id kp)
                           (rx/of kp))))
                      (rx/merge-map
                       (fn [[id page]]
@@ -212,15 +213,17 @@
 
                          (->> data
                               (filter (comp t/pointer? val))
-                              (resolve-pointers {})
+                              (resolve-pointers id)
                               (rx/map workspace-data-pointers-loaded))
 
                          (->> (rp/cmd! :get-file-libraries {:file-id id :features features})
                               (rx/mapcat identity)
                               (rx/mapcat
-                               (fn [file]
-                                 (->> (filter (comp t/pointer? val) file)
-                                      (resolve-pointers file))))
+                               (fn [{:keys [id data] :as file}]
+                                 (->> (filter (comp t/pointer? val) data)
+                                      (resolve-pointers id)
+                                      (rx/map #(update file :data merge %)))))
+                              (rx/reduce conj [])
                               (rx/map libraries-fetched)))))))
 
                (rx/take-until stoper)))))))
@@ -693,7 +696,7 @@
         (pcb/resize-parents parents))))
 
 (defn relocate-shapes
-  [ids parent-id to-index]
+  [ids parent-id to-index & [ignore-parents?]]
   (us/verify (s/coll-of ::us/uuid) ids)
   (us/verify ::us/uuid parent-id)
   (us/verify number? to-index)
@@ -709,7 +712,9 @@
 
             ;; If we try to move a parent into a child we remove it
             ids      (filter #(not (cph/is-parent? objects parent-id %)) ids)
-            parents  (into #{parent-id} (map #(cph/get-parent-id objects %)) ids)
+            parents  (if ignore-parents?
+                       #{parent-id}
+                       (into #{parent-id} (map #(cph/get-parent-id objects %)) ids))
 
             groups-to-delete
             (loop [current-id  (first parents)
@@ -1830,6 +1835,21 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Orphan Shapes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defn fix-orphan-shapes
+  []
+  (ptk/reify ::fix-orphan-shapes
+    ptk/WatchEvent
+    (watch [_ state _]
+      (let [orphans (set (into [] (keys (wsh/find-orphan-shapes state))))]
+        (rx/of (relocate-shapes orphans uuid/zero 0 true))))))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inspect
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1841,6 +1861,26 @@
     (update [_ state]
       (assoc-in state [:workspace-local :inspect-expanded] expanded?))))
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; File Library persistent settings
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defn set-file-library-listing-thumbs
+  [listing-thumbs?]
+  (ptk/reify ::set-file-library-listing-thumbs
+    ptk/UpdateEvent
+    (update [_ state]
+      (assoc-in state [:workspace-global :file-library-listing-thumbs] listing-thumbs?))))
+
+(defn set-file-library-reverse-sort
+  [reverse-sort?]
+  (ptk/reify ::set-file-library-reverse-sort
+    ptk/UpdateEvent
+    (update [_ state]
+      (assoc-in state [:workspace-global :file-library-reverse-sort] reverse-sort?))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Exports

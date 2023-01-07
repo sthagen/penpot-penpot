@@ -380,25 +380,24 @@
                                         (dwsl/create-layout-from-selection :flex)))
         remove-flex        #(st/emit! (dwsl/remove-layout ids))]
     (cond
-      (or (not single?) (and is-frame? (not is-flex-container?)) is-group?)
+      (or single? (and is-frame? (not is-flex-container?)) is-group?)
       [:*
        [:& menu-separator]
        [:& menu-entry {:title (tr "workspace.shape.menu.add-flex")
-                       :shortcut (sc/get-tooltip :toogle-layout-flex)
+                       :shortcut (sc/get-tooltip :toggle-layout-flex)
                        :on-click add-flex}]]
 
       is-flex-container?
       [:*
        [:& menu-separator]
        [:& menu-entry {:title (tr "workspace.shape.menu.remove-flex")
-                       :shortcut (sc/get-tooltip :toogle-layout-flex)
+                       :shortcut (sc/get-tooltip :toggle-layout-flex)
                        :on-click remove-flex}]])))
 
 (mf/defc context-menu-component
   [{:keys [shapes]}]
   (let [single?             (= (count shapes) 1)
 
-        has-frame?          (->> shapes (d/seek cph/frame-shape?))
         has-component?      (some true? (map #(contains? % :component-id) shapes))
         is-component?       (and single? (-> shapes first :component-id some?))
 
@@ -454,19 +453,18 @@
                                        :accept-style :primary
                                        :on-accept do-update-component-in-bulk}))]
     [:*
-     (when (not has-frame?)
-       [:*
-        [:& menu-separator]
-        [:& menu-entry {:title (tr "workspace.shape.menu.create-component")
-                        :shortcut (sc/get-tooltip :create-component)
-                        :on-click do-add-component}]
-        (when (and has-component? (not single?))
-          [:*
-           [:& menu-entry {:title (tr "workspace.shape.menu.detach-instances-in-bulk")
-                           :shortcut (sc/get-tooltip :detach-component)
-                           :on-click do-detach-component-in-bulk}]
-           [:& menu-entry {:title (tr "workspace.shape.menu.update-components-in-bulk")
-                           :on-click do-update-in-bulk}]])])
+     [:*
+      [:& menu-separator]
+      [:& menu-entry {:title (tr "workspace.shape.menu.create-component")
+                      :shortcut (sc/get-tooltip :create-component)
+                      :on-click do-add-component}]
+      (when (and has-component? (not single?))
+        [:*
+         [:& menu-entry {:title (tr "workspace.shape.menu.detach-instances-in-bulk")
+                         :shortcut (sc/get-tooltip :detach-component)
+                         :on-click do-detach-component-in-bulk}]
+         [:& menu-entry {:title (tr "workspace.shape.menu.update-components-in-bulk")
+                         :on-click do-update-in-bulk}]])]
 
      (when is-component?
        ;; WARNING: this menu is the same as the context menu at the sidebar.

@@ -26,7 +26,7 @@
    [app.rpc.rlimit :as rlimit]
    [app.storage :as-alias sto]
    [app.util.services :as sv]
-   [app.util.time :as ts]
+   [app.util.time :as dt]
    [app.worker :as-alias wrk]
    [clojure.spec.alpha :as s]
    [integrant.core :as ig]
@@ -34,6 +34,8 @@
    [promesa.exec :as px]
    [yetti.request :as yrq]
    [yetti.response :as yrs]))
+
+(s/def ::profile-id ::us/uuid)
 
 (defn- default-handler
   [_]
@@ -72,8 +74,11 @@
   (let [type   (keyword (:type params))
         data   (into {::http/request request} params)
         data   (if profile-id
-                 (assoc data :profile-id profile-id ::session-id session-id)
-                 (dissoc data :profile-id))
+                 (assoc data
+                        :profile-id profile-id
+                        ::profile-id profile-id
+                        ::session-id session-id)
+                 (dissoc data :profile-id ::profile-id))
         method (get methods type default-handler)]
 
     (-> (method data)
@@ -90,8 +95,11 @@
   (let [type   (keyword (:type params))
         data   (into {::http/request request} params)
         data   (if profile-id
-                 (assoc data :profile-id profile-id ::session-id session-id)
-                 (dissoc data :profile-id))
+                 (assoc data
+                        :profile-id profile-id
+                        ::profile-id profile-id
+                        ::session-id session-id)
+                 (dissoc data :profile-id ::profile-id))
 
         method (get methods type default-handler)]
     (-> (method data)
@@ -107,11 +115,12 @@
   [methods {:keys [profile-id session-id params] :as request} respond raise]
   (let [cmd    (keyword (:type params))
         etag   (yrq/get-header request "if-none-match")
-        data   (into {::http/request request ::cond/key etag} params)
+        data   (into {::request-at (dt/now)
+                      ::http/request request
+                      ::cond/key etag} params)
         data   (if profile-id
-                 (assoc data :profile-id profile-id ::session-id session-id)
-                 (dissoc data :profile-id))
-
+                 (assoc data ::profile-id profile-id ::session-id session-id)
+                 (dissoc data ::profile-id))
         method (get methods cmd default-handler)]
     (binding [cond/*enabled* true]
       (-> (method data)
@@ -126,7 +135,7 @@
   [{:keys [metrics ::metrics-id]} f mdata]
   (let [labels (into-array String [(::sv/name mdata)])]
     (fn [cfg params]
-      (let [tp (ts/tpoint)]
+      (let [tp (dt/tpoint)]
         (p/finally
           (f cfg params)
           (fn [_ _]
@@ -152,9 +161,12 @@
     (letfn [(handle-audit [params result]
               (let [resultm    (meta result)
                     request    (::http/request params)
+
                     profile-id (or (::audit/profile-id resultm)
                                    (:profile-id result)
-                                   (:profile-id params)
+                                   (if (= (::type cfg) "command")
+                                     (::profile-id params)
+                                     (:profile-id params))
                                    uuid/zero)
 
                     props      (-> (or (::audit/replace-props resultm)
@@ -209,21 +221,24 @@
                 (wrap-audit cfg $ mdata))
 
         spec  (or (::sv/spec mdata) (s/spec any?))
-        auth? (:auth mdata true)]
+        auth? (::auth mdata true)]
+
 
     (l/debug :hint "register method" :name (::sv/name mdata))
     (with-meta
       (fn [params]
         ;; Raise authentication error when rpc method requires auth but
         ;; no profile-id is found in the request.
-
-        (p/do!
-         (if (and auth? (not (uuid? (:profile-id params))))
-           (ex/raise :type :authentication
-                     :code :authentication-required
-                     :hint "authentication required for this endpoint")
-           (let [params (us/conform spec params)]
-             (f cfg params)))))
+        (let [profile-id (if (= "command" (::type cfg))
+                           (::profile-id params)
+                           (:profile-id params))]
+          (p/do!
+           (if (and auth? (not (uuid? profile-id)))
+             (ex/raise :type :authentication
+                       :code :authentication-required
+                       :hint "authentication required for this endpoint")
+             (let [params (us/conform spec params)]
+               (f cfg params))))))
       mdata)))
 
 (defn- process-method
@@ -262,6 +277,7 @@
   (let [cfg (assoc cfg ::type "command" ::metrics-id :rpc-command-timing)]
     (->> (sv/scan-ns 'app.rpc.commands.binfile
                      'app.rpc.commands.comments
+                     'app.rpc.commands.profile
                      'app.rpc.commands.management
                      'app.rpc.commands.verify-token
                      'app.rpc.commands.search

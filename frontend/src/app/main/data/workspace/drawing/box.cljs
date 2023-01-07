@@ -37,19 +37,21 @@
       (assoc :x (- (:x point) (* sx (- dy dx)))))))
 
 (defn resize-shape [{:keys [x y width height] :as shape} initial point lock?]
-  (let [draw-rect (gsh/make-rect initial (cond-> point lock? (adjust-ratio initial)))
-        shape-rect (gsh/make-rect x y width height)
+  (if (and (some? x) (some? y) (some? width) (some? height))
+    (let [draw-rect (gsh/make-rect initial (cond-> point lock? (adjust-ratio initial)))
+          shape-rect (gsh/make-rect x y width height)
 
-        scalev (gpt/point (/ (:width draw-rect) (:width shape-rect))
-                          (/ (:height draw-rect) (:height shape-rect)))
+          scalev (gpt/point (/ (:width draw-rect) (:width shape-rect))
+                            (/ (:height draw-rect) (:height shape-rect)))
 
-        movev (gpt/to-vec (gpt/point shape-rect) (gpt/point draw-rect))]
+          movev (gpt/to-vec (gpt/point shape-rect) (gpt/point draw-rect))]
 
-    (-> shape
-        (assoc :click-draw? false)
-        (gsh/transform-shape (-> (ctm/empty)
-                                 (ctm/resize scalev (gpt/point x y))
-                                 (ctm/move movev))))))
+      (-> shape
+          (assoc :click-draw? false)
+          (gsh/transform-shape (-> (ctm/empty)
+                                   (ctm/resize scalev (gpt/point x y))
+                                   (ctm/move movev)))))
+    shape))
 
 (defn update-drawing [state initial point lock?]
   (update-in state [:workspace-drawing :object] resize-shape initial point lock?))
@@ -94,19 +96,22 @@
          (rx/of #(assoc-in state [:workspace-drawing :object] shape))
 
          ;; Initial SNAP
-         (->> (snap/closest-snap-point page-id [shape] objects layout zoom focus initial)
-              (rx/map move-drawing))
+         (->>
+          (rx/concat
+           (->> (snap/closest-snap-point page-id [shape] objects layout zoom focus initial)
+                (rx/map move-drawing))
 
-         (->> ms/mouse-position
-              (rx/filter #(> (gpt/distance % initial) (/ 2 zoom)))
-              (rx/with-latest vector ms/mouse-position-shift)
-              (rx/switch-map
-               (fn [[point :as current]]
-                 (->> (snap/closest-snap-point page-id [shape] objects layout zoom focus point)
-                      (rx/map #(conj current %)))))
-              (rx/map
-               (fn [[_ shift? point]]
-                 #(update-drawing % initial (cond-> point snap-pixel? gpt/round) shift?)))
+           (->> ms/mouse-position
+                (rx/filter #(> (gpt/distance % initial) (/ 2 zoom)))
+                (rx/with-latest vector ms/mouse-position-shift)
+                (rx/switch-map
+                 (fn [[point :as current]]
+                   (->> (snap/closest-snap-point page-id [shape] objects layout zoom focus point)
+                        (rx/map #(conj current %)))))
+                (rx/map
+                 (fn [[_ shift? point]]
+                   #(update-drawing % initial (cond-> point snap-pixel? gpt/round) shift?)))))
+          (rx/take-until stoper))
 
-              (rx/take-until stoper))
-         (rx/of (common/handle-finish-drawing)))))))
+         (->> (rx/of (common/handle-finish-drawing))
+              (rx/delay 100)))))))

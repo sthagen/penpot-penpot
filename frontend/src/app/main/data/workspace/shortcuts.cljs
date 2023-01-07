@@ -214,10 +214,10 @@
                           :subsections [:modify-layers]
                           :fn #(emit-when-no-readonly (dws/create-artboard-from-selection))}
 
-   :toogle-layout-flex   {:tooltip (ds/shift "F")
-                          :command "shift+f"
+   :toggle-layout-flex   {:tooltip (ds/shift "A")
+                          :command "shift+a"
                           :subsections [:modify-layers]
-                          :fn #(emit-when-no-readonly (dwsl/toogle-layout-flex))}
+                          :fn #(emit-when-no-readonly (dwsl/toggle-layout-flex))}
 
    ;; TOOLS
 
@@ -468,10 +468,10 @@
                           :subsections [:navigation-workspace]
                           :fn #(st/emit! (dw/go-to-viewer))}
 
-   :open-handoff         {:tooltip "G H"
-                          :command "g h"
+   :open-inspect         {:tooltip "G I"
+                          :command "g i"
                           :subsections [:navigation-workspace]
-                          :fn #(st/emit! (dw/go-to-viewer {:section :handoff}))}
+                          :fn #(st/emit! (dw/go-to-viewer {:section :inspect}))}
 
    :open-comments        {:tooltip "G C"
                           :command "g c"

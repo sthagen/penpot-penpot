@@ -68,7 +68,7 @@
         [:a {:on-click go-settings} (tr "labels.settings")]]]]
      [:div.dashboard-buttons
       (if (and (or invitations-section? members-section?) (:is-admin permissions))
-        [:a.btn-primary.btn-small {:on-click invite-member :data-test "invite-member"}
+        [:a.btn-secondary.btn-small {:on-click invite-member :data-test "invite-member"}
          (tr "dashboard.invite-profile")]
         [:div.blank-space])]]))
 
@@ -517,7 +517,6 @@
            (let [params (with-meta {:email email :team-id team-id}
                           {:on-success on-copy-success
                            :on-error on-error})]
-             (prn "KKK1")
              (st/emit!
               (-> (dd/copy-invitation-link params)
                   (with-meta {::ev/origin :team}))))))]
@@ -694,7 +693,6 @@
         on-submit
         (mf/use-fn
          (fn [form]
-           (prn @form)
            (let [data (:clean-data @form)]
              (if (:id data)
                (on-update-submit form)

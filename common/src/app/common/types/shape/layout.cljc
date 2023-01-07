@@ -100,15 +100,13 @@
    (and (= :frame (:type shape)) (= :flex (:layout shape)))))
 
 (defn layout-child? [objects shape]
-  (let [parent-id (:parent-id shape)
-        parent (get objects parent-id)]
-    (layout? parent)))
+  (let [frame-id (:frame-id shape)
+        frame (get objects frame-id)]
+    (layout? frame)))
 
 (defn layout-child-id? [objects id]
-  (let [shape (get objects id)
-        parent-id (:parent-id shape)
-        parent (get objects parent-id)]
-    (layout? parent)))
+  (let [shape (get objects id)]
+    (layout-child? objects shape)))
 
 (defn inside-layout?
   "Check if the shape is inside a layout"
@@ -193,7 +191,7 @@
         m4 (or m4 0)]
     (if (= layout-item-margin-type :multiple)
       [m1 m2 m3 m4]
-      [m1 m1 m1 m1])))
+      [m1 m2 m1 m2])))
 
 (defn child-height-margin
   [child]

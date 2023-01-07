@@ -736,6 +736,13 @@
         width: 50px;
         margin-bottom: $size-4;
       }
+
+      & svg#loader-pencil {
+        fill: $color-gray-20;
+        height: 75px;
+        width: 75px;
+        margin-bottom: $size-4;
+      }
     }
 
     .libraries-search {
@@ -1472,6 +1479,13 @@
         display: grid;
         grid-template-columns: 1fr auto;
         gap: 8px;
+        .btn-large {
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .btn-primary {
+          max-width: 250px;
+        }
       }
     }
     .skip-action {

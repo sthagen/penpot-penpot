@@ -102,9 +102,12 @@
 (s/def ::audit-log-archive-uri ::us/string)
 (s/def ::audit-log-http-handler-concurrency ::us/integer)
 
-(s/def ::admins ::us/set-of-strings)
+(s/def ::admins ::us/set-of-valid-emails)
 (s/def ::file-change-snapshot-every ::us/integer)
 (s/def ::file-change-snapshot-timeout ::dt/duration)
+
+(s/def ::setup-admin-email ::us/email)
+(s/def ::setup-admin-password ::us/not-empty-string)
 
 (s/def ::default-executor-parallelism ::us/integer)
 (s/def ::scheduled-executor-parallelism ::us/integer)
@@ -126,6 +129,16 @@
 (s/def ::database-readonly ::us/boolean)
 (s/def ::database-min-pool-size ::us/integer)
 (s/def ::database-max-pool-size ::us/integer)
+
+(s/def ::quotes-teams-per-profile ::us/integer)
+(s/def ::quotes-projects-per-team ::us/integer)
+(s/def ::quotes-invitations-per-team ::us/integer)
+(s/def ::quotes-profiles-per-team ::us/integer)
+(s/def ::quotes-files-per-project ::us/integer)
+(s/def ::quotes-files-per-team ::us/integer)
+(s/def ::quotes-font-variants-per-team ::us/integer)
+(s/def ::quotes-comment-threads-per-file ::us/integer)
+(s/def ::quotes-comments-per-file ::us/integer)
 
 (s/def ::default-blob-version ::us/integer)
 (s/def ::error-report-webhook ::us/string)
@@ -189,15 +202,10 @@
 (s/def ::srepl-host ::us/string)
 (s/def ::srepl-port ::us/integer)
 (s/def ::assets-storage-backend ::us/keyword)
-(s/def ::fdata-storage-backend ::us/keyword)
 (s/def ::storage-assets-fs-directory ::us/string)
 (s/def ::storage-assets-s3-bucket ::us/string)
 (s/def ::storage-assets-s3-region ::us/keyword)
 (s/def ::storage-assets-s3-endpoint ::us/string)
-(s/def ::storage-fdata-s3-bucket ::us/string)
-(s/def ::storage-fdata-s3-region ::us/keyword)
-(s/def ::storage-fdata-s3-prefix ::us/string)
-(s/def ::storage-fdata-s3-endpoint ::us/string)
 (s/def ::telemetry-uri ::us/string)
 (s/def ::telemetry-with-taiga ::us/boolean)
 (s/def ::tenant ::us/string)
@@ -274,6 +282,17 @@
                    ::profile-complaint-max-age
                    ::profile-complaint-threshold
                    ::public-uri
+
+                   ::quotes-teams-per-profile
+                   ::quotes-projects-per-team
+                   ::quotes-invitations-per-team
+                   ::quotes-profiles-per-team
+                   ::quotes-files-per-project
+                   ::quotes-files-per-team
+                   ::quotes-font-variants-per-team
+                   ::quotes-comment-threads-per-file
+                   ::quotes-comments-per-file
+
                    ::redis-uri
                    ::registration-domain-whitelist
                    ::rpc-rlimit-config
@@ -295,16 +314,14 @@
                    ::srepl-host
                    ::srepl-port
 
+                   ::setup-admin-email
+                   ::setup-admin-password
+
                    ::assets-storage-backend
                    ::storage-assets-fs-directory
                    ::storage-assets-s3-bucket
                    ::storage-assets-s3-region
                    ::storage-assets-s3-endpoint
-                   ::fdata-storage-backend
-                   ::storage-fdata-s3-bucket
-                   ::storage-fdata-s3-region
-                   ::storage-fdata-s3-prefix
-                   ::storage-fdata-s3-endpoint
                    ::telemetry-enabled
                    ::telemetry-uri
                    ::telemetry-referer
@@ -315,7 +332,8 @@
   [:enable-backend-api-doc
    :enable-backend-worker
    :enable-secure-session-cookies
-   :enable-email-verification])
+   :enable-email-verification
+   :enable-quotes])
 
 (defn- parse-flags
   [config]

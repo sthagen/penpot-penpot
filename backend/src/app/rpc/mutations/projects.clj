@@ -14,6 +14,7 @@
    [app.rpc.doc :as-alias doc]
    [app.rpc.helpers :as rph]
    [app.rpc.queries.projects :as proj]
+   [app.rpc.quotes :as quotes]
    [app.util.services :as sv]
    [app.util.time :as dt]
    [clojure.spec.alpha :as s]))
@@ -26,8 +27,6 @@
 
 ;; --- Mutation: Create Project
 
-(declare create-project-profile-state)
-
 (s/def ::team-id ::us/uuid)
 (s/def ::create-project
   (s/keys :req-un [::profile-id ::team-id ::name]
@@ -39,21 +38,20 @@
   [{:keys [pool] :as cfg} {:keys [profile-id team-id] :as params}]
   (db/with-atomic [conn pool]
     (teams/check-edition-permissions! conn profile-id team-id)
-    (let [project (teams/create-project conn params)
-          params  (assoc params
-                         :project-id (:id project)
-                         :role :owner)]
-      (teams/create-project-role conn params)
-      (create-project-profile-state conn params)
-      (assoc project :is-pinned true))))
+    (quotes/check-quote! conn {::quotes/id ::quotes/projects-per-team
+                               ::quotes/profile-id profile-id
+                               ::quotes/team-id team-id})
 
-(defn create-project-profile-state
-  [conn {:keys [team-id project-id profile-id] :as params}]
-  (db/insert! conn :team-project-profile-rel
-              {:project-id project-id
-               :profile-id profile-id
-               :team-id team-id
-               :is-pinned true}))
+    (let [project (teams/create-project conn params)]
+      (teams/create-project-role conn profile-id (:id project) :owner)
+
+      (db/insert! conn :team-project-profile-rel
+                  {:project-id (:id project)
+                   :profile-id profile-id
+                   :team-id team-id
+                   :is-pinned true})
+
+      (assoc project :is-pinned true))))
 
 ;; --- Mutation: Toggle Project Pin
 
@@ -122,4 +120,7 @@
                               {:deleted-at (dt/now)}
                               {:id id :is-default false})]
       (rph/with-meta (rph/wrap)
-        {::audit/props {:team-id (:team-id project)}}))))
+        {::audit/props {:team-id (:team-id project)
+                        :name (:name project)
+                        :created-at (:created-at project)
+                        :modified-at (:modified-at project)}}))))

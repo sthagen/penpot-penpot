@@ -11,10 +11,12 @@
    [app.db :as db]
    [app.http.session :as session]
    [app.loggers.audit :as audit]
+   [app.rpc :as-alias rpc]
    [app.rpc.commands.teams :as teams]
    [app.rpc.doc :as-alias doc]
    [app.rpc.helpers :as rph]
    [app.rpc.queries.profile :as profile]
+   [app.rpc.quotes :as quotes]
    [app.tokens :as tokens]
    [app.tokens.spec.team-invitation :as-alias spec.team-invitation]
    [app.util.services :as sv]
@@ -27,10 +29,10 @@
 
 (s/def ::verify-token
   (s/keys :req-un [::token]
-          :opt-un [::profile-id]))
+          :opt [::rpc/profile-id]))
 
 (sv/defmethod ::verify-token
-  {:auth false
+  {::rpc/auth false
    ::doc/added "1.15"}
   [{:keys [pool sprops] :as cfg} {:keys [token] :as params}]
   (db/with-atomic [conn pool]
@@ -95,6 +97,11 @@
       (ex/raise :type :restriction
                 :code :profile-blocked))
 
+    (quotes/check-quote! conn
+                         {::quotes/id ::quotes/profiles-per-team
+                          ::quotes/profile-id (:id member)
+                          ::quotes/team-id team-id})
+
     ;; Insert the invited member to the team
     (db/insert! conn :team-profile-rel params {:on-conflict-do-nothing true})
 
@@ -126,7 +133,8 @@
           :opt-un [::spec.team-invitation/member-id]))
 
 (defmethod process-token :team-invitation
-  [{:keys [conn session] :as cfg} {:keys [profile-id token]}
+  [{:keys [conn session] :as cfg}
+   {:keys [::rpc/profile-id token]}
    {:keys [member-id team-id member-email] :as claims}]
 
   (us/verify! ::team-invitation-claims claims)

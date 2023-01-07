@@ -1,8 +1,19 @@
 # CHANGELOG
 
-## :rocket: Next (1.17)
+## :rocket: Next
 
 ### :boom: Breaking changes & Deprecations
+
+### :sparkles: New features
+
+### :bug: Bugs fixed
+
+### :arrow_up: Deps updates
+
+### :heart: Community contributions by (Thank you!)
+
+
+## 1.17.0
 
 ### :sparkles: New features
 
@@ -10,6 +21,7 @@
 - Better overlays interactions on boards inside boards [Taiga #4386](https://tree.taiga.io/project/penpot/us/4386)
 - Show board miniature in manual overlay setting [Taiga #4475](https://tree.taiga.io/project/penpot/issue/4475)
 - Handoff visual improvements [Taiga #3124](https://tree.taiga.io/project/penpot/us/3124)
+- Dynamic alignment only in sight [Github 1971](https://github.com/penpot/penpot/issues/1971)
 
 ### :bug: Bugs fixed
 
@@ -22,12 +34,28 @@
 - Fix adding an extra page on import [Taiga #4543](https://tree.taiga.io/project/penpot/task/4543)
 - Fix unable to select text at assets inputs in firefox [Taiga #4572](https://tree.taiga.io/project/penpot/issue/4572)
 - Fix component sync when converting to path [Taiga #3642](https://tree.taiga.io/project/penpot/issue/3642)
-
-### :arrow_up: Deps updates
-
-### :heart: Community contributions by (Thank you!)
+- Fix style for team invite in deutsch [Taiga #4614](https://tree.taiga.io/project/penpot/issue/4614)
+- Fix problem with text edition in Safari [Taiga #4046](https://tree.taiga.io/project/penpot/issue/4046)
+- Fix show outline with rounded corners on rects [Taiga #4053](https://tree.taiga.io/project/penpot/issue/4053)
+- Fix wrong interaction between comments and panning modes [Taiga #4297](https://tree.taiga.io/project/penpot/issue/4297)
+- Fix bad element positioning on interaction with fixed scroll [Github #2660](https://github.com/penpot/penpot/issues/2660)
+- Fix display type of component library not persistent [Taiga #4512](https://tree.taiga.io/project/penpot/issue/4512)
+- Fix problem when moving texts with keyboard [#2690](https://github.com/penpot/penpot/issues/2690)
+- Fix problem when drawing boxes won't detect mouse-up [Taiga #4618](https://tree.taiga.io/project/penpot/issue/4618)
+- Fix missing loading icon on shared libraries [Taiga #4148](https://tree.taiga.io/project/penpot/issue/4148)
+- Fix selection stroke missing in properties of multiple texts [Taiga #4048](https://tree.taiga.io/project/penpot/issue/4048)
+- Fix missing create component menu for frames [Github #2670](https://github.com/penpot/penpot/issues/2670)
+- Fix "currentColor" is not converted when importing SVG [Github 2276](https://github.com/penpot/penpot/issues/2276)
+- Fix incorrect color in properties of multiple bool shapes [Taiga #4355](https://tree.taiga.io/project/penpot/issue/4355)
+- Fix pressing the enter key gives you an internal error [Github 2675](https://github.com/penpot/penpot/issues/2675) [Github 2577](https://github.com/penpot/penpot/issues/2577)
+- Fix confirm group name with enter doesn't work in assets modal [Taiga #4506](https://tree.taiga.io/project/penpot/issue/4506)
+- Fix group/ungroup shapes inside a component [Taiga #4052](https://tree.taiga.io/project/penpot/issue/4052)
+- Fix wrong update of text in components [Taiga #4646](https://tree.taiga.io/project/penpot/issue/4646)
 
 ## 1.16.2-beta
+
+### :bug: Bugs fixed
+
 - Fix strage cursor behaviour after clicking viewport with text pool [Github #2447](https://github.com/penpot/penpot/issues/2447)
 
 ## 1.16.1-beta
@@ -97,7 +125,6 @@
 - Fix grid not syncing immediately in multiuser [Taiga #4339](https://tree.taiga.io/project/penpot/issue/4339)
 - Fix custom font upload fails silently for unsupported formats [Taiga #4279](https://tree.taiga.io/project/penpot/issue/4280)
 
-### :arrow_up: Deps updates
 ### :heart: Community contributions by (Thank you!)
 
 - To @andrewzhurov for many code contributions on this release.

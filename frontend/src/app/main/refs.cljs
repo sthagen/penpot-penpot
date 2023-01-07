@@ -183,6 +183,12 @@
 (def context-menu
   (l/derived :context-menu workspace-local))
 
+(def file-library-listing-thumbs?
+  (l/derived :file-library-listing-thumbs workspace-global))
+
+(def file-library-reverse-sort?
+  (l/derived :file-library-reverse-sort workspace-global))
+
 (def current-hover-ids
   (l/derived :hover-ids context-menu))
 
@@ -318,11 +324,7 @@
   (l/derived :workspace-editor-state st/state))
 
 (def workspace-modifiers
-  (l/derived :workspace-modifiers st/state))
-
-(defn workspace-modifiers-by-id
-  [ids]
-  (l/derived #(select-keys % ids) workspace-modifiers))
+  (l/derived :workspace-modifiers st/state =))
 
 (def workspace-modifiers-with-objects
   (l/derived
@@ -334,20 +336,29 @@
      (and (= (:modifiers a) (:modifiers b))
           (identical? (:objects a) (:objects b))))))
 
-(defn workspace-modifiers-by-frame-id
-  [frame-id]
+(def workspace-frame-modifiers
   (l/derived
    (fn [{:keys [modifiers objects]}]
-     (let [keys (->> modifiers
-                     (keys)
-                     (filter (fn [id]
-                               (let [shape (get objects id)]
-                                 (or (= frame-id id)
-                                     (and (= frame-id (:frame-id shape))
-                                          (not (= :frame (:type shape)))))))))]
-       (select-keys modifiers keys)))
-   workspace-modifiers-with-objects
-   =))
+     (->> modifiers
+          (reduce
+           (fn [result [id modifiers]]
+             (let [shape (get objects id)
+                   frame-id (:frame-id shape)]
+               (cond
+                 (cph/frame-shape? shape)
+                 (assoc-in result [id id] modifiers)
+
+                 (some? frame-id)
+                 (assoc-in result [frame-id id] modifiers)
+
+                 :else
+                 result)))
+           {})))
+   workspace-modifiers-with-objects))
+
+(defn workspace-modifiers-by-frame-id
+  [frame-id]
+  (l/derived #(get % frame-id) workspace-frame-modifiers =))
 
 (defn select-bool-children [id]
   (l/derived (partial wsh/select-bool-children id) st/state =))
@@ -483,6 +494,19 @@
                    (filter (partial ctl/layout-child? objects)))
              ids)))
    st/state =))
+
+
+(defn get-viewer-objects
+  ([]
+   (let [route      (deref route)
+         page-id    (:page-id (:query-params route))]
+     (get-viewer-objects page-id)))
+  ([page-id]
+   (l/derived
+    (fn [state]
+      (let [objects (wsh/lookup-viewer-objects state page-id)]
+        objects))
+    st/state =)))
 
 (def colorpicker
   (l/derived :colorpicker st/state))
