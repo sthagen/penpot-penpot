@@ -16,15 +16,16 @@
    [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.selection :as dws]
    [app.main.data.workspace.state-helpers :as wsh]
+   [app.main.data.workspace.undo :as dwu]
    [beicon.core :as rx]
    [potok.core :as ptk]))
 
 (defn shapes-for-grouping
   [objects selected]
   (->> selected
-       (map #(get objects %))
-       (map #(assoc % ::index (cph/get-position-on-parent objects (:id %))))
-       (sort-by ::index)))
+       (cph/order-by-indexed-shapes objects)
+       reverse
+       (map #(get objects %))))
 
 (defn- get-empty-groups-after-group-creation
   "An auxiliary function that finds and returns a set of ids that
@@ -76,12 +77,17 @@
                         (ctst/generate-unique-name base-name)))
 
         selrect   (gsh/selection-rect shapes)
+        group-idx (->> shapes
+                       last
+                       :id
+                       (cph/get-position-on-parent objects)
+                       inc)
         group     (-> (cts/make-minimal-group frame-id selrect gname)
                       (cts/setup-shape selrect)
                       (assoc :shapes (mapv :id shapes)
                              :parent-id parent-id
                              :frame-id frame-id
-                             :index (::index (first shapes))))
+                             :index group-idx))
 
         ;; Shapes that are in a component, but are not root, must be detached,
         ;; because they will be now children of a non instance group.
@@ -93,8 +99,8 @@
 
         changes   (-> (pcb/empty-changes it page-id)
                       (pcb/with-objects objects)
-                      (pcb/add-object group {:index (::index (first shapes))})
-                      (pcb/change-parent (:id group) shapes)
+                      (pcb/add-object group {:index group-idx})
+                      (pcb/change-parent (:id group) (reverse shapes))
                       (pcb/update-shapes (map :id shapes-to-detach) ctk/detach-shape)
                       (pcb/remove-objects ids-to-delete))]
 
@@ -102,7 +108,9 @@
 
 (defn remove-group-changes
   [it page-id group objects]
-  (let [children  (mapv #(get objects %) (:shapes group))
+  (let [children (->> (:shapes group)
+                      (cph/order-by-indexed-shapes objects)
+                      (mapv #(get objects %)))
         parent-id (cph/get-parent-id objects (:id group))
         parent    (get objects parent-id)
 
@@ -110,11 +118,12 @@
         (->> (:shapes parent)
              (map-indexed vector)
              (filter #(#{(:id group)} (second %)))
-             (ffirst))
+             (ffirst)
+             inc)
 
         ;; Shapes that are in a component (including root) must be detached,
         ;; because cannot be easyly synchronized back to the main component.
-        shapes-to-detach (filter ctk/in-component-instance? 
+        shapes-to-detach (filter ctk/in-component-instance?
                                  (cph/get-children-with-self objects (:id group)))]
 
     (-> (pcb/empty-changes it page-id)
@@ -125,10 +134,13 @@
 
 (defn remove-frame-changes
   [it page-id frame objects]
-
-  (let [children      (mapv #(get objects %) (:shapes frame))
+  (let [children (->> (:shapes frame)
+                      (cph/order-by-indexed-shapes objects)
+                      (mapv #(get objects %)))
         parent-id     (cph/get-parent-id objects (:id frame))
-        idx-in-parent (cph/get-position-on-parent objects (:id frame))]
+        idx-in-parent (->> (:id frame)
+                          (cph/get-position-on-parent objects)
+                           inc)]
 
     (-> (pcb/empty-changes it page-id)
         (pcb/with-objects objects)
@@ -183,10 +195,13 @@
 
             changes {:redo-changes (vec (mapcat :redo-changes changes-list))
                      :undo-changes (vec (mapcat :undo-changes changes-list))
-                     :origin it}]
+                     :origin it}
+            undo-id (js/Symbol)]
 
-        (rx/of (dch/commit-changes changes)
-               (ptk/data-event :layout/update parents))))))
+        (rx/of (dwu/start-undo-transaction undo-id)
+               (dch/commit-changes changes)
+               (ptk/data-event :layout/update parents)
+               (dwu/commit-undo-transaction undo-id))))))
 
 (def mask-group
   (ptk/reify ::mask-group

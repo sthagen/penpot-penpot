@@ -19,7 +19,6 @@
 (def precision 6)
 
 ;; --- Matrix Impl
-
 (defrecord Matrix [^double a
                    ^double b
                    ^double c
@@ -28,13 +27,13 @@
                    ^double f]
   Object
   (toString [_]
-    (str "matrix("
-         (mth/precision a precision) ","
-         (mth/precision b precision) ","
-         (mth/precision c precision) ","
-         (mth/precision d precision) ","
-         (mth/precision e precision) ","
-         (mth/precision f precision) ")")))
+    (dm/fmt "matrix(%, %, %, %, %, %)"
+      (mth/to-fixed a precision)
+      (mth/to-fixed b precision)
+      (mth/to-fixed c precision)
+      (mth/to-fixed d precision)
+      (mth/to-fixed e precision)
+      (mth/to-fixed f precision))))
 
 (defn matrix?
   "Return true if `v` is Matrix instance."

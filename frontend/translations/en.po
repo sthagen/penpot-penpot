@@ -305,8 +305,8 @@ msgstr "Duplicate %s files"
 #, markdown
 msgid "dashboard.empty-placeholder-drafts"
 msgstr ""
-"Oh no! You have no files yet! If you want to try with some templates go to "
-"[Libraries & templates](https://penpot.app/libraries-templates.html)"
+"Files added to Libraries will appear here. Try sharing your files or add from our "
+"[Libraries & templates](https://penpot.app/libraries-templates.html)."
 
 msgid "dashboard.export-binary-multi"
 msgstr "Download %s Penpot files (.penpot)"
@@ -393,7 +393,7 @@ msgid "dashboard.fonts.dismiss-all"
 msgstr "Dismiss all"
 
 msgid "dashboard.fonts.empty-placeholder"
-msgstr "You still have no custom fonts installed."
+msgstr "Custom fonts you upload will appear here."
 
 #: src/app/main/ui/dashboard/fonts.cljs
 msgid "dashboard.fonts.fonts-added"
@@ -1548,6 +1548,9 @@ msgstr "Active"
 
 msgid "labels.inactive"
 msgstr "Inactive"
+
+msgid "labels.view-only"
+msgstr "VIEW ONLY"
 
 #: src/app/main/data/workspace/persistence.cljs, src/app/main/data/workspace/persistence.cljs, src/app/main/data/media.cljs
 msgid "media.loading"
@@ -4005,10 +4008,10 @@ msgid "workspace.options.width"
 msgstr "Width"
 
 msgid "workspace.options.x"
-msgstr "X"
+msgstr "X axis"
 
 msgid "workspace.options.y"
-msgstr "Y"
+msgstr "Y axis"
 
 msgid "workspace.path.actions.add-node"
 msgstr "Add node (%s)"

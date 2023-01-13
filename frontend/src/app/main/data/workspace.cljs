@@ -639,14 +639,15 @@
 (defn relocate-shapes-changes [it objects parents parent-id page-id to-index ids
                                groups-to-delete groups-to-unmask shapes-to-detach
                                shapes-to-reroot shapes-to-deroot shapes-to-unconstraint]
-  (let [shapes (map (d/getf objects) ids)]
+  (let [ordered-indexes (cph/order-by-indexed-shapes objects ids)
+        shapes (map (d/getf objects) ordered-indexes)]
 
     (-> (pcb/empty-changes it page-id)
         (pcb/with-objects objects)
 
         ; Move the shapes
         (pcb/change-parent parent-id
-                           (reverse shapes)
+                           shapes
                            to-index)
 
         ; Remove empty groups
@@ -811,11 +812,14 @@
             layouts-to-update
             (into #{}
                   (filter (partial ctl/layout? objects))
-                  (concat [parent-id] (cph/get-parent-ids objects parent-id)))]
+                  (concat [parent-id] (cph/get-parent-ids objects parent-id)))
+            undo-id (js/Symbol)]
 
-        (rx/of (dch/commit-changes changes)
+        (rx/of (dwu/start-undo-transaction undo-id)
+               (dch/commit-changes changes)
                (dwco/expand-collapse parent-id)
-               (ptk/data-event :layout/update layouts-to-update))))))
+               (ptk/data-event :layout/update layouts-to-update)
+               (dwu/commit-undo-transaction undo-id))))))
 
 (defn relocate-selected-shapes
   [parent-id to-index]
@@ -1557,11 +1561,14 @@
                                  (filter #(= (:type %) :add-obj))
                                  (filter #(selected (:old-id %)))
                                  (map #(get-in % [:obj :id]))
-                                 (into (d/ordered-set)))]
+                                 (into (d/ordered-set)))
+                  undo-id (js/Symbol)]
 
-              (rx/of (dch/commit-changes changes)
+              (rx/of (dwu/start-undo-transaction undo-id) 
+                     (dch/commit-changes changes)
                      (dws/select-shapes selected)
-                     (ptk/data-event :layout/update [frame-id]))))]
+                     (ptk/data-event :layout/update [frame-id])
+                     (dwu/commit-undo-transaction undo-id))))]
 
     (ptk/reify ::paste-shape
       ptk/WatchEvent
@@ -1581,8 +1588,10 @@
                         (map str/trim)
                         (mapv #(hash-map :type "paragraph"
                                          :children [(merge txt/default-text-attrs {:text %})])))]
-    {:type "root"
-     :children [{:type "paragraph-set" :children paragraphs}]}))
+    ;; if text is composed only by line breaks paragraphs is an empty list and should be nil
+    (when (d/not-empty? paragraphs)
+      {:type "root"
+       :children [{:type "paragraph-set" :children paragraphs}]})))
 
 (defn calculate-paste-position [state]
   (cond
@@ -1617,7 +1626,7 @@
                    :height height
                    :grow-type (if (> (count text) 100) :auto-height :auto-width)
                    :content (as-content text)}
-            undo-id (uuid/next)]
+            undo-id (js/Symbol)]
 
         (rx/of (dwu/start-undo-transaction undo-id)
                (dwsh/create-and-add-shape :text x y shape)
@@ -1969,3 +1978,6 @@
 (dm/export dwv/update-viewport-size)
 (dm/export dwv/start-panning)
 (dm/export dwv/finish-panning)
+
+;; Undo
+(dm/export dwu/reinitialize-undo)

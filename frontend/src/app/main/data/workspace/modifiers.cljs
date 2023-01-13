@@ -16,9 +16,7 @@
    [app.common.pages.helpers :as cph]
    [app.common.spec :as us]
    [app.common.types.modifiers :as ctm]
-   [app.common.types.shape :as cts]
    [app.common.types.shape.layout :as ctl]
-   [app.common.uuid :as uuid]
    [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.comments :as-alias dwcm]
    [app.main.data.workspace.guides :as-alias dwg]
@@ -114,6 +112,18 @@
 
      (reduce set-child ignore-tree children))))
 
+(defn assoc-position-data
+  [shape position-data old-shape]
+  (let [deltav (gpt/to-vec (gpt/point (:selrect old-shape))
+                           (gpt/point (:selrect shape)))
+        position-data
+        (-> position-data
+            (gsh/move-position-data deltav))]
+    (cond-> shape
+      (d/not-empty? position-data)
+      (assoc :position-data position-data))))
+
+
 (defn update-grow-type
   [shape old-shape]
   (let [auto-width? (= :auto-width (:grow-type shape))
@@ -195,13 +205,10 @@
   [shape {:keys [width height]}]
   (cond-> shape
     (some? width)
-    (assoc :width width)
+    (gsh/transform-shape (ctm/change-dimensions-modifiers shape :width width {:ignore-lock? true}))
 
     (some? height)
-    (assoc :height height)
-
-    (or (some? width) (some? height))
-    (cts/setup-rect-selrect)))
+    (gsh/transform-shape (ctm/change-dimensions-modifiers shape :height height {:ignore-lock? true}))))
 
 (defn apply-text-modifiers
   [objects text-modifiers]
@@ -319,7 +326,8 @@
    (ptk/reify ::apply-modifiers
      ptk/WatchEvent
      (watch [_ state _]
-       (let [objects           (wsh/lookup-page-objects state)
+       (let [text-modifiers    (get state :workspace-text-modifier)
+             objects           (wsh/lookup-page-objects state)
              object-modifiers  (if modifiers
                                  (calculate-modifiers state modifiers)
                                  (get state :workspace-modifiers))
@@ -330,7 +338,7 @@
              shapes            (map (d/getf objects) ids)
              ignore-tree       (->> (map #(get-ignore-tree object-modifiers objects %) shapes)
                                     (reduce merge {}))
-             undo-id (uuid/next)]
+             undo-id (js/Symbol)]
 
          (rx/concat
           (if undo-transation?
@@ -342,9 +350,13 @@
                   ids
                   (fn [shape]
                     (let [modif (get-in object-modifiers [(:id shape) :modifiers])
-                          text-shape? (cph/text-shape? shape)]
+                          text-shape? (cph/text-shape? shape)
+                          position-data (when text-shape?
+                                          (dm/get-in text-modifiers [(:id shape) :position-data]))]
                       (-> shape
                           (gsh/transform-shape modif)
+                          (cond-> (d/not-empty? position-data)
+                            (assoc-position-data position-data shape))
                           (cond-> text-shape?
                             (update-grow-type shape)))))
                   {:reg-objects? true
@@ -366,7 +378,11 @@
                            :grow-type
                            :layout-item-h-sizing
                            :layout-item-v-sizing
+                           :position-data
                            ]})
+                 ;; We've applied the text-modifier so we can dissoc the temporary data
+                 (fn [state]
+                   (update state :workspace-text-modifier #(apply dissoc % ids)))
                  (clear-local-transform))
           (if undo-transation?
             (rx/of (dwu/commit-undo-transaction undo-id))

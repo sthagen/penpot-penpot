@@ -12,7 +12,6 @@
    [app.common.pages.helpers :as cph]
    [app.common.spec :as us]
    [app.common.text :as txt]
-   [app.common.uuid :as uuid]
    [app.config :as cf]
    [app.main.data.events :as ev]
    [app.main.data.modal :as modal]
@@ -182,7 +181,7 @@
 
 (defn- create-assets-group
   [rename components-to-group group-name]
-  (let [undo-id (uuid/next)]
+  (let [undo-id (js/Symbol)]
   (st/emit! (dwu/start-undo-transaction undo-id))
   (apply st/emit!
          (->> components-to-group
@@ -594,7 +593,7 @@
         (mf/use-fn
          (mf/deps @state)
          (fn []
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (if (empty? selected-components)
              (st/emit! (dwl/duplicate-component {:id (:component-id @state)}))
              (do
@@ -606,7 +605,7 @@
         (mf/use-fn
          (mf/deps @state file-id multi-components? multi-assets?)
          (fn []
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (if (or multi-components? multi-assets?)
              (on-assets-delete)
              (st/emit! (dwu/start-undo-transaction undo-id)
@@ -653,7 +652,7 @@
          (mf/deps components selected-components on-clear-selection)
          (fn [group-name]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> components
@@ -670,7 +669,7 @@
          (mf/deps components)
          (fn [path last-path]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> components
@@ -701,7 +700,7 @@
          (mf/deps components)
          (fn [path]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> components
@@ -1029,7 +1028,7 @@
          (mf/deps objects selected-objects on-clear-selection)
          (fn [group-name]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> objects
@@ -1046,7 +1045,7 @@
          (mf/deps objects)
          (fn [path last-path]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> objects
@@ -1076,7 +1075,7 @@
          (mf/deps objects)
          (fn [path]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> objects
@@ -1193,7 +1192,7 @@
          (fn []
            (if (or multi-colors? multi-assets?)
              (on-assets-delete)
-             (let [undo-id (uuid/next)]
+             (let [undo-id (js/Symbol)]
                (st/emit! (dwu/start-undo-transaction undo-id)
                          (dwl/delete-color color)
                          (dwl/sync-file file-id file-id :colors (:id color))
@@ -1458,7 +1457,7 @@
          (fn [color-id]
            (fn [group-name]
              (on-clear-selection)
-             (let [undo-id (uuid/next)]
+             (let [undo-id (js/Symbol)]
                (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> colors
@@ -1476,7 +1475,7 @@
          (mf/deps colors)
          (fn [path last-path]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> colors
@@ -1508,7 +1507,7 @@
          (mf/deps colors)
          (fn [path]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> colors
@@ -1757,7 +1756,7 @@
          (mf/deps typographies selected-typographies on-clear-selection file-id)
          (fn [group-name]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> typographies
@@ -1775,7 +1774,7 @@
          (mf/deps typographies)
          (fn [path last-path]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> typographies
@@ -1806,7 +1805,7 @@
          (mf/deps typographies)
          (fn [path]
            (on-clear-selection)
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit!
                     (->> typographies
@@ -1844,7 +1843,7 @@
         (mf/use-fn
          (mf/deps @state multi-typographies? multi-assets?)
          (fn []
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (if (or multi-typographies? multi-assets?)
                (on-assets-delete)
                (st/emit! (dwu/start-undo-transaction undo-id)
@@ -2088,7 +2087,7 @@
         (mf/use-fn
          (mf/deps selected-assets)
          (fn []
-           (let [undo-id (uuid/next)]
+           (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
              (apply st/emit! (map #(dwl/delete-component {:id %})
                                   (:components selected-assets)))
@@ -2243,7 +2242,19 @@
            (let [value (-> (dom/get-target event)
                            (dom/get-value)
                            (d/read-string))]
-             (swap! filters assoc :box value))))]
+             (swap! filters assoc :box value))))
+
+        handle-key-down
+        (mf/use-callback
+         (fn [event]
+           (let [enter? (kbd/enter? event)
+                 esc?   (kbd/esc? event)
+                 input-node (dom/event->target event)]
+
+             (when enter?
+               (dom/blur! input-node))
+             (when esc?
+               (dom/blur! input-node)))))]
 
     [:div.assets-bar
      [:div.tool-window
@@ -2260,7 +2271,8 @@
          {:placeholder (tr "workspace.assets.search")
           :type "text"
           :value (:term @filters)
-          :on-change on-search-term-change}]
+          :on-change on-search-term-change
+          :on-key-down handle-key-down}]
         (if (str/empty? (:term @filters))
           [:div.search-icon
            i/search]

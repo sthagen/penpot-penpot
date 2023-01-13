@@ -119,6 +119,19 @@
             }
           }
         }
+
+        & .view-only-mode {
+          color: $color-primary;
+          border: 1px solid $color-primary;
+          border-radius: 3px;
+          font-size: 10px;
+          text-transform: uppercase;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-left: auto;
+          padding: 0.25rem;
+        }
       }
 
       & .focus-title {
@@ -347,12 +360,16 @@ button.collapse-sidebar {
   overflow: hidden;
 }
 
-.shortcuts {
-  .shortcuts-header {
+.shortcuts,
+.debug-panel {
+  .shortcuts-header,
+  .debug-panel-header {
     display: flex;
     height: 40px;
     background-color: $color-gray-60;
-    .shortcuts-title {
+
+    .shortcuts-title,
+    .debug-panel-title {
       color: $color-white;
       font-size: $fs12;
       display: flex;
@@ -366,7 +383,9 @@ button.collapse-sidebar {
         fill: $color-gray-20;
       }
     }
-    .shortcuts-close-button {
+
+    .shortcuts-close-button,
+    .debug-panel-close-button {
       display: flex;
       justify-content: center;
       background-color: transparent;
@@ -390,6 +409,7 @@ button.collapse-sidebar {
     justify-content: center;
     align-items: center;
     padding: 12px 10px;
+
     .search-box {
       display: flex;
       justify-content: space-between;
@@ -397,6 +417,9 @@ button.collapse-sidebar {
       border: 1px solid $color-gray-30;
       border-radius: 2px;
       width: 100%;
+      &:focus-within {
+        border: 1px solid $color-primary;
+      }
       .input-text {
         margin: 0;
         background: $color-gray-50;
@@ -528,5 +551,37 @@ button.collapse-sidebar {
     justify-content: center;
     margin-top: 4px;
     font-size: $fs12;
+  }
+}
+
+.debug-panel {
+  .debug-panel-inner {
+    padding: 8px;
+  }
+  .debug-option {
+    display: flex;
+    gap: 8px;
+    margin: 4px 0;
+    cursor: pointer;
+
+    label {
+      font-size: 80%;
+      cursor: pointer;
+    }
+
+    svg {
+      width: 15px;
+      height: 15px;
+      background: white;
+    }
+
+    &:hover {
+      svg {
+        stroke: var(--color-primary);
+      }
+      label {
+        color: var(--color-primary);
+      }
+    }
   }
 }

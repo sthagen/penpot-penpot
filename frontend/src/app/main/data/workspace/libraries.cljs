@@ -154,7 +154,7 @@
                         (pcb/with-library-data data)
                         (pcb/update-color color))
         
-        undo-id (uuid/next)]
+        undo-id (js/Symbol)]
     (rx/of (dwu/start-undo-transaction undo-id)
            (dch/commit-changes changes)
            (sync-file (:current-file-id state) file-id :colors (:id color))
@@ -259,7 +259,7 @@
         changes     (-> (pcb/empty-changes it)
                         (pcb/with-library-data data)
                         (pcb/update-typography typography))
-        undo-id (uuid/next)]
+        undo-id (js/Symbol)]
     (rx/of (dwu/start-undo-transaction undo-id)
            (dch/commit-changes changes)
            (sync-file (:current-file-id state) file-id :typographies (:id typography))
@@ -476,9 +476,14 @@
                                                  component-id
                                                  position
                                                  page
-                                                 libraries)]
-        (rx/of (dch/commit-changes changes)
-               (dws/select-shapes (d/ordered-set (:id new-shape))))))))
+                                                 libraries)
+            undo-id (js/Symbol)]
+        (rx/of (dwu/start-undo-transaction undo-id)
+               (dch/commit-changes changes)
+               (ptk/data-event :layout/update [(:id new-shape)])
+               (dws/select-shapes (d/ordered-set (:id new-shape))) 
+               
+               (dwu/commit-undo-transaction undo-id))))))
 
 (defn detach-component
   "Remove all references to components in the shape with the given id,
@@ -650,7 +655,7 @@
       (let [current-file-id (:current-file-id state)
             page            (wsh/lookup-page state)
             shape           (ctn/get-shape page shape-id)
-            undo-id (uuid/next)]
+            undo-id (js/Symbol)]
         (rx/of
          (dwu/start-undo-transaction undo-id)
          (update-component shape-id)
@@ -664,7 +669,7 @@
   (ptk/reify ::update-component-in-bulk
     ptk/WatchEvent
     (watch [_ _ _]
-      (let [undo-id (uuid/next)]
+      (let [undo-id (js/Symbol)]
        (rx/concat
        (rx/of (dwu/start-undo-transaction undo-id))
        (rx/map #(update-component-sync (:id %) file-id) (rx/from shapes))

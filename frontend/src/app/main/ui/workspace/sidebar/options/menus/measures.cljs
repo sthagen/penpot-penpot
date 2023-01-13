@@ -10,7 +10,6 @@
    [app.common.geom.shapes :as gsh]
    [app.common.types.shape.layout :as ctl]
    [app.common.types.shape.radius :as ctsr]
-   [app.common.uuid :as uuid]
    [app.main.constants :refer [size-presets]]
    [app.main.data.workspace :as udw]
    [app.main.data.workspace.changes :as dch]
@@ -250,7 +249,7 @@
          (mf/deps ids)
          (fn [event]
            (let [value (-> event dom/get-target dom/checked?)
-                 undo-id (uuid/next)]
+                 undo-id (js/Symbol)]
              (do
                (st/emit! (dwu/start-undo-transaction undo-id)
                          (dch/update-shapes ids (fn [shape] (assoc shape :hide-in-viewer (not value)))))
@@ -282,7 +281,8 @@
        (when (and (options :presets)
                   (or (nil? all-types) (= (count all-types) 1))) ;; Don't show presets if multi selected
          [:div.row-flex                                          ;; some frames and some non frames
-          [:div.presets.custom-select.flex-grow {:on-click #(reset! show-presets-dropdown? true)}
+          [:div.presets.custom-select.flex-grow {:class (when @show-presets-dropdown? "opened")
+                                                 :on-click #(reset! show-presets-dropdown? true)}
            [:span (tr "workspace.options.size-presets")]
            [:span.dropdown-button i/arrow-down]
            [:& dropdown {:show @show-presets-dropdown?

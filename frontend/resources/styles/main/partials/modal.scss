@@ -65,6 +65,7 @@
   flex-direction: column;
   width: 448px;
   background-color: $color-white;
+  max-height: 700px;
 
   .modal-header {
     align-items: center;
@@ -102,6 +103,11 @@
       width: 16px;
       height: 16px;
     }
+  }
+
+  .component-list {
+    max-height: 408px;
+    overflow-y: scroll;
   }
 
   .modal-item-element {
@@ -620,6 +626,7 @@
   border-radius: $br-medium;
   height: 664px;
   width: 920px;
+  max-height: 100%;
 
   .modal-content {
     display: flex;
@@ -686,8 +693,8 @@
       .section-list-item {
         padding: $size-4 0;
         border-bottom: 1px solid $color-gray-20;
-        position: relative;
         display: flex;
+        align-items: center;
         justify-content: space-between;
 
         .item-name {
@@ -704,7 +711,6 @@
 
         .item-button {
           cursor: pointer;
-          position: absolute;
           top: $size-4;
           right: 0;
           border: 1px solid $color-primary;
@@ -713,6 +719,7 @@
           background: $color-primary;
           color: $color-black;
           padding: $size-2;
+          margin-bottom: 0;
 
           &:hover {
             color: $color-primary;
@@ -763,6 +770,11 @@
         margin: 0;
         padding: 0;
         flex-grow: 1;
+
+        &:hover,
+        &:focus {
+          outline: none;
+        }
       }
 
       & .search-icon {

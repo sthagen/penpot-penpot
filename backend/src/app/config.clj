@@ -61,7 +61,7 @@
 
    :public-uri "http://localhost:3449"
    :host "localhost"
-   :tenant "main"
+   :tenant "default"
 
    :redis-uri "redis://redis/0"
    :srepl-host "127.0.0.1"
@@ -105,9 +105,6 @@
 (s/def ::admins ::us/set-of-valid-emails)
 (s/def ::file-change-snapshot-every ::us/integer)
 (s/def ::file-change-snapshot-timeout ::dt/duration)
-
-(s/def ::setup-admin-email ::us/email)
-(s/def ::setup-admin-password ::us/not-empty-string)
 
 (s/def ::default-executor-parallelism ::us/integer)
 (s/def ::scheduled-executor-parallelism ::us/integer)
@@ -314,9 +311,6 @@
                    ::srepl-host
                    ::srepl-port
 
-                   ::setup-admin-email
-                   ::setup-admin-password
-
                    ::assets-storage-backend
                    ::storage-assets-fs-directory
                    ::storage-assets-s3-bucket
@@ -332,8 +326,7 @@
   [:enable-backend-api-doc
    :enable-backend-worker
    :enable-secure-session-cookies
-   :enable-email-verification
-   :enable-quotes])
+   :enable-email-verification])
 
 (defn- parse-flags
   [config]

@@ -13,6 +13,7 @@
   padding: $size-1 $size-4 $size-1 $size-2;
   position: relative;
   z-index: 10;
+  user-select: none;
   &.team {
     display: grid;
     grid-template-columns: 20% 1fr 20%;
@@ -85,6 +86,7 @@
       font-size: $fs22;
       font-weight: 600;
       z-index: 10;
+      user-select: all;
     }
 
     .context-menu.is-open {
@@ -122,6 +124,8 @@
 
   .pin-icon {
     margin: 0 $size-2 0 $size-5;
+    background-color: transparent;
+    border: none;
     svg {
       fill: $color-gray-20;
     }
