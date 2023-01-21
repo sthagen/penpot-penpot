@@ -8,6 +8,7 @@
   (:require
    [app.common.exceptions :as ex]
    [app.common.logging :as log]
+   [app.common.math :as mth]
    [app.common.pages.changes-builder :as pcb]
    [app.common.spec :as us]
    [app.common.types.container :as ctn]
@@ -52,8 +53,8 @@
             shape {:name name
                    :width width
                    :height height
-                   :x (- x (/ width 2))
-                   :y (- y (/ height 2))
+                   :x (mth/round (- x (/ width 2)))
+                   :y (mth/round (- y (/ height 2)))
                    :metadata {:width width
                               :height height
                               :mtype mtype
@@ -125,7 +126,7 @@
           (rx/map dmm/validate-file)
           (rx/filter (comp not svg-blob?))
           (rx/map prepare-blob)
-          (rx/mapcat #(rp/mutation! :upload-file-media-object %))
+          (rx/mapcat #(rp/cmd! :upload-file-media-object %))
           (rx/do on-image))
 
      (->> (rx/from blobs)
@@ -361,7 +362,7 @@
                           :type :info
                           :timeout nil
                           :tag :media-loading}))
-         (->> (rp/mutation! :clone-file-media-object params)
+         (->> (rp/cmd! :clone-file-media-object params)
               (rx/do on-success)
               (rx/catch on-error)
               (rx/finalize #(st/emit! (dm/hide-tag :media-loading)))))))))

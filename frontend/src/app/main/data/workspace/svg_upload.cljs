@@ -11,6 +11,7 @@
    [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
+   [app.common.math :as mth]
    [app.common.pages.changes-builder :as pcb]
    [app.common.pages.helpers :as cph]
    [app.common.spec :as us :refer [max-safe-int min-safe-int]]
@@ -21,6 +22,7 @@
    [app.main.data.workspace.selection :as dws]
    [app.main.data.workspace.shapes :as dwsh]
    [app.main.data.workspace.state-helpers :as wsh]
+   [app.main.data.workspace.undo :as dwu]
    [app.main.repo :as rp]
    [app.util.color :as uc]
    [app.util.path.parser :as upp]
@@ -79,13 +81,13 @@
         color-style (str/trim (get-in shape [:svg-attrs :style :fill]))
         color-style (if (= color-style "currentColor") clr/black color-style)]
     (cond-> shape
-    ;; Color present as attribute
+      ;; Color present as attribute
       (uc/color? color-attr)
       (-> (update :svg-attrs dissoc :fill)
           (update-in [:svg-attrs :style] dissoc :fill)
           (assoc-in [:fills 0 :fill-color] (uc/parse-color color-attr)))
 
-    ;; Color present as style
+      ;; Color present as style
       (uc/color? color-style)
       (-> (update-in [:svg-attrs :style] dissoc :fill)
           (update :svg-attrs dissoc :fill)
@@ -108,20 +110,22 @@
                                (get-in shape [:svg-attrs :style :stroke-linecap]))
                            ((d/nilf str/trim))
                            ((d/nilf keyword)))
+        color-attr (str/trim (get-in shape [:svg-attrs :stroke]))
+        color-attr (if (= color-attr "currentColor") clr/black color-attr)
+        color-style (str/trim (get-in shape [:svg-attrs :style :stroke]))
+        color-style (if (= color-style "currentColor") clr/black color-style)
 
         shape
         (cond-> shape
-          (uc/color? (str/trim (get-in shape [:svg-attrs :stroke])))
+          ;; Color present as attribute
+          (uc/color? color-attr)
           (-> (update :svg-attrs dissoc :stroke)
-              (assoc-in [:strokes 0 :stroke-color] (-> (get-in shape [:svg-attrs :stroke])
-                                                       (str/trim)
-                                                       (uc/parse-color))))
+              (assoc-in [:strokes 0 :stroke-color] (uc/parse-color color-attr)))
 
-          (uc/color? (str/trim (get-in shape [:svg-attrs :style :stroke])))
+          ;; Color present as style
+          (uc/color? color-style)
           (-> (update-in [:svg-attrs :style] dissoc :stroke)
-              (assoc-in [:strokes 0 :stroke-color] (-> (get-in shape [:svg-attrs :style :stroke])
-                                                       (str/trim)
-                                                       (uc/parse-color))))
+              (assoc-in [:strokes 0 :stroke-color] (uc/parse-color color-style)))
 
           (get-in shape [:svg-attrs :stroke-opacity])
           (-> (update :svg-attrs dissoc :stroke-opacity)
@@ -131,7 +135,7 @@
           (get-in shape [:svg-attrs :style :stroke-opacity])
           (-> (update-in [:svg-attrs :style] dissoc :stroke-opacity)
               (assoc-in [:strokes 0 :stroke-opacity] (-> (get-in shape [:svg-attrs :style :stroke-opacity])
-                                                       (d/parse-double))))
+                                                         (d/parse-double))))
 
           (get-in shape [:svg-attrs :stroke-width])
           (-> (update :svg-attrs dissoc :stroke-width)
@@ -361,7 +365,7 @@
   (let [{:keys [tag attrs hidden]} element-data
         attrs (usvg/format-styles attrs)
         element-data (cond-> element-data (map? element-data) (assoc :attrs attrs))
-        name (ctst/generate-unique-name unames (or (:id attrs) (tag->name tag)))
+        name (or (:id attrs) (tag->name tag))
         att-refs (usvg/find-attr-references attrs)
         references (usvg/find-def-references (:defs svg-data) att-refs)
 
@@ -477,20 +481,21 @@
        (rx/reduce (fn [acc [url image]] (assoc acc url image)) {})))
 
 (defn create-svg-shapes
-  [svg-data {:keys [x y] :as position} objects frame-id parent-id selected center?]
+  [svg-data {:keys [x y]} objects frame-id parent-id selected center?]
   (try
     (let [[vb-x vb-y vb-width vb-height] (svg-dimensions svg-data)
-          x (if center?
-              (- x vb-x (/ vb-width 2))
-              x)
-          y (if center?
-              (- y vb-y (/ vb-height 2))
-              y)
+          x (mth/round
+             (if center?
+               (- x vb-x (/ vb-width 2))
+               x))
+          y (mth/round
+             (if center?
+               (- y vb-y (/ vb-height 2))
+               y))
 
           unames (ctst/retrieve-used-names objects)
 
-          svg-name (->> (str/replace (:name svg-data) ".svg" "")
-                        (ctst/generate-unique-name unames))
+          svg-name (str/replace (:name svg-data) ".svg" "")
 
           svg-data (-> svg-data
                        (assoc :x x
@@ -513,12 +518,12 @@
 
           ;; In penpot groups have the size of their children. To respect the imported svg size and empty space let's create a transparent shape as background to respect the imported size
           base-background-shape {:tag :rect
-                                 :attrs {:x "0"
-                                         :y "0"
-                                         :width (str (:width root-shape))
-                                         :height (str (:height root-shape))
-                                         :fill "none"
-                                         :id "base-background"}
+                                 :attrs {:x      (str vb-x)
+                                         :y      (str vb-y)
+                                         :width  (str vb-width)
+                                         :height (str vb-height)
+                                         :fill   "none"
+                                         :id     "base-background"}
                                  :hidden true
                                  :content []}
 
@@ -583,7 +588,11 @@
                                              (filter #(= :add-obj (:type %)))
                                              (map :id)
                                              reverse
-                                             vec))]
+                                             vec))
+            undo-id (js/Symbol)]
 
-      (rx/of (dch/commit-changes changes)
-             (dws/select-shapes (d/ordered-set (:id new-shape))))))))
+        (rx/of (dwu/start-undo-transaction undo-id)
+               (dch/commit-changes changes)
+               (dws/select-shapes (d/ordered-set (:id new-shape)))
+               (ptk/data-event :layout/update [(:id new-shape)])
+               (dwu/commit-undo-transaction undo-id))))))

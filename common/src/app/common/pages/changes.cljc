@@ -200,21 +200,9 @@
                 (cph/insert-at-index prev-shapes index shapes)
                 (cph/append-at-the-end prev-shapes shapes))))
 
-          (check-insert-items [prev-shapes parent index shapes]
-            (if-not (:masked-group? parent)
-              (insert-items prev-shapes index shapes)
-              ;; For masked groups, the first shape is the mask
-              ;; and it cannot be moved.
-              (let [mask-id         (first prev-shapes)
-                    other-ids       (rest prev-shapes)
-                    not-mask-shapes (without-obj shapes mask-id)
-                    new-index       (if (nil? index) nil (max (dec index) 0))
-                    new-shapes      (insert-items other-ids new-index not-mask-shapes)]
-                (into [mask-id] new-shapes))))
-
           (add-to-parent [parent index shapes]
             (let [parent (-> parent
-                             (update :shapes check-insert-items parent index shapes)
+                             (update :shapes insert-items index shapes)
                              ;; We need to ensure that no `nil` in the
                              ;; shapes list after adding all the
                              ;; incoming shapes to the parent.
@@ -265,7 +253,8 @@
           (move-objects [objects]
             (let [valid?   (every? (partial is-valid-move? objects) shapes)
                   parent   (get objects parent-id)
-                  index (if (nil? after-shape) index (inc (d/index-of (:shapes parent) after-shape)))
+                  after-shape-index (d/index-of (:shapes parent) after-shape)
+                  index (if (nil? after-shape-index) index (inc after-shape-index))
                   frame-id (if (= :frame (:type parent))
                              (:id parent)
                              (:frame-id parent))]

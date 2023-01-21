@@ -22,6 +22,7 @@
 - Show board miniature in manual overlay setting [Taiga #4475](https://tree.taiga.io/project/penpot/issue/4475)
 - Handoff visual improvements [Taiga #3124](https://tree.taiga.io/project/penpot/us/3124)
 - Dynamic alignment only in sight [Github 1971](https://github.com/penpot/penpot/issues/1971)
+- Add some accessibility to shortcut panel [Taiga #4713](https://tree.taiga.io/project/penpot/issue/4713)
 
 ### :bug: Bugs fixed
 
@@ -56,6 +57,11 @@
 - Fix layer orders messed up on move, group, reparent and undo [Github #2672](https://github.com/penpot/penpot/issues/2672)
 - Fix max height in library dialog [Github #2335](https://github.com/penpot/penpot/issues/2335)
 - Fix undo ungroup (shift+g) scrambles positions [Taiga #4674](https://tree.taiga.io/project/penpot/issue/4674)
+- Fix justified text is stretched [Github #2539](https://github.com/penpot/penpot/issues/2539)
+- Fix mousewheel on viewer inspector [Taiga #4221](https://tree.taiga.io/project/penpot/issue/4221)
+- Fix path edition activated on boards [Taiga #4105](https://tree.taiga.io/project/penpot/issue/4105)
+- Fix hidden layers inside groups become visible after the group visibility is changed[Taiga #4710](https://tree.taiga.io/project/penpot/issue/4710)
+- Fix format of HSLA color on viewer [Taiga #4393](https://tree.taiga.io/project/penpot/issue/4393)
 
 ## 1.16.2-beta
 
