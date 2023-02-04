@@ -10,6 +10,7 @@
    [app.common.data.macros :as dm]
    [app.common.geom.shapes :as gsh]
    [app.common.math :as mth]
+   [app.config :as cf]
    [app.main.data.workspace.thumbnails :as dwt]
    [app.main.refs :as refs]
    [app.main.store :as st]
@@ -17,9 +18,11 @@
    [app.main.ui.shapes.frame :as frame]
    [app.util.dom :as dom]
    [app.util.timers :as ts]
+   [app.util.webapi :as wapi]
    [beicon.core :as rx]
    [cuerdas.core :as str]
    [debug :refer [debug?]]
+   [promesa.core :as p]
    [rumext.v2 :as mf]))
 
 (defn- draw-thumbnail-canvas!
@@ -31,7 +34,10 @@
             canvas-height  (.-height canvas-node)]
         (.clearRect canvas-context 0 0 canvas-width canvas-height)
         (.drawImage canvas-context img-node 0 0 canvas-width canvas-height)
-        (dom/set-property! canvas-node "data-ready" "true")
+
+        ;; Set a true on the next animation frame, we make sure the drawImage is completed
+        (ts/raf
+         #(dom/set-data! canvas-node "ready" "true"))
         true))
     (catch :default err
       (.error js/console err)
@@ -70,8 +76,12 @@
           (gsh/selection-rect (concat [shape] all-children))
           (-> shape :points gsh/points->selrect))
 
-        fixed-width (mth/clamp width 250 2000)
-        fixed-height (/ (* height fixed-width) width)
+        [fixed-width fixed-height]
+        (if (> width height)
+          [(mth/clamp width 250 2000)
+           (/ (* height (mth/clamp width 250 2000)) width)]
+          [(/ (* width (mth/clamp height 250 2000)) height)
+           (mth/clamp height 250 2000)])
 
         image-url    (mf/use-state nil)
         observer-ref (mf/use-var nil)
@@ -82,6 +92,10 @@
 
         thumbnail-data-ref (mf/use-memo (mf/deps page-id id) #(refs/thumbnail-frame-data page-id id))
         thumbnail-data     (mf/deref thumbnail-data-ref)
+
+        ;; We only need the zoom level in Safari. For other browsers we don't want to activate this because
+        ;; will render for every zoom change
+        zoom (when (cf/check-browser? :safari) (mf/deref refs/selected-zoom))
 
         prev-thumbnail-data (hooks/use-previous thumbnail-data)
 
@@ -97,19 +111,20 @@
         (mf/use-callback
          (mf/deps @show-frame-thumbnail)
          (fn []
-           (ts/raf
-            #(let [canvas-node (mf/ref-val frame-canvas-ref)
-                   img-node    (mf/ref-val frame-image-ref)]
-               (when (draw-thumbnail-canvas! canvas-node img-node)
-                 (reset! image-url nil)
-                 (when @show-frame-thumbnail
-                   (reset! show-frame-thumbnail false))
-                 ;; If we don't have the thumbnail data saved (normally the first load) we update the data
-                 ;; when available
-                 (when (not @thumbnail-data-ref)
-                   (st/emit! (dwt/update-thumbnail page-id id) ))
+           (let [canvas-node (mf/ref-val frame-canvas-ref)
+                 img-node    (mf/ref-val frame-image-ref)]
+             (when (draw-thumbnail-canvas! canvas-node img-node)
+               (when-not (cf/check-browser? :safari)
+                 (reset! image-url nil))
 
-                 (reset! render-frame? false))))))
+               (when @show-frame-thumbnail
+                 (reset! show-frame-thumbnail false))
+               ;; If we don't have the thumbnail data saved (normally the first load) we update the data
+               ;; when available
+               (when (not @thumbnail-data-ref)
+                 (st/emit! (dwt/update-thumbnail page-id id) ))
+
+               (reset! render-frame? false)))))
 
         generate-thumbnail
         (mf/use-callback
@@ -117,8 +132,6 @@
            (try
              ;; When starting generating the canvas we mark it as not ready so its not send to back until
              ;; we have time to update it
-             (let [canvas-node (mf/ref-val frame-canvas-ref)]
-               (dom/set-property! canvas-node "data-ready" "false"))
              (let [node @node-ref]
                (if (dom/has-children? node)
                  ;; The frame-content need to have children in order to generate the thumbnail
@@ -160,6 +173,9 @@
         on-update-frame
         (mf/use-callback
          (fn []
+           (let [canvas-node (mf/ref-val frame-canvas-ref)]
+             (when (not= "false" (dom/get-data canvas-node "ready"))
+               (dom/set-data! canvas-node "ready" "false")))
            (when (not @disable-ref?)
              (reset! render-frame? true)
              (reset! regenerate-thumbnail true))))
@@ -223,6 +239,16 @@
             (.disconnect @observer-ref)
             (reset! observer-ref nil)))))
 
+    ;; When the thumbnail-data is empty we regenerate the thumbnail
+    (mf/use-effect
+     (mf/deps (:selrect shape) thumbnail-data)
+     (fn []
+       (let [{:keys [width height]} (:selrect shape)]
+         (p/then (wapi/empty-png-size width height)
+                 (fn [data]
+                   (when (<= (count thumbnail-data) (+ 100 (count data)))
+                     (rx/push! updates-str :update)))))))
+
     [on-load-frame-dom
      @render-frame?
      (mf/html
@@ -248,18 +274,33 @@
          {:key (dm/str "thumbnail-canvas-" (:id shape))
           :ref frame-canvas-ref
           :data-object-id (dm/str page-id (:id shape))
-          :width fixed-width
-          :height fixed-height
-          ;; DEBUG
-          :style {:filter (when (debug? :thumbnails) "invert(1)")
-                  :width "100%"
-                  :height "100%"}}]]
+          :width width
+          :height height
+          :style {;; Safari has a problem with the positioning of the canvas. All this is to fix Safari behavior
+                  ;; https://bugs.webkit.org/show_bug.cgi?id=23113
+                  :display (when (cf/check-browser? :safari) "none")
+                  :position "fixed"
+                  :transform-origin "top left"
+                  :transform (when (cf/check-browser? :safari) (dm/fmt "scale(%)" zoom))
+                  ;; DEBUG
+                  :filter (when (debug? :thumbnails) "invert(1)")}}]]
+
+       ;; Safari don't support filters so instead we add a rectangle around the thumbnail
+       (when (and (cf/check-browser? :safari) (debug? :thumbnails))
+         [:rect {:x (+ x 2)
+                 :y (+ y 2)
+                 :width (- width 4)
+                 :height (- height 4)
+                 :stroke "blue"
+                 :stroke-width 2}])
 
        (when (some? @image-url)
-         [:image {:ref frame-image-ref
-                  :x x
-                  :y y
-                  :href @image-url
-                  :width width
-                  :height height
-                  :on-load on-image-load}])])]))
+         [:foreignObject {:x x
+                          :y y
+                          :width fixed-width
+                          :height fixed-height}
+          [:img {:ref frame-image-ref
+                 :src @image-url
+                 :width fixed-width
+                 :height fixed-height
+                 :on-load on-image-load}]])])]))

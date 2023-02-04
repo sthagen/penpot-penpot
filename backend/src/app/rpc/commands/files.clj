@@ -493,6 +493,7 @@
           (library-summary [{:keys [id data] :as file}]
             (binding [pmap/*load-fn* (partial load-pointer conn id)]
               {:components (assets-sample (:components data) 4)
+               :media (assets-sample (:media data) 3)
                :colors (assets-sample (:colors data) 3)
                :typographies (assets-sample (:typographies data) 3)}))]
 
@@ -996,7 +997,8 @@
           :opt-un [::data]))
 
 (sv/defmethod ::upsert-file-object-thumbnail
-  {::doc/added "1.17"}
+  {::doc/added "1.17"
+   ::audit/skip true}
   [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id file-id] :as params}]
   (db/with-atomic [conn pool]
     (check-edition-permissions! conn profile-id file-id)
@@ -1026,7 +1028,8 @@
 (sv/defmethod ::upsert-file-thumbnail
   "Creates or updates the file thumbnail. Mainly used for paint the
   grid thumbnails."
-  {::doc/added "1.17"}
+  {::doc/added "1.17"
+   ::audit/skip true}
   [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id file-id] :as params}]
   (db/with-atomic [conn pool]
     (check-edition-permissions! conn profile-id file-id)

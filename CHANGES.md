@@ -12,6 +12,17 @@
 
 ### :heart: Community contributions by (Thank you!)
 
+## 1.17.1
+
+### :bug: Bugs fixed
+- Fix components groups items show the component name in list mode [Taiga #4770](https://tree.taiga.io/project/penpot/issue/4770)
+- Fix typing CMD+Z on MacOS turns the cursor into a Zoom cursor [Taiga #4778](https://tree.taiga.io/project/penpot/issue/4778)
+- Fix white space on small screens [Taiga #4774](https://tree.taiga.io/project/penpot/issue/4774)
+- Fix button spacing on delete acount modal [Taiga #4762](https://tree.taiga.io/project/penpot/issue/4762)
+- Fix invitations input on team management and onboarding modal [Taiga #4760](https://tree.taiga.io/project/penpot/issue/4760)
+- Fix weird numeration creating new elements in dashboard [Taiga #4755](https://tree.taiga.io/project/penpot/issue/4755)
+- Fix can move shape with lens zoom active [Taiga #4787](https://tree.taiga.io/project/penpot/issue/4787)
+- Fix social links broken [Taiga #4759](https://tree.taiga.io/project/penpot/issue/4759)
 
 ## 1.17.0
 
@@ -23,6 +34,16 @@
 - Handoff visual improvements [Taiga #3124](https://tree.taiga.io/project/penpot/us/3124)
 - Dynamic alignment only in sight [Github 1971](https://github.com/penpot/penpot/issues/1971)
 - Add some accessibility to shortcut panel [Taiga #4713](https://tree.taiga.io/project/penpot/issue/4713)
+- Add shortcuts for text editing [Taiga #2052](https://tree.taiga.io/project/penpot/us/2052)
+- Second level boards treated as groups in terms of selection [Taiga #4269](https://tree.taiga.io/project/penpot/us/4269)
+- Performance improvements both for backend and frontend
+- Accessibility improvements for login area [Taiga #4353](https://tree.taiga.io/project/penpot/us/4353)
+- Outbound webhooks [Taiga #4577](https://tree.taiga.io/project/penpot/us/4577)
+- Add copy invitation link to the invitation options [Taiga #4213](https://tree.taiga.io/project/penpot/us/4213)
+- Dynamic alignment only in sight [Taiga #3537](https://tree.taiga.io/project/penpot/us/3537)
+- Improve naming of layers [Taiga #4036](https://tree.taiga.io/project/penpot/us/4036)
+- Add zoom lense [Taiga #4691](https://tree.taiga.io/project/penpot/us/4691)
+- Detect potential problems with custom font vertical metrics [Taiga #4697](https://tree.taiga.io/project/penpot/us/4697)
 
 ### :bug: Bugs fixed
 
@@ -63,6 +84,18 @@
 - Fix hidden layers inside groups become visible after the group visibility is changed[Taiga #4710](https://tree.taiga.io/project/penpot/issue/4710)
 - Fix format of HSLA color on viewer [Taiga #4393](https://tree.taiga.io/project/penpot/issue/4393)
 - Fix some typos [Taiga #4724](https://tree.taiga.io/project/penpot/issue/4724)
+- Fix ctrl+c for inspect code [Taiga #4739](https://tree.taiga.io/project/penpot/issue/4739)
+- Fix text in custom font is not at the expected position at export [Taiga #4394](https://tree.taiga.io/project/penpot/issue/4394)
+- Fix unneeded popup when updating local components [Taiga #4430](https://tree.taiga.io/project/penpot/issue/4430)
+- Fix multiuser - "Shadow" element is not updating immediately [Taiga #4709](https://tree.taiga.io/project/penpot/issue/4709)
+- Fix paths not flagged as modified when resized [Taiga #4742](https://tree.taiga.io/project/penpot/issue/4742)
+- Fix resend invitation doesn't reset the expiration date [Taiga #4741](https://tree.taiga.io/project/penpot/issue/4741)
+- Fix incorrect state after undo page creation [Taiga #4690](https://tree.taiga.io/project/penpot/issue/4690)
+- Fix copy paste texts with typography assets linked [Taiga #4750](https://tree.taiga.io/project/penpot/issue/4750)
+
+### :heart: Community contributions by (Thank you!)
+
+- To @iprithvitharun: let's make UX Writing contributions in Open Source a trend!
 
 ## 1.16.2-beta
 

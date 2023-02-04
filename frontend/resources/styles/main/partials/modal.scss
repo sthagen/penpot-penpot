@@ -184,6 +184,7 @@
 
   .modal-footer .action-buttons {
     justify-content: space-around;
+    gap: 15px;
   }
 
   .fields-container {
@@ -693,9 +694,7 @@
       .section-list-item {
         padding: $size-4 0;
         border-bottom: 1px solid $color-gray-20;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        position: relative;
 
         .item-name {
           color: $color-gray-60;
@@ -720,6 +719,8 @@
           color: $color-black;
           padding: $size-2;
           margin-bottom: 0;
+          position: absolute;
+          top: 1rem;
 
           &:hover {
             color: $color-primary;
@@ -801,6 +802,7 @@
   background-color: $color-white;
   box-shadow: 0 10px 10px rgba(0, 0, 0, 0.2);
   display: flex;
+  max-height: 710px;
   min-height: 420px;
   flex-direction: row;
   font-family: "sourcesanspro", sans-serif;
@@ -1195,9 +1197,10 @@
   }
 
   &.right {
-    left: 731px;
-    top: 100px;
+    left: auto;
     color: $color-primary;
+    top: 100px;
+    right: -40px;
   }
 
   &.square {
@@ -1539,8 +1542,52 @@
 
 .onboarding-team-members {
   .team-left {
+    padding: 42px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: auto;
     form {
-      margin-top: 32px;
+      margin-top: 5px;
+      .invite-row {
+        .custom-input {
+          width: 100%;
+          min-height: 80px;
+          height: fit-content;
+          max-height: 176px;
+          overflow-y: hidden;
+          input {
+            &.no-padding {
+              padding-top: 12px;
+            }
+            min-height: 40px;
+          }
+          .selected-items {
+            gap: 7px;
+            padding: 7px;
+            max-height: 132px;
+            overflow-y: scroll;
+            .selected-item {
+              .around {
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                width: fit-content;
+                .icon {
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                }
+              }
+            }
+          }
+        }
+      }
+      .buttons {
+        margin-top: 12px;
+      }
     }
   }
 }

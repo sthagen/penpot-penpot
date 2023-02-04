@@ -82,7 +82,7 @@
         (when (:is-admin permissions)
           {:value "admin" :label (tr "labels.admin")})
         ;; Temporarily disabled viewer roles
-        ;; https://tree.taiga.io/project/uxboxproject/issue/1083
+        ;; https://tree.taiga.io/project/penpot/issue/1083
         ;; {:value "viewer" :label (tr "labels.viewer")}
         ]
        (filterv identity)))
@@ -209,7 +209,7 @@
        [:li {:on-click set-admin} (tr "labels.admin")]
        [:li {:on-click set-editor} (tr "labels.editor")]
         ;; Temporarily disabled viewer role
-        ;; https://tree.taiga.io/project/uxboxproject/issue/1083
+        ;; https://tree.taiga.io/project/penpot/issue/1083
         ;;  [:li {:on-click set-viewer} (tr "labels.viewer")]
        (when you-owner?
          [:li {:on-click (partial set-owner member)} (tr "labels.owner")])]]]))
@@ -460,7 +460,8 @@
         (mf/use-fn
          (fn []
            (st/emit! (msg/success (tr "notifications.invitation-email-sent"))
-                     (modal/hide))))
+                     (modal/hide)
+                     (dd/fetch-team-invitations))))
 
         on-copy-success
         (mf/use-fn
@@ -636,7 +637,9 @@
   {::mf/register modal/components
    ::mf/register-as :webhook}
   [{:keys [webhook] :as props}]
-  (let [initial (mf/use-memo (fn [] (or webhook {:is-active false :mtype "application/json"})))
+  ;; FIXME: this is a workaround because input fields do not support rendering hooks
+  (let [initial (mf/use-memo (fn [] (or (some-> webhook (update :uri str))
+                                        {:is-active false :mtype "application/json"})))
         form    (fm/use-form :spec ::webhook-form
                              :initial initial)
         on-success
@@ -734,8 +737,6 @@
           ]
          [:div.explain (tr "dashboard.webhooks.active.explain")]]]
 
-
-
        [:div.modal-footer
         [:div.action-buttons
          [:input.cancel-button
@@ -826,7 +827,7 @@
         {:success? (nil? error-code)
          :text last-delivery-text}]]]
      [:div.table-field.uri
-      [:div (:uri webhook)]]
+      [:div (dm/str (:uri webhook))]]
      [:div.table-field.active
       [:div (if (:is-active webhook)
               (tr "labels.active")
@@ -887,7 +888,7 @@
 
         on-file-selected
         (fn [file]
-          (st/emit! (dd/update-team-photo {:file file})))]
+          (st/emit! (dd/update-team-photo file)))]
 
 
     (mf/use-effect

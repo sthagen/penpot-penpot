@@ -26,6 +26,7 @@
 
   (let [col?  (ctl/col? shape)
         row?  (ctl/row? shape)
+        space-around?  (ctl/space-around? shape)
 
         wrap? (and (ctl/wrap? shape)
                    (or col? (not (ctl/auto-width? shape)))
@@ -77,8 +78,18 @@
               next-max-width   (+ child-margin-width (if fill-width? child-max-width child-width))
               next-max-height  (+ child-margin-height (if fill-height? child-max-height child-height))
 
-              next-line-min-width  (+ line-min-width  next-min-width  (* layout-gap-col num-children))
-              next-line-min-height (+ line-min-height next-min-height (* layout-gap-row num-children))]
+              total-gap-col (if space-around?
+                              (* layout-gap-col (+ num-children 2))
+                              (* layout-gap-col num-children))
+
+              total-gap-row (if space-around?
+                              (* layout-gap-row (+ num-children 2))
+                              (* layout-gap-row num-children))
+
+              next-line-min-width  (+ line-min-width  next-min-width  total-gap-col)
+              next-line-min-height (+ line-min-height next-min-height total-gap-row)
+
+              ]
 
           (if (and (some? line-data)
                    (or (not wrap?)
@@ -141,6 +152,9 @@
 
   (let [row? (ctl/row? parent)
         col? (ctl/col? parent)
+        auto-width? (ctl/auto-width? parent)
+        auto-height? (ctl/auto-height? parent)
+        space-around? (ctl/space-around? parent)
 
         [layout-gap-row layout-gap-col] (ctl/gaps parent)
 
@@ -168,48 +182,85 @@
       (let [[total-min-width total-min-height total-max-width total-max-height]
             (->> layout-lines (reduce add-ranges [0 0 0 0]))
 
-            get-layout-width (fn [{:keys [num-children]}] (- layout-width (* layout-gap-col (dec num-children))))
-            get-layout-height (fn [{:keys [num-children]}] (- layout-height (* layout-gap-row (dec num-children))))
+            get-layout-width (fn [{:keys [num-children]}]
+                               (let [num-gap (if space-around? (inc num-children) (dec num-children))]
+                                 (- layout-width (* layout-gap-col num-gap))))
+            get-layout-height (fn [{:keys [num-children]}]
+                                (let [num-gap (if space-around? (inc num-children) (dec num-children))]
+                                  (- layout-height (* layout-gap-row num-gap))))
 
             num-lines (count layout-lines)
 
             ;; When align-items is stretch we need to adjust the main axis size to grow for the full content
             stretch-width-fix
-            (if (and col? (ctl/content-stretch? parent))
+            (if (and col? (ctl/content-stretch? parent) (not auto-width?))
               (/ (- layout-width (* layout-gap-col (dec num-lines)) total-max-width) num-lines)
               0)
 
             stretch-height-fix
-            (if (and row? (ctl/content-stretch? parent))
+            (if (and row? (ctl/content-stretch? parent) (not auto-height?))
               (/ (- layout-height (* layout-gap-row (dec num-lines)) total-max-height) num-lines)
               0)
+
+            rest-layout-height (- layout-height (* (dec num-lines) layout-gap-row))
+            rest-layout-width  (- layout-width (* (dec num-lines) layout-gap-col))
 
             ;; Distributes the space between the layout lines based on its max/min constraints
             layout-lines
             (cond->> layout-lines
               row?
-              (map #(assoc % :line-width (max (:line-min-width %) (min (get-layout-width %) (:line-max-width %)))))
+              (map #(assoc % :line-width
+                           (if (ctl/auto-width? parent)
+                             (:line-min-width %)
+                             (max (:line-min-width %) (min (get-layout-width %) (:line-max-width %))))))
 
               col?
-              (map #(assoc % :line-height (max (:line-min-height %) (min (get-layout-height %) (:line-max-height %)))))
+              (map #(assoc % :line-height
+                           (if (ctl/auto-height? parent)
+                             (:line-min-height %)
+                             (max (:line-min-height %) (min (get-layout-height %) (:line-max-height %))))))
 
-              (and row? (>= total-min-height layout-height))
+              (and row? (or (>= total-min-height rest-layout-height) (ctl/auto-height? parent)))
               (map #(assoc % :line-height (:line-min-height %)))
 
-              (and row? (<= total-max-height layout-height))
+              (and row? (<= total-max-height rest-layout-height) (not (ctl/auto-height? parent)))
               (map #(assoc % :line-height (+ (:line-max-height %) stretch-height-fix)))
 
-              (and row? (< total-min-height layout-height total-max-height))
-              (distribute-space :line-height :line-min-height :line-max-height total-min-height (- layout-height (* (dec num-lines) layout-gap-row)))
+              (and row? (< total-min-height rest-layout-height total-max-height) (not (ctl/auto-height? parent)))
+              (distribute-space :line-height :line-min-height :line-max-height total-min-height rest-layout-height)
 
-              (and col? (>= total-min-width layout-width))
+              (and col? (or (>= total-min-width rest-layout-width) (ctl/auto-width? parent)))
               (map #(assoc % :line-width (:line-min-width %)))
 
-              (and col? (<= total-max-width layout-width))
+              (and col? (<= total-max-width rest-layout-width) (not (ctl/auto-width? parent)))
               (map #(assoc % :line-width (+ (:line-max-width %) stretch-width-fix)))
 
-              (and col? (< total-min-width layout-width total-max-width))
-              (distribute-space :line-width :line-min-width :line-max-width total-min-width (- layout-width (* (dec num-lines) layout-gap-col))))
+              (and col? (< total-min-width rest-layout-width total-max-width) (not (ctl/auto-width? parent)))
+              (distribute-space :line-width :line-min-width :line-max-width total-min-width rest-layout-width))
+
+            ;; Add information to limit the growth of width: 100% shapes to the bounds of the layout
+            layout-lines
+            (cond
+              row?
+              (->> layout-lines
+                   (reduce
+                    (fn [[result rest-layout-height] {:keys [line-height] :as line}]
+                      [(conj result (assoc line :to-bound-height rest-layout-height))
+                       (- rest-layout-height line-height layout-gap-row)])
+                    [[] layout-height])
+                   (first))
+
+              col?
+              (->> layout-lines
+                   (reduce
+                    (fn [[result rest-layout-width] {:keys [line-width] :as line}]
+                      [(conj result (assoc line :to-bound-width rest-layout-width))
+                       (- rest-layout-width line-width layout-gap-col)])
+                    [[] layout-width])
+                   (first))
+
+              :else
+              layout-lines)
 
             [total-width total-height] (->> layout-lines (reduce add-lines [0 0]))
 
@@ -226,17 +277,39 @@
 
         row?           (ctl/row? shape)
         col?           (ctl/col? shape)
+        auto-height?   (ctl/auto-height? shape)
+        auto-width?    (ctl/auto-width? shape)
         space-between? (ctl/space-between? shape)
         space-around?  (ctl/space-around? shape)
 
         [layout-gap-row layout-gap-col] (ctl/gaps shape)
 
+        margin-x
+        (cond (and row? space-around? (not auto-width?))
+              (max layout-gap-col (/ (- width line-width) (inc num-children)))
+
+              (and row? space-around? auto-width?)
+              layout-gap-col
+
+              :else
+              0)
+
+        margin-y
+        (cond (and col? space-around? (not auto-height?))
+              (max layout-gap-row (/ (- height line-height) (inc num-children)))
+
+              (and col? space-around? auto-height?)
+              layout-gap-row
+
+              :else
+              0)
+
         layout-gap-col
         (cond (and row? space-around?)
               0
 
-              (and row? space-between?)
-              (/ (- width line-width) (dec num-children))
+              (and row? space-between? (not auto-width?))
+              (max layout-gap-col (/ (- width line-width) (dec num-children)))
 
               :else
               layout-gap-col)
@@ -245,21 +318,11 @@
         (cond (and col? space-around?)
               0
 
-              (and col? space-between?)
-              (/ (- height line-height) (dec num-children))
+              (and col? space-between? (not auto-height?))
+              (max layout-gap-row (/ (- height line-height) (dec num-children)))
 
               :else
-              layout-gap-row)
-
-        margin-x
-        (if (and row? space-around?)
-          (/ (- width line-width) (inc num-children))
-          0)
-
-        margin-y
-        (if (and col? space-around?)
-          (/ (- height line-height) (inc num-children))
-          0)]
+              layout-gap-row)]
     (assoc line-data
            :layout-bounds layout-bounds
            :layout-gap-row layout-gap-row
@@ -308,4 +371,3 @@
     {:layout-lines layout-lines
      :layout-bounds layout-bounds
      :reverse? reverse?}))
-

@@ -247,7 +247,7 @@
      from audit_log
     where archived_at is null
     order by created_at asc
-    limit 256
+    limit 128
       for update skip locked;")
 
 (defn archive-events
@@ -323,7 +323,7 @@
     where archived_at is not null")
 
 (defn- clean-archived
-  [{:keys [pool]}]
+  [{:keys [::db/pool]}]
   (let [result (db/exec-one! pool [sql:clean-archived])
         result (:next.jdbc/update-count result)]
     (l/debug :hint "delete archived audit log entries" :deleted result)

@@ -15,9 +15,9 @@
    [app.config :as cf]
    [app.db :as db]
    [app.http :as-alias http]
-   [app.http.access-token :as-alias actoken]
+   [app.http.access-token :as actoken]
    [app.http.client :as-alias http.client]
-   [app.http.session :as-alias session]
+   [app.http.session :as session]
    [app.loggers.audit :as audit]
    [app.loggers.webhooks :as-alias webhooks]
    [app.main :as-alias main]
@@ -93,7 +93,7 @@
          (p/mcat (partial handle-response request))
          (p/fnly (fn [response cause]
                    (if cause
-                     (raise (ex/wrap-with-context cause {:profile-id profile-id}))
+                     (raise cause)
                      (respond response)))))))
 
 (defn- rpc-mutation-handler
@@ -117,7 +117,7 @@
          (p/mcat (partial handle-response request))
          (p/fnly (fn [response cause]
                    (if cause
-                     (raise (ex/wrap-with-context cause {:profile-id profile-id}))
+                     (raise cause)
                      (respond response)))))))
 
 (defn- rpc-command-handler
@@ -144,7 +144,7 @@
            (p/mcat (partial handle-response request))
            (p/fnly (fn [response cause]
                      (if cause
-                       (raise (ex/wrap-with-context cause {:profile-id profile-id}))
+                       (raise cause)
                        (respond response))))))))
 
 (defn- wrap-metrics
