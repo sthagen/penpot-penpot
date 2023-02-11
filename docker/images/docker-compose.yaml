@@ -40,7 +40,7 @@ services:
       - 9001:80
 
     volumes:
-      - penpot_assets:/opt/penpot/assets
+      - penpot_assets:/opt/data/assets
 
     depends_on:
       - penpot-backend
@@ -180,7 +180,7 @@ services:
       ## stored in a docker volume.
 
       - PENPOT_ASSETS_STORAGE_BACKEND=assets-fs
-      - PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/penpot/assets
+      - PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets
 
       ## Also can be configured to to use a S3 compatible storage
       ## service like MiniIO. Look below for minio service setup.
@@ -259,6 +259,8 @@ services:
       - '1025'
     ports:
       - "1080:1080"
+    networks:
+      - penpot
 
   ## Example configuration of MiniIO (S3 compatible object storage service); If you don't
   ## have preference, then just use filesystem, this is here just for the completeness.

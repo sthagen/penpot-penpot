@@ -651,20 +651,20 @@
     (-> (pcb/empty-changes it page-id)
         (pcb/with-objects objects)
 
-        ; Move the shapes
+        ;; Move the shapes
         (pcb/change-parent parent-id
                            shapes
                            to-index)
 
-        ; Remove empty groups
+        ;; Remove empty groups
         (pcb/remove-objects groups-to-delete)
 
-        ; Unmask groups whose mask have moved outside
+        ;; Unmask groups whose mask have moved outside
         (pcb/update-shapes groups-to-unmask
                            (fn [shape]
                              (assoc shape :masked-group? false)))
 
-        ; Detach shapes moved out of their component
+        ;; Detach shapes moved out of their component
         (pcb/update-shapes shapes-to-detach
                            (fn [shape]
                              (assoc shape :component-id nil
@@ -674,17 +674,17 @@
                                     :shape-ref nil
                                     :touched nil)))
 
-        ; Make non root a component moved inside another one
+        ;; Make non root a component moved inside another one
         (pcb/update-shapes shapes-to-deroot
                            (fn [shape]
                              (assoc shape :component-root? nil)))
 
-        ; Make root a subcomponent moved outside its parent component
+        ;; Make root a subcomponent moved outside its parent component
         (pcb/update-shapes shapes-to-reroot
                            (fn [shape]
                              (assoc shape :component-root? true)))
 
-        ; Reset constraints depending on the new parent
+        ;; Reset constraints depending on the new parent
         (pcb/update-shapes shapes-to-unconstraint
                            (fn [shape]
                              (let [parent      (get objects parent-id)
@@ -699,7 +699,19 @@
                                       :constraints-v (gsh/default-constraints-v moved-shape))))
                            {:ignore-touched true})
 
-        ; Resize parent containers that need to
+        ;; Fix the sizing when moving a shape
+        (pcb/update-shapes parents
+                           (fn [parent]
+                             (if (ctl/layout? parent)
+                               (cond-> parent
+                                 (ctl/change-h-sizing? (:id parent) objects (:shapes parent))
+                                 (assoc :layout-item-h-sizing :fix)
+
+                                 (ctl/change-v-sizing? (:id parent) objects (:shapes parent))
+                                 (assoc :layout-item-v-sizing :fix))
+                               parent)))
+
+        ;; Resize parent containers that need to
         (pcb/resize-parents parents))))
 
 (defn relocate-shapes
@@ -719,9 +731,9 @@
 
             ;; If we try to move a parent into a child we remove it
             ids      (filter #(not (cph/is-parent? objects parent-id %)) ids)
-            parents  (if ignore-parents?
-                       #{parent-id}
-                       (into #{parent-id} (map #(cph/get-parent-id objects %)) ids))
+
+            all-parents (into #{parent-id} (map #(cph/get-parent-id objects %)) ids)
+            parents  (if ignore-parents? #{parent-id} all-parents)
 
             groups-to-delete
             (loop [current-id  (first parents)
@@ -814,17 +826,12 @@
                                              shapes-to-reroot
                                              shapes-to-deroot
                                              ids)
-
-            layouts-to-update
-            (into #{}
-                  (filter (partial ctl/layout? objects))
-                  (concat [parent-id] (cph/get-parent-ids objects parent-id)))
             undo-id (js/Symbol)]
 
         (rx/of (dwu/start-undo-transaction undo-id)
                (dch/commit-changes changes)
                (dwco/expand-collapse parent-id)
-               (ptk/data-event :layout/update layouts-to-update)
+               (ptk/data-event :layout/update (concat all-parents ids))
                (dwu/commit-undo-transaction undo-id))))))
 
 (defn relocate-selected-shapes
@@ -1433,6 +1440,19 @@
     (and (= 1 (count selected))
          (= :frame (get-in objects [(first selected) :type])))))
 
+(defn same-frame-from-selected? [state frame-id]
+  (let [selected (wsh/lookup-selected state)]
+     (contains? frame-id (first selected))))
+
+(defn frame-same-size?
+  [paste-obj frame-obj]
+  (and
+   (= (:heigth (:selrect (first (vals paste-obj))))
+      (:heigth (:selrect frame-obj)))
+   (= (:width (:selrect (first (vals paste-obj))))
+      (:width (:selrect frame-obj)))))
+
+
 (defn- paste-shape
   [{selected :selected
     paste-objects :objects ;; rename this because here comes only the clipboard shapes,
@@ -1471,55 +1491,67 @@
               item))
 
           (calculate-paste-position [state mouse-pos in-viewport?]
-            (let [page-objects  (wsh/lookup-page-objects state)
-                  selected-objs (map #(get paste-objects %) selected)
-                  page-selected (wsh/lookup-selected state)
-                  wrapper       (gsh/selection-rect selected-objs)
-                  orig-pos      (gpt/point (:x1 wrapper) (:y1 wrapper))]
+            (let [page-objects       (wsh/lookup-page-objects state)
+                  selected-objs      (map #(get paste-objects %) selected)
+                  first-selected-obj (first selected-objs)
+                  page-selected      (wsh/lookup-selected state)
+                  wrapper            (gsh/selection-rect selected-objs)
+                  orig-pos           (gpt/point (:x1 wrapper) (:y1 wrapper))
+                  frame-id           (first page-selected)
+                  frame-object       (get page-objects frame-id)
+                  base               (cph/get-base-shape page-objects page-selected)
+                  index              (cph/get-position-on-parent page-objects (:id base))]
 
               (cond
-                ;; Pasting inside a frame
                 (selected-frame? state)
-                (let [frame-id (first page-selected)
-                      frame-object (get page-objects frame-id)
 
-                      origin-frame-id (:frame-id (first selected-objs))
-                      origin-frame-object (get page-objects origin-frame-id)
+                (if (or (same-frame-from-selected? state (first (vals paste-objects)))
+                        (frame-same-size? paste-objects frame-object))
+                  ;; Paste next to selected frame, if selected is itself or of the same size as the copied
+                  (let [selected-frame-obj (get page-objects (first page-selected))
+                        parent-id          (:parent-id base)
+                        paste-x            (+ (:width selected-frame-obj) (:x selected-frame-obj) 50)
+                        paste-y            (:y selected-frame-obj)
+                        delta              (gpt/subtract (gpt/point paste-x paste-y) orig-pos)]
 
-                      margin-x (-> (- (:width origin-frame-object) (+ (:x wrapper) (:width wrapper)))
-                                   (min (- (:width frame-object) (:width wrapper))))
+                    [(:frame-id base) parent-id delta index])
 
-                      margin-y  (-> (- (:height origin-frame-object) (+ (:y wrapper) (:height wrapper)))
-                                    (min (- (:height frame-object) (:height wrapper))))
+                  ;; Paste inside selected frame otherwise
+                  (let [origin-frame-id (:frame-id first-selected-obj)
+                        origin-frame-object (get page-objects origin-frame-id)
+
+                        margin-x (-> (- (:width origin-frame-object) (+ (:x wrapper) (:width wrapper)))
+                                     (min (- (:width frame-object) (:width wrapper))))
+
+                        margin-y  (-> (- (:height origin-frame-object) (+ (:y wrapper) (:height wrapper)))
+                                      (min (- (:height frame-object) (:height wrapper))))
 
                       ;; Pasted objects mustn't exceed the selected frame x limit
-                      paste-x (if (> (+ (:width wrapper) (:x1 wrapper)) (:width frame-object))
-                                (+ (- (:x frame-object) (:x orig-pos)) (- (:width frame-object) (:width wrapper) margin-x))
-                                (:x frame-object))
+                        paste-x (if (> (+ (:width wrapper) (:x1 wrapper)) (:width frame-object))
+                                  (+ (- (:x frame-object) (:x orig-pos)) (- (:width frame-object) (:width wrapper) margin-x))
+                                  (:x frame-object))
 
                       ;; Pasted objects mustn't exceed the selected frame y limit
-                      paste-y (if (> (+ (:height wrapper) (:y1 wrapper)) (:height frame-object))
-                                (+ (- (:y frame-object) (:y orig-pos)) (- (:height frame-object) (:height wrapper) margin-y))
-                                (:y frame-object))
+                        paste-y (if (> (+ (:height wrapper) (:y1 wrapper)) (:height frame-object))
+                                  (+ (- (:y frame-object) (:y orig-pos)) (- (:height frame-object) (:height wrapper) margin-y))
+                                  (:y frame-object))
 
-                      delta (if (= origin-frame-id uuid/zero)
+                        delta (if (= origin-frame-id uuid/zero)
                               ;; When the origin isn't in a frame the result is pasted in the center.
-                              (gpt/subtract (gsh/center-shape frame-object) (gsh/center-selrect wrapper))
+                                (gpt/subtract (gsh/center-shape frame-object) (gsh/center-selrect wrapper))
                               ;; When pasting from one frame to another frame the object position must be limited to container boundaries. If the pasted object doesn't fit we try to:
                               ;;    - Align it to the limits on the x and y axis
                               ;;    - Respect the distance of the object to the right and bottom in the original frame
-                              (gpt/point paste-x paste-y))]
-                  [frame-id frame-id delta])
-
+                                (gpt/point paste-x paste-y))]
+                    [frame-id frame-id delta]))
+                
                 (empty? page-selected)
                 (let [frame-id (ctst/top-nested-frame page-objects mouse-pos)
                       delta    (gpt/subtract mouse-pos orig-pos)]
                   [frame-id frame-id delta])
 
                 :else
-                (let [base      (cph/get-base-shape page-objects page-selected)
-                      index     (cph/get-position-on-parent page-objects (:id base))
-                      frame-id  (:frame-id base)
+                (let [frame-id  (:frame-id base)
                       parent-id (:parent-id base)
                       delta     (if in-viewport?
                                   (gpt/subtract mouse-pos orig-pos)
