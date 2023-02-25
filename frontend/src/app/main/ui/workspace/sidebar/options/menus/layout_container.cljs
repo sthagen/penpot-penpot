@@ -7,6 +7,7 @@
 (ns app.main.ui.workspace.sidebar.options.menus.layout-container
   (:require [app.common.data :as d]
             [app.common.data.macros :as dm]
+            [app.main.data.workspace :as udw]
             [app.main.data.workspace.shape-layout :as dwsl]
             [app.main.store :as st]
             [app.main.ui.components.numeric-input :refer [numeric-input]]
@@ -21,8 +22,8 @@
    :layout-gap-type        ;; :simple, :multiple
    :layout-gap             ;; {:row-gap number , :column-gap number}
    :layout-align-items     ;; :start :end :center :stretch
-   :layout-justify-content ;; :start :center :end :space-between :space-around
-   :layout-align-content   ;; :start :center :end :space-between :space-around :stretch (by default)
+   :layout-justify-content ;; :start :center :end :space-between :space-around :space-evenly
+   :layout-align-content   ;; :start :center :end :space-between :space-around :space-evenly :stretch (by default)
    :layout-wrap-type       ;; :wrap, :nowrap
    :layout-padding-type    ;; :simple, :multiple
    :layout-padding         ;; {:p1 num :p2 num :p3 num :p4 num} number could be negative
@@ -50,12 +51,14 @@
                          :end           i/justify-content-column-end
                          :center        i/justify-content-column-center
                          :space-around  i/justify-content-column-around
+                         :space-evenly  i/justify-content-column-evenly
                          :space-between i/justify-content-column-between)
                        (case val
                          :start         i/justify-content-row-start
                          :end           i/justify-content-row-end
                          :center        i/justify-content-row-center
                          :space-around  i/justify-content-row-around
+                         :space-evenly  i/justify-content-row-evenly
                          :space-between i/justify-content-row-between))
 
     :align-content  (if is-col?
@@ -64,6 +67,7 @@
                         :end           i/align-content-column-end
                         :center        i/align-content-column-center
                         :space-around  i/align-content-column-around
+                        :space-evenly  i/align-content-column-evenly
                         :space-between i/align-content-column-between
                         :stretch nil)
 
@@ -72,6 +76,7 @@
                         :end           i/align-content-row-end
                         :center        i/align-content-row-center
                         :space-around  i/align-content-row-around
+                        :space-evenly  i/align-content-row-evenly
                         :space-between i/align-content-row-between
                         :stretch nil))
 
@@ -140,16 +145,27 @@
 
 (mf/defc align-content-row
   [{:keys [is-col? align-content set-align-content] :as props}]
-  [:div.align-content-style
-   (for [align [:start :center :end :space-around :space-between]]
-     [:button.align-content.tooltip
-      {:class    (dom/classnames :active  (= align-content align)
-                                 :tooltip-bottom-left (not= align :start)
-                                 :tooltip-bottom (= align :start))
-       :alt      (dm/str "Align content " (d/name align))
-       :on-click #(set-align-content align)
-       :key      (dm/str  "align-content" (d/name align))}
-      (get-layout-flex-icon :align-content align is-col?)])])
+  [:*
+   [:div.align-content-style
+    (for [align [:start :center :end]]
+      [:button.align-content.tooltip
+       {:class    (dom/classnames :active  (= align-content align)
+                                  :tooltip-bottom-left (not= align :start)
+                                  :tooltip-bottom (= align :start))
+        :alt      (dm/str "Align content " (d/name align))
+        :on-click #(set-align-content align)
+        :key      (dm/str  "align-content" (d/name align))}
+       (get-layout-flex-icon :align-content align is-col?)])]
+   [:div.align-content-style
+    (for [align [:space-between :space-around :space-evenly]]
+      [:button.align-content.tooltip
+       {:class    (dom/classnames :active  (= align-content align)
+                                  :tooltip-bottom-left (not= align :start)
+                                  :tooltip-bottom (= align :start))
+        :alt      (dm/str "Align content " (d/name align))
+        :on-click #(set-align-content align)
+        :key      (dm/str  "align-content" (d/name align))}
+       (get-layout-flex-icon :align-content align is-col?)])]])
 
 (mf/defc justify-content-row
   [{:keys [is-col? justify-content set-justify] :as props}]
@@ -165,7 +181,7 @@
         :key (dm/str "justify-content" (d/name justify))}
        (get-layout-flex-icon :justify-content justify is-col?)])]
    [:div.justify-content-style
-    (for [justify [:space-around :space-between]]
+    (for [justify [:space-between :space-around :space-evenly]]
       [:button.justify.tooltip
        {:class    (dom/classnames :active  (= justify-content justify)
                                   :tooltip-bottom-left (not= justify :space-around)
@@ -189,7 +205,13 @@
                     (= (dm/get-in values [:layout-padding :p2])
                        (dm/get-in values [:layout-padding :p4])))
              (dm/get-in values [:layout-padding :p2])
-             "--")]
+             "--")
+
+        select-paddings
+        (fn [p1? p2? p3? p4?]
+          (st/emit! (udw/set-paddings-selected {:p1 p1? :p2 p2? :p3 p3? :p4 p4?})))
+
+        select-padding #(select-paddings (= % :p1) (= % :p2) (= % :p3) (= % :p4))]
 
     [:div.padding-row
      (cond
@@ -203,6 +225,8 @@
           {:placeholder "--"
            :on-click #(dom/select-target %)
            :on-change (partial on-change :simple :p1)
+           :on-focus #(select-paddings true false true false)
+           :on-blur #(select-paddings false false false false)
            :value p1}]]
 
         [:div.padding-item.tooltip.tooltip-bottom-left
@@ -212,6 +236,8 @@
           {:placeholder "--"
            :on-click #(dom/select-target %)
            :on-change (partial on-change :simple :p2)
+           :on-focus #(select-paddings false true false true)
+           :on-blur #(select-paddings false false false false)
            :value p2}]]]
 
        (= padding-type :multiple)
@@ -229,12 +255,14 @@
              {:placeholder "--"
               :on-click #(dom/select-target %)
               :on-change (partial on-change :multiple num)
+              :on-focus #(select-padding num)
+              :on-blur #(select-paddings false false false false)
               :value (num (:layout-padding values))}]]])])
 
      [:div.padding-icons
       [:div.padding-icon.tooltip.tooltip-bottom-left
        {:class (dom/classnames :selected (= padding-type :multiple))
-        :alt "Padding - multiple"
+        :alt "Independent paddings"
         :on-click #(on-change-style (if (= padding-type :multiple) :simple :multiple))}
        i/auto-padding-side]]]))
 
@@ -399,7 +427,7 @@
             (when (= :wrap wrap-type)
               [:div.layout-row
                [:div.align-content.row-title "Content"]
-               [:div.btn-wrapper
+               [:div.btn-wrapper.align-content
                 [:& align-content-row {:is-col? is-col?
                                        :align-content align-content
                                        :set-align-content set-align-content}]]])

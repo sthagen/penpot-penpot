@@ -5,19 +5,30 @@
 ### :boom: Breaking changes & Deprecations
 
 ### :sparkles: New features
+- Adds more accessibility improvements in dashboard [Taiga #4577](https://tree.taiga.io/project/penpot/us/4577)
 - Adds paddings and gaps prediction on layout creation [Taiga #4838](https://tree.taiga.io/project/penpot/task/4838)
+- Add visual feedback when proportionally scaling text elements with **K** [Taiga #3415](https://tree.taiga.io/project/penpot/us/3415)
+- Add visualization and mouse control to paddings in frames with layout [Taiga #4839](https://tree.taiga.io/project/penpot/task/4839)
+- Allow for absolute positioned elements inside layout [Taiga #4834](https://tree.taiga.io/project/penpot/us/4834)
+- Add z-index option for flex layout items [Taiga #2980](https://tree.taiga.io/project/penpot/us/2980)
 
 ### :bug: Bugs fixed
 
 ### :arrow_up: Deps updates
 
 ### :heart: Community contributions by (Thank you!)
-
+- To @ondrejkonec: for contributing to the code with:
+- Refactor CSS variables [Github #2948](https://github.com/penpot/penpot/pull/2948)
 
 ## 1.17.2
 
 ### :bug: Bugs fixed
+
 - Fix invite members button text [Taiga #4794](https://tree.taiga.io/project/penpot/issue/4794)
+- Fix problem with opacity in frames [Taiga #4795](https://tree.taiga.io/project/penpot/issue/4795)
+- Fix correct behaviour for space-around and added space-evenly option
+- Fix duplicate with alt and undo only undo one step [Taiga #4746](https://tree.taiga.io/project/penpot/issue/4746)
+- Fix problem creating frames inside layout [Taiga #4844](https://tree.taiga.io/project/penpot/issue/4844)
 
 ## 1.17.2
 

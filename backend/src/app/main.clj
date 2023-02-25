@@ -22,7 +22,6 @@
    [app.http.session :as-alias session]
    [app.http.session.tasks :as-alias session.tasks]
    [app.http.websocket :as http.ws]
-   [app.loggers.audit :as-alias audit]
    [app.loggers.audit.tasks :as-alias audit.tasks]
    [app.loggers.webhooks :as-alias webhooks]
    [app.metrics :as-alias mtx]
@@ -281,7 +280,6 @@
                           :github (ig/ref ::oidc.providers/github)
                           :gitlab (ig/ref ::oidc.providers/gitlab)
                           :oidc   (ig/ref ::oidc.providers/generic)}
-    ::audit/collector    (ig/ref ::audit/collector)
     ::session/manager    (ig/ref ::session/manager)}
 
    :app.http/router
@@ -326,8 +324,7 @@
     ::wrk/scheduled-executor (ig/ref ::wrk/scheduled-executor)}
 
    :app.rpc/methods
-   {::audit/collector    (ig/ref ::audit/collector)
-    ::http.client/client (ig/ref ::http.client/client)
+   {::http.client/client (ig/ref ::http.client/client)
     ::db/pool            (ig/ref ::db/pool)
     ::wrk/executor       (ig/ref ::wrk/executor)
     ::session/manager    (ig/ref ::session/manager)
@@ -427,11 +424,6 @@
     ;; NOTE: this dependency is only necessary for proper initialization ordering, props
     ;; module requires the migrations to run before initialize.
     ::migrations (ig/ref :app.migrations/migrations)}
-
-   ::audit/collector
-   {::db/pool           (ig/ref ::db/pool)
-    ::wrk/executor      (ig/ref ::wrk/executor)
-    ::mtx/metrics       (ig/ref ::mtx/metrics)}
 
    ::audit.tasks/archive
    {::props              (ig/ref :app.setup/props)

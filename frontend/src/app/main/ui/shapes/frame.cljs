@@ -8,6 +8,8 @@
   (:require
    [app.common.data.macros :as dm]
    [app.common.geom.shapes :as gsh]
+   [app.common.pages.helpers :as cph]
+   [app.common.types.shape.layout :as ctl]
    [app.config :as cf]
    [app.main.ui.context :as muc]
    [app.main.ui.shapes.attrs :as attrs]
@@ -124,11 +126,13 @@
   (mf/fnc frame-shape
     {::mf/wrap-props false}
     [props]
-
-    (let [childs (unchecked-get props "childs")]
+    (let [shape  (unchecked-get props "shape")
+          childs (unchecked-get props "childs")
+          childs (cond-> childs
+                   (ctl/layout? shape)
+                   (cph/sort-layout-children-z-index))]
       [:> frame-container props
-       [:g.frame-children
+       [:g.frame-children {:opacity (:opacity shape)}
         (for [item childs]
-            [:& shape-wrapper {:key (dm/str (:id item)) :shape item}]
-            )]])))
+          [:& shape-wrapper {:key (dm/str (:id item)) :shape item}])]])))
 

@@ -14,6 +14,7 @@
    [app.common.pages.helpers :as cph]
    [app.common.spec :as us]
    [app.common.types.shape :as cts]
+   [app.common.types.shape.layout :as ctl]
    [app.common.uuid :as uuid]
    [clojure.spec.alpha :as s]))
 
@@ -161,7 +162,16 @@
 
       ;; Check which index is lower
       :else
-      (< index-a index-b))))
+      ;; If the base is a layout we should check if the z-index property is set
+      (let [[z-index-a z-index-b]
+            (if (ctl/layout? objects base)
+              [(ctl/layout-z-index objects (dm/get-in objects [base :shapes index-a]))
+               (ctl/layout-z-index objects (dm/get-in objects [base :shapes index-b]))]
+              [0 0])]
+
+        (if (= z-index-a z-index-b)
+          (< index-a index-b)
+          (< z-index-a z-index-b))))))
 
 (defn sort-z-index
   ([objects ids]
@@ -205,9 +215,8 @@
 (defn all-frames-by-position
   [objects position]
   (->> (get-frames-ids objects)
-       (sort-z-index objects)
-       (filterv #(and position (gsh/has-point? (get objects %) position)))))
-
+       (filter #(and position (gsh/has-point? (get objects %) position)))
+       (sort-z-index objects)))
 
 (defn top-nested-frame
   "Search for the top nested frame for positioning shapes when moving or creating.

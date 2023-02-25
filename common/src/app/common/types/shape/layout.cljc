@@ -15,8 +15,8 @@
 ;; :layout-gap-type        ;; :simple, :multiple
 ;; :layout-gap             ;; {:row-gap number , :column-gap number}
 ;; :layout-align-items     ;; :start :end :center :stretch
-;; :layout-justify-content ;; :start :center :end :space-between :space-around
-;; :layout-align-content   ;; :start :center :end :space-between :space-around :stretch (by default)
+;; :layout-justify-content ;; :start :center :end :space-between :space-around :space-evenly
+;; :layout-align-content   ;; :start :center :end :space-between :space-around :space-evenly :stretch (by default)
 ;; :layout-wrap-type       ;; :wrap, :nowrap
 ;; :layout-padding-type    ;; :simple, :multiple
 ;; :layout-padding         ;; {:p1 num :p2 num :p3 num :p4 num} number could be negative
@@ -30,14 +30,16 @@
 ;; :layout-item-min-h       ;; num
 ;; :layout-item-max-w       ;; num
 ;; :layout-item-min-w       ;; num
+;; :layout-item-absolute
+;; :layout-item-z-index
 
 (s/def ::layout  #{:flex :grid})
 (s/def ::layout-flex-dir #{:row :reverse-row :row-reverse :column :reverse-column :column-reverse}) ;;TODO remove reverse-column and reverse-row after script
 (s/def ::layout-gap-type #{:simple :multiple})
 (s/def ::layout-gap ::us/safe-number)
 (s/def ::layout-align-items #{:start :end :center :stretch})
-(s/def ::layout-align-content #{:start :end :center :space-between :space-around :stretch})
-(s/def ::layout-justify-content #{:start :center :end :space-between :space-around})
+(s/def ::layout-align-content #{:start :end :center :space-between :space-around :space-evenly :stretch})
+(s/def ::layout-justify-content #{:start :center :end :space-between :space-around :space-evenly})
 (s/def ::layout-wrap-type #{:wrap :nowrap :no-wrap}) ;;TODO remove no-wrap after script
 (s/def ::layout-padding-type #{:simple :multiple})
 
@@ -82,6 +84,8 @@
 (s/def ::layout-item-min-h ::us/safe-number)
 (s/def ::layout-item-max-w ::us/safe-number)
 (s/def ::layout-item-min-w ::us/safe-number)
+(s/def ::layout-item-absolute boolean?)
+(s/def ::layout-item-z-index ::us/safe-integer)
 
 (s/def ::layout-child-props
   (s/keys :opt-un [::layout-item-margin
@@ -92,7 +96,9 @@
                    ::layout-item-min-h
                    ::layout-item-max-w
                    ::layout-item-min-w
-                   ::layout-item-align-self]))
+                   ::layout-item-align-self
+                   ::layout-item-absolute
+                   ::layout-item-z-index]))
 
 (defn layout?
   ([objects id]
@@ -286,6 +292,10 @@
   [{:keys [layout-align-content]}]
   (= :space-around layout-align-content))
 
+(defn content-evenly?
+  [{:keys [layout-align-content]}]
+  (= :space-evenly layout-align-content))
+
 (defn content-stretch?
   [{:keys [layout-align-content]}]
   (or (= :stretch layout-align-content)
@@ -320,6 +330,10 @@
   [{:keys [layout-justify-content]}]
   (= layout-justify-content :space-around))
 
+(defn space-evenly?
+  [{:keys [layout-justify-content]}]
+  (= layout-justify-content :space-evenly))
+
 (defn align-self-start? [{:keys [layout-item-align-self]}]
   (= :start layout-item-align-self))
 
@@ -350,3 +364,43 @@
            (and (row? objects frame-id)
                 (every? (partial fill-height? objects) children-ids)))))
 
+(defn layout-absolute?
+  ([objects id]
+   (layout-absolute? (get objects id)))
+  ([shape]
+   (true? (:layout-item-absolute shape))))
+
+(defn layout-z-index
+  ([objects id]
+   (layout-z-index (get objects id)))
+  ([shape]
+   (or (:layout-item-z-index shape) 0)))
+
+(defn remove-layout-container-data
+  [shape]
+  (dissoc shape
+          :layout
+          :layout-flex-dir
+          :layout-gap
+          :layout-gap-type
+          :layout-wrap-type
+          :layout-padding-type
+          :layout-padding
+          :layout-justify-content
+          :layout-align-items
+          :layout-align-content))
+
+(defn remove-layout-item-data
+  [shape]
+  (dissoc shape
+          :layout-item-margin
+          :layout-item-margin-type
+          :layout-item-h-sizing
+          :layout-item-v-sizing
+          :layout-item-max-h
+          :layout-item-min-h
+          :layout-item-max-w
+          :layout-item-min-w
+          :layout-item-align-self
+          :layout-item-absolute
+          :layout-item-z-index))
