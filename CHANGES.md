@@ -11,6 +11,7 @@
 - Add visualization and mouse control to paddings in frames with layout [Taiga #4839](https://tree.taiga.io/project/penpot/task/4839)
 - Allow for absolute positioned elements inside layout [Taiga #4834](https://tree.taiga.io/project/penpot/us/4834)
 - Add z-index option for flex layout items [Taiga #2980](https://tree.taiga.io/project/penpot/us/2980)
+- Scale content proportionally affects strokes, shadows, blurs and corners [Taiga #1951](https://tree.taiga.io/project/penpot/us/1951)
 
 ### :bug: Bugs fixed
 
@@ -19,6 +20,13 @@
 ### :heart: Community contributions by (Thank you!)
 - To @ondrejkonec: for contributing to the code with:
 - Refactor CSS variables [Github #2948](https://github.com/penpot/penpot/pull/2948)
+
+## 1.17.3
+
+### :bug: Bugs fixed
+- Fix copy and paste very nested inside itself [Taiga #4848](https://tree.taiga.io/project/penpot/issue/4848)
+- Fix custom fonts not rendered correctly [Taiga #4874](https://tree.taiga.io/project/penpot/issue/4874)
+- Fix problem with shadows and blur on multiple selection
 
 ## 1.17.2
 
@@ -29,10 +37,6 @@
 - Fix correct behaviour for space-around and added space-evenly option
 - Fix duplicate with alt and undo only undo one step [Taiga #4746](https://tree.taiga.io/project/penpot/issue/4746)
 - Fix problem creating frames inside layout [Taiga #4844](https://tree.taiga.io/project/penpot/issue/4844)
-
-## 1.17.2
-
-### :bug: Bugs fixed
 - Fix paste board inside itself [Taiga #4775](https://tree.taiga.io/project/penpot/issue/4775)
 - Fix middle button panning can drag guides [Taiga #4266](https://tree.taiga.io/project/penpot/issue/4266)
 
