@@ -8,12 +8,22 @@
 - Adds more accessibility improvements in dashboard [Taiga #4577](https://tree.taiga.io/project/penpot/us/4577)
 - Adds paddings and gaps prediction on layout creation [Taiga #4838](https://tree.taiga.io/project/penpot/task/4838)
 - Add visual feedback when proportionally scaling text elements with **K** [Taiga #3415](https://tree.taiga.io/project/penpot/us/3415)
-- Add visualization and mouse control to paddings in frames with layout [Taiga #4839](https://tree.taiga.io/project/penpot/task/4839)
+- Add visualization and mouse control to paddings, margins and gaps in frames with layout [Taiga #4839](https://tree.taiga.io/project/penpot/task/4839)
 - Allow for absolute positioned elements inside layout [Taiga #4834](https://tree.taiga.io/project/penpot/us/4834)
 - Add z-index option for flex layout items [Taiga #2980](https://tree.taiga.io/project/penpot/us/2980)
 - Scale content proportionally affects strokes, shadows, blurs and corners [Taiga #1951](https://tree.taiga.io/project/penpot/us/1951)
 
 ### :bug: Bugs fixed
+
+- Fix problem with rules position on changing pages [Taiga #4847](https://tree.taiga.io/project/penpot/issue/4847)
+- Fix error streen when uploading wrong SVG [#2995](https://github.com/penpot/penpot/issues/2995)
+- Fix selecting children from hidden parent layers [Taiga #4934](https://tree.taiga.io/project/penpot/issue/4934)
+- Fix problem when undoing multiple selected colors [Taiga #4920](https://tree.taiga.io/project/penpot/issue/4920)
+- Allow selection of empty board by partial rect [Taiga #4806](https://tree.taiga.io/project/penpot/issue/4806)
+- Improve behavior for undo on text edition [Taiga #4693](https://tree.taiga.io/project/penpot/issue/4693)
+- Improve deeps selection of nested arboards [Taiga #4913](https://tree.taiga.io/project/penpot/issue/4913)
+- Fix problem on selection numeric inputs on Firefox [#2991](https://github.com/penpot/penpot/issues/2991)
+- Changed the text dominant-baseline to use ideographic [Taiga #4791](https://tree.taiga.io/project/penpot/issue/4791)
 
 ### :arrow_up: Deps updates
 
@@ -27,6 +37,15 @@
 - Fix copy and paste very nested inside itself [Taiga #4848](https://tree.taiga.io/project/penpot/issue/4848)
 - Fix custom fonts not rendered correctly [Taiga #4874](https://tree.taiga.io/project/penpot/issue/4874)
 - Fix problem with shadows and blur on multiple selection
+- Fix problem with redo shortcut
+- Fix Component texts not displayed in assets panel [Taiga #4907](https://tree.taiga.io/project/penpot/issue/4907)
+- Fix search field has implemented shared styles for "close icon" and "search icon" [Taiga #4927](https://tree.taiga.io/project/penpot/issue/4927)
+- Fix Handling correctly slashes "/" in emails [Taiga #4906](https://tree.taiga.io/project/penpot/issue/4906)
+- Fix Change text color from selected colors [Taiga #4933](https://tree.taiga.io/project/penpot/issue/4933)
+
+### :sparkles: Enhancements
+
+- Adds environment variables for specifying the export and backend URI for the frontend docker image, thanks to @Supernova3339 for the initial PR and suggestion [Github #2984](https://github.com/penpot/penpot/issues/2984)
 
 ## 1.17.2
 

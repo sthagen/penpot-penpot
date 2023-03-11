@@ -222,10 +222,14 @@
 
         show-padding? (and (= (count selected-shapes) 1)
                         (= (:type (first selected-shapes)) :frame)
-                        (= (:layout (first selected-shapes)) :flex))]
+                        (= (:layout (first selected-shapes)) :flex))
+
+
+        show-margin? (and (= (count selected-shapes) 1)
+                          (= (:layout selected-frame) :flex))]
 
     (hooks/setup-dom-events viewport-ref zoom disable-paste in-viewport? workspace-read-only?)
-    (hooks/setup-viewport-size viewport-ref)
+    (hooks/setup-viewport-size vport viewport-ref)
     (hooks/setup-cursor cursor alt? mod? space? panning drawing-tool drawing-path? node-editing? z? workspace-read-only?)
     (hooks/setup-keyboard alt? mod? space? z? shift?)
     (hooks/setup-hover-shapes page-id move-stream base-objects transform selected mod? hover hover-ids hover-top-frame-id @hover-disabled? focus zoom show-measures?)
@@ -382,12 +386,29 @@
            :zoom zoom}])
 
        (when show-padding?
-         [:& msr/padding
-          {:frame (first selected-shapes)
-          :hover @frame-hover
-          :zoom zoom
-          :alt? @alt?
-          :shift? @shift?}])
+         [:*
+          [:& msr/padding
+           {:frame (first selected-shapes)
+            :hover @frame-hover
+            :zoom zoom
+            :alt? @alt?
+            :shift? @shift?}]
+
+          [:& msr/gap
+           {:frame (first selected-shapes)
+            :hover @frame-hover
+            :zoom zoom
+            :alt? @alt?
+            :shift? @shift?}]])
+
+       (when show-margin?
+         [:& msr/margin
+          {:shape (first selected-shapes)
+           :parent selected-frame
+           :hover @frame-hover
+           :zoom zoom
+           :alt? @alt?
+           :shift? @shift?}])
 
        [:& widgets/frame-titles
         {:objects base-objects

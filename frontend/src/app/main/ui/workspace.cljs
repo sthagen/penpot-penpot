@@ -16,6 +16,7 @@
    [app.main.refs :as refs]
    [app.main.store :as st]
    [app.main.ui.context :as ctx]
+   [app.main.ui.hooks :as hooks]
    [app.main.ui.hooks.resize :refer [use-resize-observer]]
    [app.main.ui.icons :as i]
    [app.main.ui.workspace.colorpalette :refer [colorpalette]]
@@ -45,6 +46,7 @@
   (let [selected (mf/deref refs/selected-shapes)
         file     (obj/get props "file")
         layout   (obj/get props "layout")
+        page-id  (obj/get props "page-id")
 
         {:keys [vport] :as wlocal} (mf/deref refs/workspace-local)
         {:keys [options-mode] :as wglobal} (obj/get props "wglobal")
@@ -68,7 +70,8 @@
      (when (and textpalette? (not hide-ui?))
        [:& textpalette])
 
-     [:section.workspace-content {:ref node-ref}
+     [:section.workspace-content {:key (dm/str "workspace-" page-id)
+                                  :ref node-ref}
       [:section.workspace-viewport
        (when (debug? :coordinates)
          [:& coordinates/coordinates {:colorpalette? colorpalette?}])
@@ -100,19 +103,21 @@
 (mf/defc workspace-page
   [{:keys [file layout page-id wglobal] :as props}]
 
- (mf/with-effect [page-id]
-   (if (nil? page-id)
-     (st/emit! (dw/go-to-page))
-     (st/emit! (dw/initialize-page page-id)))
-   (fn []
-     (when page-id
-       (st/emit! (dw/finalize-page page-id)))))
+  (let [prev-page-id (hooks/use-previous page-id)]
+    (mf/with-effect
+      [page-id]
+      (when (and prev-page-id (not= prev-page-id page-id))
+        (st/emit! (dw/finalize-page prev-page-id)))
 
-  (when (mf/deref trimmed-page-ref)
-    [:& workspace-content {:key (dm/str page-id)
-                           :file file
-                           :wglobal wglobal
-                           :layout layout}]))
+      (if (nil? page-id)
+        (st/emit! (dw/go-to-page))
+        (st/emit! (dw/initialize-page page-id))))
+
+    (when (mf/deref trimmed-page-ref)
+      [:& workspace-content {:page-id page-id
+                             :file file
+                             :wglobal wglobal
+                             :layout layout}])))
 
 (mf/defc workspace-loader
   []
@@ -126,7 +131,7 @@
         project              (mf/deref refs/workspace-project)
         layout               (mf/deref refs/workspace-layout)
         wglobal              (mf/deref refs/workspace-global)
-        ready?  (mf/deref refs/workspace-ready?)
+        ready?               (mf/deref refs/workspace-ready?)
         workspace-read-only? (mf/deref refs/workspace-read-only?)
 
         components-v2 (features/use-feature :components-v2)
@@ -169,11 +174,10 @@
            [:& context-menu]
 
           (if ready?
-             [:& workspace-page {:key (dm/str "page-" page-id)
-                                 :page-id page-id
-                                 :file file
-                                 :wglobal wglobal
-                                 :layout layout}]
+            [:& workspace-page {:page-id page-id
+                                :file file
+                                :wglobal wglobal
+                                :layout layout}]
              [:& workspace-loader])]]]]]]]))
 
 (mf/defc remove-graphics-dialog

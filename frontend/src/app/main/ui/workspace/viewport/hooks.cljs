@@ -7,6 +7,7 @@
 (ns app.main.ui.workspace.viewport.hooks
   (:require
    [app.common.data :as d]
+   [app.common.data.macros :as dm]
    [app.common.geom.shapes :as gsh]
    [app.common.pages :as cp]
    [app.common.pages.helpers :as cph]
@@ -63,14 +64,16 @@
            (doseq [key keys]
              (events/unlistenByKey key))))))))
 
-(defn setup-viewport-size [viewport-ref]
+(defn setup-viewport-size [vport viewport-ref]
   (mf/use-layout-effect
+   (mf/deps vport)
    (fn []
-     (let [node (mf/ref-val viewport-ref)
-           prnt (dom/get-parent node)
-           size (dom/get-client-size prnt)]
-       ;; We schedule the event so it fires after `initialize-page` event
-       (timers/schedule #(st/emit! (dw/initialize-viewport size)))))))
+     (when-not vport
+       (let [node (mf/ref-val viewport-ref)
+             prnt (dom/get-parent node)
+             size (dom/get-client-size prnt)]
+         ;; We schedule the event so it fires after `initialize-page` event
+         (timers/schedule #(st/emit! (dw/initialize-viewport size))))))))
 
 (defn setup-cursor [cursor alt? mod? space? panning drawing-tool drawing-path? path-editing? z? workspace-read-only?]
   (mf/use-effect
@@ -167,7 +170,8 @@
              ;; but the mouse has not been moved from its position.
              (->> mod-str
                   (rx/observe-on :async)
-                  (rx/map #(deref last-point-ref)))
+                  (rx/map #(deref last-point-ref))
+                  (rx/merge-map query-point))
 
              (->> move-stream
                   (rx/tap #(reset! last-point-ref %))
@@ -239,9 +243,17 @@
              remove-id?
              (into selected-with-parents remove-id-xf ids)
 
+             no-fill-nested-frames?
+             (fn [id]
+               (and (cph/frame-shape? objects id)
+                    (not (cph/root-frame? objects id))
+                    (empty? (dm/get-in objects [id :fills]))))
+
              hover-shape
              (->> ids
                   (remove remove-id?)
+                  (remove (partial cph/hidden-parent? objects))
+                  (remove no-fill-nested-frames?)
                   (filter #(or (empty? focus) (cp/is-in-focus? objects focus %)))
                   (first)
                   (get objects))]

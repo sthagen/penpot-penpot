@@ -24,9 +24,11 @@
   (and (= type :frame) (= id uuid/zero)))
 
 (defn root-frame?
-  [{:keys [frame-id type]}]
-  (and (= type :frame)
-       (= frame-id uuid/zero)))
+  ([objects id]
+   (root-frame? (get objects id)))
+  ([{:keys [frame-id type]}]
+   (and (= type :frame)
+        (= frame-id uuid/zero))))
 
 (defn frame-shape?
   ([objects id]
@@ -119,6 +121,16 @@
       (if (and (some? parent-id) (not= parent-id id))
         (recur (conj result parent-id) parent-id)
         result))))
+
+(defn hidden-parent?
+  "Checks the parent for the hidden property"
+  [objects shape-id]
+  (let [parent-id (dm/get-in objects [shape-id :parent-id])]
+    (cond
+      (or (nil? parent-id) (nil? shape-id) (= shape-id uuid/zero) (= parent-id uuid/zero)) false
+      (dm/get-in objects [parent-id :hidden]) true
+      :else
+      (recur objects parent-id))))
 
 (defn get-parent-ids-with-index
   "Returns a tuple with the list of parents and a map with the position within each parent"
