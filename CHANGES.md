@@ -5,6 +5,16 @@
 ### :boom: Breaking changes & Deprecations
 
 ### :sparkles: New features
+
+### :bug: Bugs fixed
+
+### :arrow_up: Deps updates
+
+### :heart: Community contributions by (Thank you!)
+
+## 1.18.0
+
+### :sparkles: New features
 - Adds more accessibility improvements in dashboard [Taiga #4577](https://tree.taiga.io/project/penpot/us/4577)
 - Adds paddings and gaps prediction on layout creation [Taiga #4838](https://tree.taiga.io/project/penpot/task/4838)
 - Add visual feedback when proportionally scaling text elements with **K** [Taiga #3415](https://tree.taiga.io/project/penpot/us/3415)
@@ -24,8 +34,16 @@
 - Improve deeps selection of nested arboards [Taiga #4913](https://tree.taiga.io/project/penpot/issue/4913)
 - Fix problem on selection numeric inputs on Firefox [#2991](https://github.com/penpot/penpot/issues/2991)
 - Changed the text dominant-baseline to use ideographic [Taiga #4791](https://tree.taiga.io/project/penpot/issue/4791)
-
-### :arrow_up: Deps updates
+- Viewer wrong translations [Github #3035](https://github.com/penpot/penpot/issues/3035)
+- Fix problem with text editor in Safari
+- Fix unlink library color when blur color picker input [#3026](https://github.com/penpot/penpot/issues/3026)
+- Fix snap pixel when moving path points on high zoom [#2930](https://github.com/penpot/penpot/issues/2930)
+- Fix shortcuts for zoom now take into account the mouse position [#2924](https://github.com/penpot/penpot/issues/2924)
+- Fix close colorpicker on Firefox when mouse-up is outside the picker [#2911](https://github.com/penpot/penpot/issues/2911)
+- Fix problems with touch devices and Wacom tablets [#2216](https://github.com/penpot/penpot/issues/2216)
+- Fix problem with board titles misplaced [Taiga #4738](https://tree.taiga.io/project/penpot/issue/4738)
+- Fix problem with alt getting stuck when alt+tab [Taiga #5013](https://tree.taiga.io/project/penpot/issue/5013)
+- Fix problem with z positioning of elements [Taiga #5014](https://tree.taiga.io/project/penpot/issue/5014)
 
 ### :heart: Community contributions by (Thank you!)
 - To @ondrejkonec: for contributing to the code with:

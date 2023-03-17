@@ -19,6 +19,7 @@
    java.time.ZonedDateTime
    java.time.format.DateTimeFormatter
    java.time.temporal.ChronoUnit
+   java.time.temporal.Temporal
    java.time.temporal.TemporalAmount
    java.time.temporal.TemporalUnit
    java.util.Date
@@ -127,7 +128,8 @@
 
 (extend-protocol fez/IEdn
   Duration
-  (-edn [o] (pr-str o)))
+  (-edn [o]
+    (tagged-literal 'app/duration (str o))))
 
 (defn format-duration
   [o]
@@ -160,11 +162,29 @@
 
 (defn plus
   [d ta]
-  (.plus d ^TemporalAmount (duration ta)))
+  (let [^TemporalAmount ta (duration ta)]
+    (cond
+      (instance? Duration d)
+      (.plus ^Duration d ta)
+
+      (instance? Temporal d)
+      (.plus ^Temporal d ta)
+
+      :else
+      (throw (UnsupportedOperationException. "unsupported type")))))
 
 (defn minus
   [d ta]
-  (.minus d ^TemporalAmount (duration ta)))
+  (let [^TemporalAmount ta (duration ta)]
+    (cond
+      (instance? Duration d)
+      (.minus ^Duration d ta)
+
+      (instance? Temporal d)
+      (.minus ^Temporal d ta)
+
+      :else
+      (throw (UnsupportedOperationException. "unsupported type")))))
 
 (defn now
   []
@@ -199,7 +219,7 @@
 
 (extend-protocol fez/IEdn
   Instant
-  (-edn [o] (pr-str o)))
+  (-edn [o] (tagged-literal 'app/instant (format-instant o))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Cron Expression

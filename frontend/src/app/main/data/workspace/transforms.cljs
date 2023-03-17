@@ -104,7 +104,8 @@
 (defn start-resize
   "Enter mouse resize mode, until mouse button is released."
   [handler ids shape]
-  (letfn [(resize [shape initial layout [point lock? center? point-snap]]
+  (letfn [(resize 
+           [shape initial layout [point lock? center? point-snap]]
             (let [{:keys [width height]} (:selrect shape)
                   {:keys [rotation]} shape
 
@@ -183,16 +184,16 @@
                       (ctm/resize scalev resize-origin shape-transform shape-transform-inverse)
 
                       (cond-> set-fix-width?
-                        (ctm/change-parent-property :layout-item-h-sizing :fix))
+                        (ctm/change-property :layout-item-h-sizing :fix))
 
                       (cond-> set-fix-height?
-                        (ctm/change-parent-property :layout-item-v-sizing :fix))
+                        (ctm/change-property :layout-item-v-sizing :fix))
 
                       (cond-> scale-text
                         (ctm/scale-content (:x scalev))))
 
                   modif-tree (dwm/create-modif-tree ids modifiers)]
-              (rx/of (dwm/set-modifiers modif-tree))))
+              (rx/of (dwm/set-modifiers modif-tree scale-text))))
 
           ;; Unifies the instantaneous proportion lock modifier
           ;; activated by Shift key and the shapes own proportion
@@ -209,7 +210,7 @@
       ptk/WatchEvent
       (watch [_ state stream]
         (let [initial-position @ms/mouse-position
-              stoper  (rx/filter ms/mouse-up? stream)
+              stopper (rx/filter ms/mouse-up? stream)
               layout  (:workspace-layout state)
               page-id (:current-page-id state)
               focus   (:workspace-focus-selected state)
@@ -226,7 +227,7 @@
                                  (->> (snap/closest-snap-point page-id resizing-shapes objects layout zoom focus point)
                                       (rx/map #(conj current %)))))
                 (rx/mapcat (partial resize shape initial-position layout))
-                (rx/take-until stoper))
+                (rx/take-until stopper))
            (rx/of (dwm/apply-modifiers)
                   (finish-transform))))))))
 
@@ -737,6 +738,13 @@
             (if (empty? moving-shapes)
               #{}
               (into (d/ordered-set) (find-all-empty-parents #{})))
+
+            ;; Not move absolute shapes that won't change parent
+            moving-shapes
+            (->> moving-shapes
+                 (remove (fn [shape]
+                           (and (ctl/layout-absolute? shape)
+                                (= frame-id (:parent-id shape))))))
 
             changes
             (-> (pcb/empty-changes it page-id)

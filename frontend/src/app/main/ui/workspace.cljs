@@ -5,8 +5,8 @@
 ;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace
+  (:import goog.events.EventType)
   (:require
-   [app.common.colors :as clr]
    [app.common.data.macros :as dm]
    [app.main.data.messages :as msg]
    [app.main.data.modal :as modal]
@@ -32,9 +32,11 @@
    [app.main.ui.workspace.textpalette :refer [textpalette]]
    [app.main.ui.workspace.viewport :refer [viewport]]
    [app.util.dom :as dom]
+   [app.util.globals :as globals]
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.object :as obj]
    [debug :refer [debug?]]
+   [goog.events :as events]
    [okulary.core :as l]
    [rumext.v2 :as mf]))
 
@@ -136,7 +138,19 @@
 
         components-v2 (features/use-feature :components-v2)
 
-        background-color (:background-color wglobal)]
+        background-color (:background-color wglobal)
+
+        focus-out
+        (mf/use-callback
+         (fn []
+           (st/emit! (dw/workspace-focus-lost))))]
+
+    (mf/use-effect
+     (mf/deps focus-out)
+     (fn []
+       (let [keys [(events/listen globals/document EventType.FOCUSOUT focus-out)]]
+         #(doseq [key keys]
+            (events/unlistenByKey key)))))
 
     ;; Setting the layout preset by its name
     (mf/with-effect [layout-name]
@@ -150,7 +164,6 @@
 
     ;; Set html theme color and close any non-modal dialog that may be still open
     (mf/with-effect
-      (dom/set-html-theme-color clr/gray-50 "dark")
       (st/emit! msg/hide))
 
     ;; Set properly the page title
@@ -164,7 +177,8 @@
        [:& (mf/provider ctx/current-page-id) {:value page-id}
         [:& (mf/provider ctx/components-v2) {:value components-v2}
          [:& (mf/provider ctx/workspace-read-only?) {:value workspace-read-only?}
-          [:section#workspace {:style {:background-color background-color}}
+          [:section#workspace {:style {:background-color background-color
+                                       :touch-action "none"}}
            (when (not (:hide-ui layout))
              [:& header {:file file
                          :page-id page-id
