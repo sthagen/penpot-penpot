@@ -316,7 +316,7 @@
 
         on-lost-pointer-capture
         (mf/use-callback
-         (mf/deps frame-id padding-num)
+         (mf/deps frame-id padding-num padding)
          (fn [event]
            (dom/release-pointer event)
            (reset! resizing? false)
@@ -326,7 +326,7 @@
 
         on-pointer-move
         (mf/use-callback
-         (mf/deps frame-id padding-num padding)
+         (mf/deps frame-id padding-num padding hover-all? hover-v? hover-h?)
          (fn [event]
            (let [pos (dom/get-client-position event)]
              (reset! mouse-pos (point->viewport pos))
@@ -390,8 +390,8 @@
                                             :p3 (if (:flip-y frame) true false)
                                             :p4 (if (:flip-x frame) true false)}
         negate                             (cond-> negate
-                                             (= :fix (:layout-item-h-sizing frame)) (assoc :p2 (not (:p2 negate)))
-                                             (= :fix (:layout-item-v-sizing frame)) (assoc :p3 (not (:p3 negate))))
+                                             (not= :auto (:layout-item-h-sizing frame)) (assoc :p2 (not (:p2 negate)))
+                                             (not= :auto (:layout-item-v-sizing frame)) (assoc :p3 (not (:p3 negate))))
 
         padding-rect-data                  {:p1 {:key (str frame-id "-p1")
                                                  :x x1
@@ -486,7 +486,7 @@
 
         on-pointer-move
         (mf/use-callback
-         (mf/deps shape-id margin-num margin)
+         (mf/deps shape-id margin-num margin hover-all? hover-v? hover-h?)
          (fn [event]
            (let [pos (dom/get-client-position event)]
              (reset! mouse-pos (point->viewport pos))
