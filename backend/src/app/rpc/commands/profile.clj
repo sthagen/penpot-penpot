@@ -132,7 +132,7 @@
                   :code :email-as-password
                   :hint "you can't use your email as password"))
 
-      (update-profile-password! cfg (assoc profile :password password))
+      (update-profile-password! conn (assoc profile :password password))
       (invalidate-profile-session! cfg profile-id session-id)
       nil)))
 
@@ -152,10 +152,10 @@
     profile))
 
 (defn update-profile-password!
-  [{:keys [::db/conn] :as cfg} {:keys [id password] :as profile}]
-  (let [password (derive-password cfg password)]
+  [conn {:keys [id password] :as profile}]
+  (when-not (db/read-only? conn)
     (db/update! conn :profile
-                {:password password}
+                {:password (auth/derive-password password)}
                 {:id id})))
 
 ;; --- MUTATION: Update Photo
