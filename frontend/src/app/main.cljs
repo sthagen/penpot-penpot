@@ -13,6 +13,7 @@
    [app.main.data.users :as du]
    [app.main.data.websocket :as ws]
    [app.main.errors]
+   [app.main.features :as feat]
    [app.main.store :as st]
    [app.main.ui :as ui]
    [app.main.ui.alert]
@@ -57,6 +58,7 @@
     (watch [_ _ stream]
       (rx/merge
        (rx/of (ev/initialize)
+              (feat/initialize)
               (du/initialize-profile))
 
        (->> stream

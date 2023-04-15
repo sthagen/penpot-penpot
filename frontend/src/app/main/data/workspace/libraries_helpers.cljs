@@ -62,37 +62,48 @@
 ;; ---- Components and instances creation ----
 
 (defn generate-add-component
-  "If there is exactly one id, and it's a group or a frame, and not already a component,
-  use it as root. Otherwise, create a group that contains all ids. Then, make a
+  "If there is exactly one id, and it's a frame (or a group in v1), and not already a component,
+  use it as root. Otherwise, create a frame (v2) or group (v1) that contains all ids. Then, make a
   component with it, and link all shapes to their corresponding one in the component."
-  [it shapes objects page-id file-id components-v2 prepare-create-group]
-  (let [[group changes]
+  [it shapes objects page-id file-id components-v2 prepare-create-group prepare-create-board]
+  (let [changes (pcb/empty-changes it page-id)
+
+        [root changes]
         (if (and (= (count shapes) 1)
-                 (or (= (:type (first shapes)) :group)
+                 (or (and (= (:type (first shapes)) :group) (not components-v2))
                      (= (:type (first shapes)) :frame))
                  (not (ctk/instance-root? (first shapes))))
           [(first shapes) (-> (pcb/empty-changes it page-id)
                               (pcb/with-objects objects))]
-          (let [group-name (if (= 1 (count shapes))
+          (let [root-name (if (= 1 (count shapes))
                              (:name (first shapes))
                              "Component 1")]
-            (prepare-create-group it            ; This function needs to be passed as argument
-                                  objects       ; to avoid a circular dependence
-                                  page-id
-                                  shapes
-                                  group-name
-                                  (not (ctk/instance-root? (first shapes))))))
+            (if-not components-v2
+              (prepare-create-group it            ; These functions needs to be passed as argument
+                                    objects       ; to avoid a circular dependence
+                                    page-id
+                                    shapes
+                                    root-name
+                                    (not (ctk/instance-root? (first shapes))))
+              (prepare-create-board changes
+                                    (uuid/next)
+                                    (:parent-id (first shapes))
+                                    objects
+                                    (map :id shapes)
+                                    nil
+                                    root-name
+                                    true))))
 
-        name (:name group)
+        name (:name root)
         [path name] (cph/parse-path-name name)
 
         [root-shape new-shapes updated-shapes]
         (if-not components-v2
-          (ctn/make-component-shape group objects file-id components-v2)
+          (ctn/make-component-shape root objects file-id components-v2)
           (let [new-id (uuid/next)]
-            [(assoc group :id new-id)
+            [(assoc root :id new-id)
              nil
-             [(assoc group
+             [(assoc root
                      :component-id new-id
                      :component-file file-id
                      :component-root? true
@@ -104,9 +115,9 @@
                                        name
                                        new-shapes
                                        updated-shapes
-                                       (:id group)
+                                       (:id root)
                                         page-id))]
-    [group (:id root-shape) changes]))
+    [root (:id root-shape) changes]))
 
 (defn duplicate-component
   "Clone the root shape of the component and all children. Generate new
@@ -163,7 +174,7 @@
                                       components-v2)
 
          changes (cond-> (pcb/add-object changes (first new-shapes) {:ignore-touched true})
-                     (some? old-id) (pcb/amend-last-change #(assoc % :old-id old-id))) ; on copy/paste old id is used later to reorder the paster layers
+                   (some? old-id) (pcb/amend-last-change #(assoc % :old-id old-id))) ; on copy/paste old id is used later to reorder the paster layers
 
          changes (reduce #(pcb/add-object %1 %2 {:ignore-touched true})
                          changes
@@ -171,26 +182,26 @@
 
      [new-shape changes])))
 
+(declare generate-detach-recursive)
+
 (defn generate-detach-instance
   "Generate changes to remove the links between a shape and all its children
   with a component."
   [changes container shape-id]
   (log/debug :msg "Detach instance" :shape-id shape-id :container (:id container))
-  (let [shapes  (->> (cph/get-children-with-self (:objects container) shape-id)
-                     (map :id))
+  (generate-detach-recursive changes container shape-id true))
 
-        update-fn
-        (fn [shape]
-          (assoc shape
-                 :component-id nil
-                 :component-file nil
-                 :component-root? nil
-                 :remote-synced? nil
-                 :shape-ref nil
-                 :touched nil))]
-
-    (pcb/update-shapes changes shapes update-fn)))
-
+(defn- generate-detach-recursive
+  [changes container shape-id first]
+  (let [shape (ctn/get-shape container shape-id)]
+    (if (and (ctk/instance-root? shape) (not first))
+      ;; Subinstances are not detached, but converted in top instances
+      (pcb/update-shapes changes [(:id shape)] #(assoc % :component-root? true))
+      ;; Otherwise, detach the shape and all children
+      (let [children-ids (:shapes shape)]
+        (reduce #(generate-detach-recursive %1 container %2 false)
+                (pcb/update-shapes changes [(:id shape)] ctk/detach-shape)
+                children-ids)))))
 
 (defn prepare-restore-component
   ([library-data component-id it]
@@ -579,10 +590,8 @@
 
           component-container (ctf/get-component-container library component)
 
-          children-inst       (mapv #(ctn/get-shape container %)
-                                    (:shapes shape-inst))
-          children-main       (mapv #(ctn/get-shape component-container %)
-                                    (:shapes shape-main))
+          children-inst       (vec (ctn/get-direct-children container shape-inst))
+          children-main       (vec (ctn/get-direct-children component-container shape-main))
 
           only-inst (fn [changes child-inst]
                       (if-not (and omit-touched?
