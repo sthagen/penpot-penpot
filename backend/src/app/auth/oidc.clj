@@ -161,8 +161,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- retrieve-github-email
-  [cfg tdata info]
-  (or (some-> info :email)
+  [cfg tdata props]
+  (or (some-> props :github/email)
       (let [params {:uri "https://api.github.com/user/emails"
                     :headers {"Authorization" (dm/str (:type tdata) " " (:token tdata))}
                     :timeout 6000
@@ -194,7 +194,7 @@
 
               ;; Additional hooks for provider specific way of
               ;; retrieve emails.
-              :get-email-fn           (partial retrieve-github-email cfg)}]
+              :get-email-fn  (partial retrieve-github-email cfg)}]
 
     (when (contains? cf/flags :login-with-github)
       (if (and (string? (:client-id opts))
@@ -243,6 +243,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; HANDLERS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- parse-attr-path
+  [provider path]
+  (let [[fitem & items] (str/split path "__")]
+    (into [(keyword (:name provider) fitem)] (map keyword) items)))
 
 (defn- build-redirect-uri
   [{:keys [provider] :as cfg}]
@@ -303,26 +308,29 @@
 
 (defn- retrieve-user-info
   [{:keys [provider] :as cfg} tdata]
-  (letfn [(get-email [info]
+  (letfn [(get-email [props]
             ;; Allow providers hook into this for custom email
             ;; retrieval method.
-            (if-let [get-email-fn (:get-email-fn provider)]
-              (get-email-fn tdata info)
-              (let [attr-kw (cf/get :oidc-email-attr :email)]
-                (get info attr-kw))))
 
-          (get-name [info]
-            (let [attr-kw (cf/get :oidc-name-attr :name)]
-              (get info attr-kw)))
+            (if-let [get-email-fn (:get-email-fn provider)]
+              (get-email-fn tdata props)
+              (let [attr-kw (cf/get :oidc-email-attr "email")
+                    attr-ph (parse-attr-path provider attr-kw)]
+                (get-in props attr-ph))))
+
+          (get-name [props]
+            (let [attr-kw (cf/get :oidc-name-attr "name")
+                  attr-ph (parse-attr-path provider attr-kw)]
+              (get-in props attr-ph)))
 
           (process-response [response]
             (let [info  (-> response :body json/decode)
-                  email (get-email info)]
+                  props (qualify-props provider info)
+                  email (get-email props)]
               {:backend  (:name provider)
+               :fullname (or (get-name props) email)
                :email    email
-               :fullname (or (get-name info) email)
-               :props    (->> (dissoc info :name :email)
-                              (qualify-props provider))}))]
+               :props    props}))]
 
     (l/trace :hint "request user info"
              :uri (:user-uri provider)
@@ -385,16 +393,18 @@
     ;; roles if they are defined.
     (when (and (= "oidc" (:name provider))
                (seq (:roles provider)))
-      (let [provider-roles (into #{} (:roles provider))
-            profile-roles  (let [attr  (cf/get :oidc-roles-attr :roles)
-                                 roles (get info attr)]
+
+      (let [expected-roles (into #{} (:roles provider))
+            current-roles  (let [roles-kw (cf/get :oidc-roles-attr "roles")
+                                 roles-ph (parse-attr-path provider roles-kw)
+                                 roles    (get-in (:props info) roles-ph)]
                              (cond
                                (string? roles) (into #{} (str/words roles))
                                (vector? roles) (into #{} roles)
                                :else #{}))]
 
         ;; check if profile has a configured set of roles
-        (when-not (set/subset? provider-roles profile-roles)
+        (when-not (set/subset? expected-roles current-roles)
           (ex/raise :type :internal
                     :code :unable-to-auth
                     :hint "not enough permissions"))))

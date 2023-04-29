@@ -61,6 +61,33 @@
 
 ;; ---- Components and instances creation ----
 
+(defn generate-add-component-changes
+  [changes root objects file-id page-id components-v2]
+  (let [name (:name root)
+        [path name] (cph/parse-path-name name)
+
+        [root-shape new-shapes updated-shapes]
+        (if-not components-v2
+          (ctn/make-component-shape root objects file-id components-v2)
+          (let [new-id (uuid/next)]
+            [(assoc root :id new-id)
+             nil
+             [(assoc root
+                     :component-id new-id
+                     :component-file file-id
+                     :component-root? true
+                     :main-instance? true)]]))
+
+        changes (-> changes
+                    (pcb/add-component (:id root-shape)
+                                       path
+                                       name
+                                       new-shapes
+                                       updated-shapes
+                                       (:id root)
+                                       page-id))]
+    [root-shape changes]))
+
 (defn generate-add-component
   "If there is exactly one id, and it's a frame (or a group in v1), and not already a component,
   use it as root. Otherwise, create a frame (v2) or group (v1) that contains all ids. Then, make a
@@ -94,29 +121,7 @@
                                     root-name
                                     true))))
 
-        name (:name root)
-        [path name] (cph/parse-path-name name)
-
-        [root-shape new-shapes updated-shapes]
-        (if-not components-v2
-          (ctn/make-component-shape root objects file-id components-v2)
-          (let [new-id (uuid/next)]
-            [(assoc root :id new-id)
-             nil
-             [(assoc root
-                     :component-id new-id
-                     :component-file file-id
-                     :component-root? true
-                     :main-instance? true)]]))
-
-        changes (-> changes
-                    (pcb/add-component (:id root-shape)
-                                       path
-                                       name
-                                       new-shapes
-                                       updated-shapes
-                                       (:id root)
-                                        page-id))]
+        [root-shape changes] (generate-add-component-changes changes root objects file-id page-id components-v2)]
     [root (:id root-shape) changes]))
 
 (defn duplicate-component
@@ -158,9 +163,9 @@
 (defn generate-instantiate-component
   "Generate changes to create a new instance from a component."
   ([changes file-id component-id position page libraries]
-   (generate-instantiate-component changes file-id component-id position page libraries nil))
+   (generate-instantiate-component changes file-id component-id position page libraries nil nil))
 
-  ([changes file-id component-id position page libraries old-id]
+  ([changes file-id component-id position page libraries old-id parent-id]
    (let [component     (ctf/get-component libraries file-id component-id)
          library       (get libraries file-id)
 
@@ -173,7 +178,11 @@
                                       position
                                       components-v2)
 
-         changes (cond-> (pcb/add-object changes (first new-shapes) {:ignore-touched true})
+         first-shape (cond-> (first new-shapes)
+                       (not (nil? parent-id))
+                       (assoc :parent-id parent-id))
+
+         changes (cond-> (pcb/add-object changes first-shape {:ignore-touched true})
                    (some? old-id) (pcb/amend-last-change #(assoc % :old-id old-id))) ; on copy/paste old id is used later to reorder the paster layers
 
          changes (reduce #(pcb/add-object %1 %2 {:ignore-touched true})
@@ -207,17 +216,20 @@
   ([library-data component-id it]
    (let [component    (ctkl/get-deleted-component library-data component-id)
          page         (ctf/get-component-page library-data component)]
-     (prepare-restore-component library-data component-id it page (gpt/point 0 0) nil nil)))
+     (prepare-restore-component nil library-data component-id it page (gpt/point 0 0) nil nil)))
 
-  ([library-data component-id it page delta old-id changes]
+  ([changes library-data component-id it page delta old-id parent-id]
    (let [component    (ctkl/get-deleted-component library-data component-id)
 
          shapes       (cph/get-children-with-self (:objects component) (:main-instance-id component))
          shapes       (map #(gsh/move % delta) shapes)
+         first-shape  (cond-> (first shapes)
+                        (not (nil? parent-id))
+                        (assoc :parent-id parent-id))
          changes      (-> (or changes (pcb/empty-changes it))
                           (pcb/with-page page)
                           (pcb/with-library-data library-data))
-         changes      (cond-> (pcb/add-object changes (first shapes) {:ignore-touched true})
+         changes      (cond-> (pcb/add-object changes first-shape {:ignore-touched true})
                         (some? old-id) (pcb/amend-last-change #(assoc % :old-id old-id))) ; on copy/paste old id is used later to reorder the paster layers
          changes      (reduce #(pcb/add-object %1 %2 {:ignore-touched true})
                               changes

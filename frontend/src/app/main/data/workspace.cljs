@@ -1244,6 +1244,7 @@
 
 (s/def ::point gpt/point?)
 
+
 (defn show-context-menu
   [{:keys [position] :as params}]
   (us/verify ::point position)
@@ -1264,6 +1265,7 @@
 
             not-group-like? (and (= (count selected) 1)
                                  (not (contains? #{:group :bool} (:type head))))
+           
             no-bool-shapes? (->> all-selected (some (comp #{:frame :text} :type)))]
 
         (rx/concat
@@ -1272,9 +1274,19 @@
          (rx/of (show-context-menu
                  (-> params
                      (assoc
+                      :kind :shape
                       :disable-booleans? (or no-bool-shapes? not-group-like?)
                       :disable-flatten? no-bool-shapes?
                       :selected (conj selected (:id shape)))))))))))
+
+(defn show-page-item-context-menu
+  [{:keys [position page] :as params}]
+  (us/verify ::point position)
+  (ptk/reify ::show-page-item-context-menu
+    ptk/WatchEvent
+    (watch [_ _ _]
+           (rx/of (show-context-menu
+                   (-> params (assoc :kind :page :selected (:id page))))))))
 
 (def hide-context-menu
   (ptk/reify ::hide-context-menu
@@ -1638,13 +1650,14 @@
                   process-shape
                   (fn [_ shape]
                     (-> shape
-                        (assoc :frame-id frame-id)
-                        (assoc :parent-id parent-id)
+                        (assoc :frame-id frame-id :parent-id parent-id)
 
                         ;; if foreign instance, detach the shape
                         (cond-> (foreign-instance? shape paste-objects state)
-                          (dissoc :component-id :component-file :component-root?
-                                  :remote-synced? :shape-ref :touched))
+                          (->
+                             (assoc :saved-component-root? (:component-root? shape)) ;; this is used later, if the paste needs to create a new component from the detached shape
+                             (dissoc :component-id :component-file :component-root?
+                                  :remote-synced? :shape-ref :touched)))
                         ;; if is a text, remove references to external typographies
                         (cond-> (= (:type shape) :text)
                           (ctt/remove-external-typographies file-id))))
@@ -1655,7 +1668,7 @@
 
                   library-data (wsh/get-file state file-id)
 
-                  changes  (-> (dws/prepare-duplicate-changes all-objects page selected delta it libraries library-data)
+                  changes  (-> (dws/prepare-duplicate-changes all-objects page selected delta it libraries library-data file-id)
                                (pcb/amend-changes (partial process-rchange media-idx))
                                (pcb/amend-changes (partial change-add-obj-index paste-objects selected index)))
 
@@ -1916,7 +1929,7 @@
 
             shape-grid
             (ctst/generate-shape-grid media-points start-pos grid-gap)
-            
+
             stoper (rx/filter (ptk/type? ::finalize-file) stream)]
 
         (rx/concat
@@ -2006,7 +2019,25 @@
     (update [_ state]
       (assoc-in state [:workspace-local :inspect-expanded] expanded?))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Sitemap
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn start-rename-page-item
+  [id]
+  (ptk/reify ::start-rename-page-item
+    ptk/UpdateEvent
+    (update [_ state]
+      (assoc-in state [:workspace-local :page-item] id))))
+
+(defn stop-rename-page-item
+  []
+  (ptk/reify ::stop-rename-page-item
+    ptk/UpdateEvent
+    (update [_ state]
+      (let [local (-> (:workspace-local state)
+                      (dissoc :page-item))]
+        (assoc state :workspace-local local)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; File Library persistent settings
