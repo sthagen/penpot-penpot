@@ -8,6 +8,7 @@
 - Default naming of text layers [Taiga #2836](https://tree.taiga.io/project/penpot/us/2836)
 - Create typography style from a selected text layer[Taiga #3041](https://tree.taiga.io/project/penpot/us/3041)
 - Board as ruler origin [Taiga #4833](https://tree.taiga.io/project/penpot/us/4833)
+- Access tokens support [Taiga #4460](https://tree.taiga.io/project/penpot/us/4460)
 
 ### :bug: Bugs fixed
 
@@ -17,6 +18,10 @@
 - Update Typography palette order (by @akshay-gupta7) [Github #3156](https://github.com/penpot/penpot/pull/3156)
 - Palettes (color, typographies) empty state (by @akshay-gupta7) [Github #3160](https://github.com/penpot/penpot/pull/3160)
 - Duplicate objects via drag + alt (by @akshay-gupta7) [Github #3147](https://github.com/penpot/penpot/pull/3147)
+- Set line-height to auto as 1.2 (by @akshay-gupta7) [Github #3185](https://github.com/penpot/penpot/pull/3185)
+- Click to select full values at the design sidebar (by @akshay-gupta7) [Github #3179](https://github.com/penpot/penpot/pull/3179)
+- Fix rect filter bounds math (by @ryanbreen) [Github #3180](https://github.com/penpot/penpot/pull/3180)
+- Removed sizing variables from radius (by @ondrejkonec) [Github #3184](https://github.com/penpot/penpot/pull/3184)
 
 ## 1.18.3 (Unreleased)
 
