@@ -22,12 +22,13 @@
    ["date-fns/locale/ru" :default dateFnsLocalesRu]
    ["date-fns/locale/tr" :default dateFnsLocalesTr]
    ["date-fns/locale/zh-CN" :default dateFnsLocalesZhCn]
-   ["luxon" :as lxn]
+   [app.common.data.macros :as dm]
+   [app.common.time :as common-time]
    [app.util.object :as obj]
    [cuerdas.core :as str]))
 
-(def DateTime lxn/DateTime)
-(def Duration lxn/Duration)
+(dm/export common-time/DateTime)
+(dm/export common-time/Duration)
 
 (defprotocol ITimeMath
   (plus [_ o])
@@ -89,9 +90,7 @@
        :rfc2822 (.fromRFC2822 ^js DateTime s #js {:zone zone :setZone force-zone})
        :http    (.fromHTTP ^js DateTime s #js {:zone zone :setZone force-zone})))))
 
-(defn now
-  []
-  (.local ^js DateTime))
+(dm/export common-time/now)
 
 (defn utc-now
   []
@@ -164,11 +163,11 @@
 (extend-protocol IPrintWithWriter
   DateTime
   (-pr-writer [p writer _]
-    (-write writer (str/fmt "#stks/datetime \"%s\"" (format p :iso))))
+    (-write writer (str/fmt "#app/instant \"%s\"" (format p :iso))))
 
   Duration
   (-pr-writer [p writer _]
-    (-write writer (str/fmt "#stks/duration \"%s\"" (format p :iso)))))
+    (-write writer (str/fmt "#app/duration \"%s\"" (format p :iso)))))
 
 (defn- resolve-format
   [v]
@@ -240,6 +239,6 @@
    (when v
      (let [v (if (datetime? v) (format v :date) v)
            locale (obj/get locales locale)
-           f (.date (.-formatLong locale) v)]
-       (->> #js {:locale locale}
-            (dateFnsFormat v f))))))
+           f (-> (.-formatLong ^js locale)
+                 (.date v))]
+       (dateFnsFormat v f #js {:locale locale})))))
