@@ -25,6 +25,7 @@
    [app.main.ui.hooks :as h]
    [app.main.ui.icons :as i]
    [app.main.worker :as wrk]
+   [app.util.color :as uc]
    [app.util.dom :as dom]
    [app.util.dom.dnd :as dnd]
    [app.util.i18n :as i18n :refer [tr]]
@@ -46,7 +47,8 @@
   (let [features (cond-> ffeat/enabled
                    (features/active-feature? :components-v2)
                    (conj "components/v2"))]
-    (wrk/ask! {:cmd :thumbnails/generate
+
+    (wrk/ask! {:cmd :thumbnails/generate-for-file
                :revn (:revn file)
                :file-id (:id file)
                :file-name (:name file)
@@ -125,7 +127,7 @@
            [:div.asset-list
             (for [color (:sample colors)]
               (let [default-name (cond
-                                   (:gradient color) (bc/gradient-type->string (get-in color [:gradient :type]))
+                                   (:gradient color) (uc/gradient-type->string (get-in color [:gradient :type]))
                                    (:color color) (:color color)
                                    :else (:value color))]
                 [:div.asset-list-item {:key (str "assets-color-" (:id color))}

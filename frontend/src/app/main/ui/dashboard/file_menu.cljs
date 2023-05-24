@@ -12,7 +12,7 @@
    [app.main.data.modal :as modal]
    [app.main.repo :as rp]
    [app.main.store :as st]
-   [app.main.ui.components.context-menu-a11y.context-menu-a11y :refer [context-menu-a11y]]
+   [app.main.ui.components.context-menu-a11y :refer [context-menu-a11y]]
    [app.main.ui.context :as ctx]
    [app.util.dom :as dom]
    [app.util.i18n :as i18n :refer [tr]]
@@ -177,7 +177,7 @@
           (->> (rx/from files)
                (rx/flat-map
                 (fn [file]
-                  (->> (rp/command :has-file-libraries {:file-id (:id file)})
+                  (->> (rp/cmd! :has-file-libraries {:file-id (:id file)})
                        (rx/map #(assoc file :has-libraries? %)))))
                (rx/reduce conj [])
                (rx/subs

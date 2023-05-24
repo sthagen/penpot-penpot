@@ -35,6 +35,7 @@
    [app.main.refs :as refs]
    [app.main.repo :as rp]
    [app.main.store :as st]
+   [app.util.color :as uc]
    [app.util.i18n :refer [tr]]
    [app.util.router :as rt]
    [app.util.time :as dt]
@@ -98,19 +99,14 @@
       item
       (assoc  item :path path :name name))))
 
-(defn default-color-name [color]
-  (or (:color color)
-      (case (get-in color [:gradient :type])
-        :linear (tr "workspace.gradients.linear")
-        :radial (tr "workspace.gradients.radial"))))
-
 (defn add-color
   [color]
   (let [id    (uuid/next)
         color (-> color
                   (assoc :id id)
-                  (assoc :name (default-color-name color)))]
-    (dm/assert! (ctc/color? color))
+                  (assoc :name (or (:color color)
+                                   (uc/gradient-type->string (get-in color [:gradient :type])))))]
+    (dm/assert! ::ctc/color color)
     (ptk/reify ::add-color
       IDeref
       (-deref [_] color)
@@ -875,7 +871,10 @@
             workspace-data-s
             (->> (rx/concat
                   (rx/of nil)
-                  (rx/from-atom refs/workspace-data {:emit-current-value? true})))
+                  (rx/from-atom refs/workspace-data {:emit-current-value? true}))
+                 ;; Need to get the file data before the change, so deleted shapes
+                 ;; still exist, for example
+                 (rx/buffer 3 1))
 
             change-s
             (->> stream
@@ -884,16 +883,17 @@
                  (rx/observe-on :async))
 
             check-changes
-            (fn [[event data]]
+            (fn [[event [old-data _mid_data _new-data]]]
               (let [{:keys [changes save-undo? undo-group]} (deref event)
-                    components-changed (reduce #(into %1 (ch/components-changed data %2))
+                    components-changed (reduce #(into %1 (ch/components-changed old-data %2))
                                                #{}
                                                changes)]
                 (when (and (d/not-empty? components-changed) save-undo?)
                   (log/info :msg "DETECTED COMPONENTS CHANGED"
-                            :ids (map str components-changed))
+                            :ids (map str components-changed)
+                            :undo-group undo-group)
                   (run! st/emit!
-                        (map #(update-component-sync % (:id data) undo-group)
+                        (map #(update-component-sync % (:id old-data) undo-group)
                              components-changed)))))]
 
         (when components-v2
