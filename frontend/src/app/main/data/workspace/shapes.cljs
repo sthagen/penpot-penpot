@@ -332,11 +332,13 @@
                     (cond-> (seq starting-flows)
                       (pcb/update-page-option :flows (fn [flows]
                                                        (->> (map :id starting-flows)
-                                                            (reduce ctp/remove-flow flows))))))]
-
-    (rx/of (dc/detach-comment-thread ids)
+                                                            (reduce ctp/remove-flow flows))))))
+                    undo-id (js/Symbol)]
+    (rx/of (dwu/start-undo-transaction undo-id)
+           (dc/detach-comment-thread ids)
+           (dch/commit-changes changes)
            (ptk/data-event :layout/update all-parents)
-           (dch/commit-changes changes))))
+           (dwu/commit-undo-transaction undo-id))))
 
 (defn create-and-add-shape
   [type frame-x frame-y data]

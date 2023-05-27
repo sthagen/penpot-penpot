@@ -74,8 +74,8 @@
       [:frame-id {:optional true} ::sm/uuid]
       [:parent-id {:optional true} ::sm/uuid]
       [:index {:optional true} [:maybe :int]]
-      [:ignore-touched {:optional true} :boolean]
-      ]]
+      [:ignore-touched {:optional true} :boolean]]]
+      
 
     [:mod-obj
      [:map {:title "ModObjChange"}
@@ -214,9 +214,9 @@
     [:del-typography
      [:map {:title "DelTypogrphyChange"}
       [:type [:= :del-typography]]
-      [:id ::sm/uuid]]]
+      [:id ::sm/uuid]]]]])
 
-    ]])
+    
 
 (def change?
   (sm/pred-fn ::change))
@@ -240,25 +240,28 @@
 ;; Changes Processing Impl
 
 (defn validate-shapes!
-  [data objects items]
-  (letfn [(validate-shape! [[page-id {:keys [id] :as shape}]]
-            (when-not (= shape (dm/get-in data [:pages-index page-id :objects id]))
-              ;; If object has changed verify is correct
-              (dm/verify! (cts/shape? shape))))]
+  [data-old data-new items]
+  (letfn [(validate-shape! [[page-id id]]
+            (let [shape-old (dm/get-in data-old [:pages-index page-id :objects id])
+                  shape-new (dm/get-in data-new [:pages-index page-id :objects id])]
 
-    (let [lookup (d/getf objects)]
-      (->> (into #{} (map :page-id) items)
-           (mapcat (fn [page-id]
-                     (filter #(= page-id (:page-id %)) items)))
-           (mapcat (fn [{:keys [type id page-id] :as item}]
-                     (sequence
-                      (comp (keep lookup)
-                            (map (partial vector page-id)))
-                      (case type
-                        (:add-obj :mod-obj :del-obj) (cons id nil)
-                        (:mov-objects :reg-objects)  (:shapes item)
-                        nil))))
-           (run! validate-shape!)))))
+              ;; If object has changed verify is correct
+              (when (and (some? shape-old)
+                         (some? shape-new)
+                         (not= shape-old shape-new))
+                (dm/verify! (cts/shape? shape-new)))))]
+
+    (->> (into #{} (map :page-id) items)
+         (mapcat (fn [page-id]
+                   (filter #(= page-id (:page-id %)) items)))
+         (mapcat (fn [{:keys [type id page-id] :as item}]
+                   (sequence
+                    (map (partial vector page-id))
+                    (case type
+                      (:add-obj :mod-obj :del-obj) (cons id nil)
+                      (:mov-objects :reg-objects)  (:shapes item)
+                      nil))))
+         (run! validate-shape!))))
 
 (defmulti process-change (fn [_ change] (:type change)))
 (defmulti process-operation (fn [_ _ op] (:type op)))
@@ -385,15 +388,29 @@
 
 (defmethod process-change :mov-objects
   [data {:keys [parent-id shapes index page-id component-id ignore-touched after-shape]}]
-  (letfn [(calculate-invalid-targets [objects shape-id]
+  (letfn [(nested-components? [objects shape-id]
+             (let [children            (cph/get-children-with-self objects shape-id)
+                   xf-get-component-id (keep :component-id)
+                   child-components    (into #{} xf-get-component-id children)
+
+                   parents             (cph/get-parents-with-self objects parent-id)
+                   xf-get-main-id      (comp (filter :main-instance?)
+                                             xf-get-component-id)
+                   parent-components   (into #{} xf-get-main-id parents)]
+               (seq (set/intersection child-components parent-components))))
+
+          (calculate-invalid-targets [objects shape-id]
             (let [reduce-fn #(into %1 (calculate-invalid-targets objects %2))]
               (->> (get-in objects [shape-id :shapes])
                    (reduce reduce-fn #{shape-id}))))
 
+          ;; Avoid placing a shape as a direct or indirect child of itself,
+          ;; or inside its main component if it's in a copy.
           (is-valid-move? [objects shape-id]
             (let [invalid-targets (calculate-invalid-targets objects shape-id)]
               (and (contains? objects shape-id)
                    (not (invalid-targets parent-id))
+                   (not (nested-components? objects shape-id))
                    #_(cph/valid-frame-target? objects parent-id shape-id))))
 
           (insert-items [prev-shapes index shapes]
@@ -428,14 +445,12 @@
                       component? (and (:shape-ref obj)
                                       (= (:type obj) :group)
                                       (not ignore-touched))]
-
                   (-> objects
                       (d/update-in-when [pid :shapes] d/without-obj sid)
                       (d/update-in-when [pid :shapes] d/vec-without-nils)
                       (cond-> component? (d/update-when pid #(-> %
                                                                  (update :touched cph/set-touched-group :shapes-group)
                                                                  (dissoc :remote-synced?)))))))))
-
           (update-parent-id [objects id]
             (-> objects
                 (d/update-when id assoc :parent-id parent-id)))
@@ -595,8 +610,6 @@
                         ;;       function. Better check it and test toroughly when activating
                         ;;       components-v2 mode.
         in-copy?        (ctk/in-component-copy? shape)
-        root-name?      (and (= group :name-group)
-                             (:component-root? shape))
 
         ;; For geometric attributes, there are cases in that the value changes
         ;; slightly (e.g. when rounding to pixel, or when recalculating text
@@ -607,7 +620,6 @@
                  (gsh/close-attrs? attr val shape-val))]
 
     (when (and group (not ignore) (not equal?)
-               (not root-name?)
                (not (and ignore-geometry is-geometry?)))
       ;; Notify touched even if it's not copy, because it may be a main instance
       (on-touched shape))
@@ -618,7 +630,6 @@
       ;; In some cases we need to ignore touched only if the attribute is
       ;; geometric (position, width or transformation).
       (and in-copy? group (not ignore) (not equal?)
-           (not root-name?)
            (not (and ignore-geometry is-geometry?)))
       (-> (update :touched cph/set-touched-group group)
           (dissoc :remote-synced?))

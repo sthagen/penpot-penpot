@@ -18,6 +18,7 @@
 
 (def shape-for-rename-ref
   (l/derived (l/in [:workspace-local :shape-for-rename]) st/state))
+
 (mf/defc layer-name
   [{:keys [shape on-start-edit  disabled-double-click on-stop-edit name-ref depth parent-size selected? type-comp type-frame hidden] :as props}]
   (let [local            (mf/use-state {})
@@ -27,24 +28,25 @@
         start-edit (fn []
                      (when (not disabled-double-click)
                        (on-start-edit)
-                       (swap! local assoc :edition true)))
+                       (swap! local assoc :edition true)
+                       (st/emit! (dw/start-rename-shape (:id shape)))))
 
         accept-edit (fn []
-                      (let [name-input (mf/ref-val name-ref)
-                            name       (dom/get-value name-input)]
+                      (let [name-input     (mf/ref-val name-ref)
+                            name           (str/trim (dom/get-value name-input))]
                         (on-stop-edit)
                         (swap! local assoc :edition false)
-                        (st/emit! (dw/end-rename-shape)
-                                  (when-not (str/empty? (str/trim name))
-                                    (dw/update-shape (:id shape) {:name (str/trim name)})))))
+                        (st/emit! (dw/end-rename-shape name))))
+
         cancel-edit (fn []
                       (on-stop-edit)
                       (swap! local assoc :edition false)
-                      (st/emit! (dw/end-rename-shape)))
+                      (st/emit! (dw/end-rename-shape nil)))
 
         on-key-down (fn [event]
                       (when (kbd/enter? event) (accept-edit))
                       (when (kbd/esc? event) (cancel-edit)))
+
         space-for-icons 110
         parent-size (str (- parent-size space-for-icons) "px")]
 
