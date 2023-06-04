@@ -109,6 +109,23 @@
     :else
     (get-component-shape objects (get objects (:parent-id shape)) options))))
 
+(defn in-component-main?
+  "Check if the shape is inside a component non-main instance.
+   
+   Note that we must iterate on the parents because non-root shapes in
+   a main component have not any discriminating attribute."
+  [objects shape]
+  (let [component-shape (get-component-shape objects shape {:allow-main? true})]
+    (:main-instance? component-shape)))
+
+(defn in-any-component?
+  "Check if the shape is part of any component (main or copy), wether it's
+   head or not."
+  [objects shape]
+  (or (ctk/in-component-copy? shape)
+      (ctk/main-instance? shape)
+      (in-component-main? objects shape)))
+
 (defn make-component-shape
   "Clone the shape and all children. Generate new ids and detach
   from parent and frame. Update the original shapes to have links
@@ -173,8 +190,8 @@
    (make-component-instance container component library-data position components-v2 {}))
 
   ([container component library-data position components-v2
-    {:keys [main-instance? force-id force-frame-id]
-     :or {main-instance? false force-id nil force-frame-id nil}}]
+    {:keys [main-instance? force-id force-frame-id keep-ids?]
+     :or {main-instance? false force-id nil force-frame-id nil keep-ids? false}}]
    (let [component-page  (when components-v2
                            (ctpl/get-page library-data (:main-instance-page component)))
          component-shape (if components-v2
@@ -237,7 +254,8 @@
                             (if components-v2 (:objects component-page) (:objects component))
                             update-new-shape
                             (fn [object _] object)
-                            force-id)
+                            force-id
+                            keep-ids?)
 
         ;; If frame-id points to a shape inside the component, remap it to the
         ;; corresponding new frame shape. If not, set it to the destination frame.

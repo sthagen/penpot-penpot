@@ -12,6 +12,7 @@
    [app.common.types.pages-list :as ctpl]
    [app.common.types.shape.layout :as ctl]
    [app.common.uuid :as uuid]
+   [clojure.set :as set]
    [cuerdas.core :as str]))
 
 (declare reduce-objects)
@@ -96,14 +97,17 @@
                 (into shapes (mapcat #(get-children-ids-rec % (conj processed id))) shapes))))]
     (get-children-ids-rec id #{})))
 
+(defn get-children-ids-with-self
+  [objects id]
+  (into [id] (get-children-ids objects id)))
+
 (defn get-children
   [objects id]
   (mapv (d/getf objects) (get-children-ids objects id)))
 
 (defn get-children-with-self
   [objects id]
-  (let [lookup (d/getf objects)]
-    (into [(lookup id)] (map lookup) (get-children-ids objects id))))
+  (mapv (d/getf objects) (get-children-ids-with-self objects id)))
 
 (defn get-parent
   "Retrieve the id of the parent for the shape-id (if exists)"
@@ -220,7 +224,6 @@
         pos (d/index-of shapes id)]
     (if (= 0 pos) nil (nth shapes (dec pos)))))
 
-
 (defn get-immediate-children
   "Retrieve resolved shape objects that are immediate children
    of the specified shape-id"
@@ -298,6 +301,26 @@
         (ctpl/get-page file id)
         (ctkl/get-component file id))
       (assoc :type type)))
+
+(defn component-touched?
+  "Check if any shape in the component is touched"
+  [objects root-id]
+  (->> (get-children-with-self objects root-id)
+       (filter (comp seq :touched))
+       seq))
+
+(defn components-nesting-loop?
+  "Check if a nesting loop would be created if the given shape is moved below the given parent"
+  [objects shape-id parent-id]
+  (let [children            (get-children-with-self objects shape-id)
+        xf-get-component-id (keep :component-id)
+        child-components    (into #{} xf-get-component-id children)
+
+        parents             (get-parents-with-self objects parent-id)
+        xf-get-main-id      (comp (filter :main-instance?)
+                                  xf-get-component-id)
+        parent-components   (into #{} xf-get-main-id parents)]
+    (seq (set/intersection child-components parent-components))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ALGORITHMS & TRANSFORMATIONS FOR SHAPES
