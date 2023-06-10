@@ -1014,7 +1014,7 @@
 (defn can-distribute? [selected]
   (cond
     (empty? selected) false
-    (< (count selected) 2) false
+    (< (count selected) 3) false
     :else true))
 
 (defn distribute-objects
@@ -1172,7 +1172,6 @@
   (ptk/reify ::select-single-asset
     ptk/UpdateEvent
     (update [_ state]
-      (prn "select-single-asset" file-id asset-id type)
       (assoc-in state [:workspace-assets :selected file-id type] #{asset-id}))))
 
 (defn select-assets
@@ -1211,7 +1210,21 @@
             current-project-id (:current-project-id state)
             file-id            (or file-id current-file-id)
 
-            redirect-to
+            select-and-zoom
+            (fn [shape-id]
+              (rx/of (dws/select-shapes (d/ordered-set shape-id))
+                     dwz/zoom-to-selected-shape))
+
+            redirect-to-page
+            (fn [page-id shape-id]
+              (rx/concat
+               (rx/of (go-to-page page-id))
+               (->> stream
+                    (rx/filter (ptk/type? ::initialize-page))
+                    (rx/take 1))
+               (select-and-zoom shape-id)))
+
+            redirect-to-file
             (fn [file-id page-id]
               (let [pparams {:file-id file-id :project-id current-project-id}
                     qparams {:page-id page-id}]
@@ -1227,17 +1240,16 @@
 
         (if (= file-id current-file-id)
           (let [component (dm/get-in state [:workspace-data :components component-id])
-                page-id   (:main-instance-page component)]
+                page-id   (:main-instance-page component)
+                shape-id (:main-instance-id component)]
             (when (some? page-id)
               (if (= page-id current-page-id)
-                (let [shape-id (:main-instance-id component)]
-                  (rx/of (dws/select-shapes (d/ordered-set shape-id))
-                         dwz/zoom-to-selected-shape))
-                (redirect-to current-file-id page-id))))
+                (select-and-zoom shape-id)
+                (redirect-to-page page-id shape-id))))
 
           (let [component (dm/get-in state [:workspace-libraries file-id :data :components component-id])]
             (some->> (:main-instance-page component)
-                     (redirect-to file-id))))))))
+                     (redirect-to-file file-id))))))))
 
 
 (defn go-to-component
@@ -1744,6 +1756,7 @@
             (let [libraries    (wsh/get-libraries state)
                   file-id      (:current-file-id state)
                   page         (wsh/lookup-page state)
+                  page-objects (:objects page)
                   media-idx    (d/index-by :prev-id media)
 
                   ;; Calculate position for the pasted elements
@@ -1751,18 +1764,24 @@
 
                   process-shape
                   (fn [_ shape]
-                    (-> shape
-                        (assoc :frame-id frame-id :parent-id parent-id)
-
-                        ;; if foreign instance, detach the shape
-                        (cond-> (foreign-instance? shape paste-objects state)
-                          (->
-                             (assoc :saved-component-root? (:component-root? shape)) ;; this is used later, if the paste needs to create a new component from the detached shape
-                             (dissoc :component-id :component-file :component-root?
-                                  :remote-synced? :shape-ref :touched)))
-                        ;; if is a text, remove references to external typographies
-                        (cond-> (= (:type shape) :text)
-                          (ctt/remove-external-typographies file-id))))
+                    (let [parent                 (get page-objects parent-id)
+                          component-shape        (ctn/get-component-shape page-objects shape)
+                          component-shape-parent (ctn/get-component-shape page-objects parent)
+                          ;; if foreign instance, or a shape belonging to another component, detach the shape
+                          detach? (or (foreign-instance? shape paste-objects state)
+                                      (and (ctk/in-component-copy-not-root? shape)
+                                           (not= (:id component-shape)
+                                                 (:id component-shape-parent))))]
+                      (-> shape
+                          (assoc :frame-id frame-id :parent-id parent-id)
+                          (cond-> detach?
+                            (->
+                             ;; this is used later, if the paste needs to create a new component from the detached shape
+                             (assoc :saved-component-root? (:component-root? shape))
+                             ctk/detach-shape))
+                          ;; if is a text, remove references to external typographies
+                          (cond-> (= (:type shape) :text)
+                            (ctt/remove-external-typographies file-id)))))
 
                   paste-objects (->> paste-objects (d/mapm process-shape))
 
