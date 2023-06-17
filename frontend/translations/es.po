@@ -502,7 +502,7 @@ msgid "dashboard.export.title"
 msgstr "Exportar ficheros"
 
 msgid "dashboard.fonts.deleted-placeholder"
-msgstr "Fuente eliminada"
+msgstr "Fuente no encontrada"
 
 #: src/app/main/ui/dashboard/fonts.cljs
 msgid "dashboard.fonts.dismiss-all"
@@ -2768,6 +2768,18 @@ msgstr "Terminar medida"
 msgid "shortcuts.thumbnail-set"
 msgstr "Activar miniaturas"
 
+msgid "shortcuts.text-align-center"
+msgstr "Alinear al centro"
+
+msgid "shortcuts.text-align-left"
+msgstr "Alinear a la izquierda"
+
+msgid "shortcuts.text-align-justify"
+msgstr "Alinear justificado"
+
+msgid "shortcuts.text-align-right"
+msgstr "Alinear a la derecha"
+
 #: src/app/main/ui/workspace/sidebar/shortcuts.cljs
 msgid "shortcuts.title"
 msgstr "Atajos de teclado"
@@ -4273,23 +4285,23 @@ msgid "workspace.options.text-options.align-bottom"
 msgstr "Alinear abajo"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/text.cljs
-msgid "workspace.options.text-options.align-center"
-msgstr "Aliniear al centro"
+msgid "workspace.options.text-options.text-align-center"
+msgstr "Alinear al centro (%s)"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/text.cljs
-msgid "workspace.options.text-options.align-justify"
+msgid "workspace.options.text-options.text-align-justify"
 msgstr "Justificar (%s)"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/text.cljs
-msgid "workspace.options.text-options.align-left"
+msgid "workspace.options.text-options.text-align-left"
 msgstr "Alinear a la izquierda (%s)"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/text.cljs
 msgid "workspace.options.text-options.align-middle"
-msgstr "Alinear al centro (%s)"
+msgstr "Alinear al centro"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/text.cljs
-msgid "workspace.options.text-options.align-right"
+msgid "workspace.options.text-options.text-align-right"
 msgstr "Alinear a la derecha (%s)"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/text.cljs
@@ -4866,7 +4878,7 @@ msgid "questions.your-feedback-will-help-us"
 msgstr "Tus respuestas nos ayudarán a entender tus hábitos y preferencias, lo que nos ayudará a continuar mejorando Penpot"
 
 #: src/app/main/ui/onboarding/questions.cljs
-msgid "questions-how-are-you-planning-to-use-penpot"
+msgid "questions.questions-how-are-you-planning-to-use-penpot"
 msgstr "¿Qué uso piensas darle a Penpot?"
 
 #: src/app/main/ui/onboarding/questions.cljs
