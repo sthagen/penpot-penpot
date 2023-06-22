@@ -1,6 +1,18 @@
 # CHANGELOG
 
-## :rocket: Next
+## :rocket: 1.20.0
+
+### :boom: Breaking changes & Deprecations
+
+### :sparkles: New features
+
+### :bug: Bugs fixed
+
+### :arrow_up: Deps updates
+
+### :heart: Community contributions by (Thank you!)
+
+## 1.19.0
 
 ### :boom: Breaking changes & Deprecations
 
@@ -9,6 +21,7 @@
 - Create typography style from a selected text layer[Taiga #3041](https://tree.taiga.io/project/penpot/us/3041)
 - Board as ruler origin [Taiga #4833](https://tree.taiga.io/project/penpot/us/4833)
 - Access tokens support [Taiga #4460](https://tree.taiga.io/project/penpot/us/4460)
+- Show interactions setting at the view mode [Taiga #1330](https://tree.taiga.io/project/penpot/issue/1330)
 
 ### :bug: Bugs fixed
 - Fix files can be opened from multiple urls [Taiga #5310](https://tree.taiga.io/project/penpot/issue/5310)
@@ -31,7 +44,25 @@
 - Distribute fix enabled when two elements were selected (by @dfelinto) [Github #3266](https://github.com/penpot/penpot/pull/3266)
 - Distribute vertical spacing failing for overlapped text (by @dfelinto) [Github #3267](https://github.com/penpot/penpot/pull/3267)
 
+## 1.18.6
+
+### :bug: Bugs fixed
+
+- Fix comments navigation from workspace [Taiga #5504](https://tree.taiga.io/project/penpot/issue/5504)
+
+### :sparkles: Enhancements
+
+- Add the ability to overwrite internal resolver with `PENPOT_INTERNAL_RESOLVER` environment
+  variable [GH #3310](https://github.com/penpot/penpot/issues/3310)
+
 ## 1.18.5
+
+### :bug: Bugs fixed
+
+- Fix add flow option in contextual menu for frames
+- Fix issues related with invitations
+- Fix problem with undefined gaps
+- Add deleted fonts auto match mechanism
 
 ## 1.18.4
 
@@ -72,6 +103,7 @@
 ## 1.18.0
 
 ### :sparkles: New features
+
 - Adds more accessibility improvements in dashboard [Taiga #4577](https://tree.taiga.io/project/penpot/us/4577)
 - Adds paddings and gaps prediction on layout creation [Taiga #4838](https://tree.taiga.io/project/penpot/task/4838)
 - Add visual feedback when proportionally scaling text elements with **K** [Taiga #3415](https://tree.taiga.io/project/penpot/us/3415)
