@@ -38,6 +38,11 @@
 
 ;; --- FEATURES
 
+(defn resolve-public-uri
+  [media-id]
+  (when media-id
+    (str (cf/get :public-uri) "/assets/by-id/" media-id)))
+
 (def supported-features
   #{"storage/objects-map"
     "storage/pointer-map"
@@ -268,16 +273,13 @@
                (binding [pmap/*tracked* (atom {})]
                  (let [data        (ctf/migrate-to-components-v2 data)
                        features    (conj features "components/v2")
-                       modified-at (dt/now)
                        features'   (db/create-array conn "text" features)]
                    (db/update! conn :file
                                {:data (blob/encode data)
-                                :modified-at modified-at
                                 :features features'}
                                {:id id})
                    (persist-pointers! conn id)
                    (-> file
-                       (assoc :modified-at modified-at)
                        (assoc :features features)
                        (assoc :data data))))
                file)]
@@ -413,15 +415,23 @@
           f.modified_at,
           f.name,
           f.revn,
-          f.is_shared
+          f.is_shared,
+          ft.media_id
      from file as f
+     left join file_thumbnail as ft on (ft.file_id = f.id and ft.revn = f.revn)
     where f.project_id = ?
       and f.deleted_at is null
     order by f.modified_at desc")
 
 (defn get-project-files
   [conn project-id]
-  (db/exec! conn [sql:project-files project-id]))
+  (->> (db/exec! conn [sql:project-files project-id])
+       (mapv (fn [row]
+               (if-let [media-id (:media-id row)]
+                 (-> row
+                     (dissoc :media-id)
+                     (assoc :thumbnail-uri (resolve-public-uri media-id)))
+                 (dissoc row :media-id))))))
 
 (sv/defmethod ::get-project-files
   "Get all files for the specified project."
@@ -536,9 +546,11 @@
           f.created_at,
           f.modified_at,
           f.name,
-          f.is_shared
+          f.is_shared,
+          ft.media_id
      from file as f
     inner join project as p on (p.id = f.project_id)
+     left join file_thumbnail as ft on (ft.file_id = f.id and ft.revn = f.revn)
     where f.is_shared = true
       and f.deleted_at is null
       and p.deleted_at is null
@@ -569,6 +581,12 @@
     (->> (db/exec! conn [sql:team-shared-files team-id])
          (into #{} (comp
                     (map decode-row)
+                    (map (fn [row]
+                           (if-let [media-id (:media-id row)]
+                             (-> row
+                                 (dissoc :media-id)
+                                 (assoc :thumbnail-uri (resolve-public-uri media-id)))
+                             (dissoc row :media-id))))
                     (map #(assoc % :library-summary (library-summary %)))
                     (map #(dissoc % :data)))))))
 
@@ -668,9 +686,11 @@
             f.modified_at,
             f.name,
             f.is_shared,
+            ft.media_id,
             row_number() over w as row_num
        from file as f
-       join project as p on (p.id = f.project_id)
+      inner join project as p on (p.id = f.project_id)
+       left join file_thumbnail as ft on (ft.file_id = f.id and ft.revn = f.revn)
       where p.team_id = ?
         and p.deleted_at is null
         and f.deleted_at is null
@@ -681,7 +701,13 @@
 
 (defn get-team-recent-files
   [conn team-id]
-  (db/exec! conn [sql:team-recent-files team-id]))
+  (->> (db/exec! conn [sql:team-recent-files team-id])
+       (mapv (fn [row]
+               (if-let [media-id (:media-id row)]
+                 (-> row
+                     (dissoc :media-id)
+                     (assoc :thumbnail-uri (resolve-public-uri media-id)))
+                 (dissoc row :media-id))))))
 
 (s/def ::get-team-recent-files
   (s/keys :req [::rpc/profile-id]
