@@ -268,9 +268,7 @@
                  ;; interactions that navigate to it.
                  (apply st/emit! (map #(dwi/remove-all-interactions-nav-to %) ids)))
 
-               (st/emit! (dwu/commit-undo-transaction undo-id))))))
-
-        select-all #(-> % (dom/get-target) (.select))]
+               (st/emit! (dwu/commit-undo-transaction undo-id))))))]
 
     (mf/use-layout-effect
      (mf/deps radius-mode @radius-multi?)
@@ -316,7 +314,6 @@
            [:> numeric-input {:min 0.01
                               :no-validate true
                               :placeholder "--"
-                              :on-focus select-all
                               :on-change on-width-change
                               :disabled disabled-width-sizing?
                               :value (:width values)}]]
@@ -325,7 +322,6 @@
            [:> numeric-input {:min 0.01
                               :no-validate true
                               :placeholder "--"
-                              :on-focus select-all
                               :on-change on-height-change
                               :disabled disabled-height-sizing?
                               :value (:height values)}]]
@@ -345,14 +341,12 @@
           [:div.input-element.Xaxis {:title (tr "workspace.options.x")}
            [:> numeric-input {:no-validate true
                               :placeholder "--"
-                              :on-focus select-all
                               :on-change on-pos-x-change
                               :disabled disabled-position-x?
                               :value (:x values)}]]
           [:div.input-element.Yaxis {:title (tr "workspace.options.y")}
            [:> numeric-input {:no-validate true
                               :placeholder "--"
-                              :on-focus select-all
                               :disabled disabled-position-y?
                               :on-change on-pos-y-change
                               :value (:y values)}]]])
@@ -368,7 +362,6 @@
              :max 359
              :data-wrap true
              :placeholder "--"
-             :on-focus select-all
              :on-change on-rotation-change
              :value (:rotation values)}]]])
 
@@ -396,7 +389,6 @@
               {:placeholder "--"
                :ref radius-input-ref
                :min 0
-               :on-focus select-all
                :on-change on-radius-1-change
                :value (:rx values)}]]
 
@@ -406,41 +398,36 @@
               {:type "number"
                :placeholder "--"
                :min 0
-               :on-focus select-all
                :on-change on-radius-multi-change
                :value ""}]]
 
             (= radius-mode :radius-4)
             [:*
-             [:div.input-element.mini {:title (tr "workspace.options.radius")}
+             [:div.input-element.mini {:title (tr "workspace.options.radius-top-left")}
               [:> numeric-input
                {:placeholder "--"
                 :min 0
-                :on-focus select-all
                 :on-change on-radius-r1-change
                 :value (:r1 values)}]]
 
-             [:div.input-element.mini {:title (tr "workspace.options.radius")}
+             [:div.input-element.mini {:title (tr "workspace.options.radius-top-right")}
               [:> numeric-input
                {:placeholder "--"
                 :min 0
-                :on-focus select-all
                 :on-change on-radius-r2-change
                 :value (:r2 values)}]]
 
-             [:div.input-element.mini {:title (tr "workspace.options.radius")}
+             [:div.input-element.mini {:title (tr "workspace.options.radius-bottom-right")}
               [:> numeric-input
                {:placeholder "--"
                 :min 0
-                :on-focus select-all
                 :on-change on-radius-r3-change
                 :value (:r3 values)}]]
 
-             [:div.input-element.mini {:title (tr "workspace.options.radius")}
+             [:div.input-element.mini {:title (tr "workspace.options.radius-bottom-left")}
               [:> numeric-input
                {:placeholder "--"
                 :min 0
-                :on-focus select-all
                 :on-change on-radius-r4-change
                 :value (:r4 values)}]]])])
 
