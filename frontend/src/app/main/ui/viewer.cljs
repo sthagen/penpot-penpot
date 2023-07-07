@@ -215,7 +215,7 @@
 (mf/defc viewer
   [{:keys [params data]}]
 
-  (let [{:keys [page-id section index interactions-mode]} params
+  (let [{:keys [page-id share-id section index interactions-mode]} params
         {:keys [file users project permissions]} data
 
         allowed (or
@@ -519,7 +519,8 @@
              :size size
              :index index
              :viewer-pagination viewer-pagination
-             :interactions-mode interactions-mode}]
+             :interactions-mode interactions-mode
+             :share-id share-id}]
 
 
            [:& (mf/provider ctx/current-zoom) {:value zoom}
@@ -544,16 +545,16 @@
 
 (mf/defc viewer-page
   [{:keys [file-id] :as props}]
-  (mf/use-effect
-   (mf/deps file-id)
-   (fn []
-     (st/emit! (dv/initialize props))
-     (fn []
-       (st/emit! (dv/finalize props)))))
+
+  (mf/with-effect [file-id]
+    (st/emit! (dv/initialize props))
+    (fn []
+      (st/emit! (dv/finalize props))))
 
   (if-let [data (mf/deref refs/viewer-data)]
     (let [key (str (get-in data [:file :id]))]
       [:& viewer {:params props :data data :key key}])
+
     [:div.loader-content.viewer-loader
      i/loader-pencil]))
 
