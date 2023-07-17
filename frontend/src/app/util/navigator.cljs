@@ -4,6 +4,11 @@
 ;;
 ;; Copyright (c) KALEIDOS INC
 
-(ns app.common.files.defaults)
+(ns app.util.navigator
+  (:require [app.util.globals :as globals]))
 
-(def version 28)
+(defn get-user-agent []
+  (.-userAgent globals/navigator))
+
+
+

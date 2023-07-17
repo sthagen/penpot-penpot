@@ -45,8 +45,9 @@
 
 (defn migrated?
   [{:keys [data] :as file}]
-  (> (:version data)
-     (::orig-version file)))
+  (or (::migrated file)
+      (> (:version data)
+         (::orig-version file))))
 
 ;; Default handler, noop
 (defmethod migrate :default [data] data)
@@ -436,33 +437,7 @@
         (update :pages-index update-vals update-container)
         (update :components update-vals update-container))))
 
-(defmethod migrate 20
-  [data]
-  (letfn [(update-object [objects object]
-            (let [frame-id (:frame-id object)
-                  calculated-frame-id
-                  (or (->> (cph/get-parent-ids objects (:id object))
-                           (map (d/getf objects))
-                           (d/seek cph/frame-shape?)
-                           :id)
-                      ;; If we cannot find any we let the frame-id as it was before
-                      frame-id)]
-              (when (not= frame-id calculated-frame-id)
-                (log/info :hint "Fix wrong frame-id"
-                          :shape (:name object)
-                          :id (:id object)
-                          :current (dm/get-in objects [frame-id :name])
-                          :calculated (get-in objects [calculated-frame-id :name])))
-              (assoc object :frame-id calculated-frame-id)))
-
-          (update-container [container]
-            (update container :objects #(update-vals % (partial update-object %))))]
-
-    (-> data
-        (update :pages-index update-vals update-container)
-        (update :components update-vals update-container))))
-
-(defmethod migrate 21
+(defmethod migrate 25
   [data]
   (letfn [(update-object [object]
             (-> object
@@ -474,7 +449,7 @@
         (update :pages-index update-vals update-container)
         (update :components update-vals update-container))))
 
-(defmethod migrate 22
+(defmethod migrate 26
   [data]
   (letfn [(update-object [object]
             (cond-> object
@@ -491,7 +466,7 @@
         (update :pages-index update-vals update-container)
         (update :components update-vals update-container))))
 
-(defmethod migrate 23
+(defmethod migrate 27
   [data]
   (letfn [(update-object [object]
             (cond-> object
@@ -513,6 +488,32 @@
 
           (update-container [container]
             (d/update-when container :objects update-vals update-object))]
+
+    (-> data
+        (update :pages-index update-vals update-container)
+        (update :components update-vals update-container))))
+
+(defmethod migrate 28
+  [data]
+  (letfn [(update-object [objects object]
+            (let [frame-id (:frame-id object)
+                  calculated-frame-id
+                  (or (->> (cph/get-parent-ids objects (:id object))
+                           (map (d/getf objects))
+                           (d/seek cph/frame-shape?)
+                           :id)
+                      ;; If we cannot find any we let the frame-id as it was before
+                      frame-id)]
+              (when (not= frame-id calculated-frame-id)
+                (log/info :hint "Fix wrong frame-id"
+                          :shape (:name object)
+                          :id (:id object)
+                          :current (dm/get-in objects [frame-id :name])
+                          :calculated (get-in objects [calculated-frame-id :name])))
+              (assoc object :frame-id calculated-frame-id)))
+
+          (update-container [container]
+            (update container :objects #(update-vals % (partial update-object %))))]
 
     (-> data
         (update :pages-index update-vals update-container)
