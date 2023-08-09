@@ -10,6 +10,7 @@
    [app.common.exceptions :as ex]
    [app.common.logging :as l]
    [app.common.schema :as sm]
+   [app.config :as cf]
    [app.http :as-alias http]
    [app.http.access-token :as-alias actoken]
    [app.http.session :as-alias session]
@@ -30,14 +31,14 @@
   (let [claims (-> {}
                    (into (::session/token-claims request))
                    (into (::actoken/token-claims request)))]
-    {:path       (:path request)
-     :method     (:method request)
-     :params     (:params request)
-     :ip-addr    (parse-client-ip request)
-     :user-agent (yrq/get-header request "user-agent")
-     :profile-id (:uid claims)
-     :version    (or (yrq/get-header request "x-frontend-version")
-                     "unknown")}))
+    {:request/path       (:path request)
+     :request/method     (:method request)
+     :request/params     (:params request)
+     :request/user-agent (yrq/get-header request "user-agent")
+     :request/ip-addr    (parse-client-ip request)
+     :request/profile-id (:uid claims)
+     :version/frontend   (or (yrq/get-header request "x-frontend-version") "unknown")
+     :version/backend    (:full cf/version)}))
 
 (defmulti handle-exception
   (fn [err & _rest]
@@ -73,7 +74,7 @@
      ::yrs/headers headers}))
 
 (defmethod handle-exception :validation
-  [err _]
+  [err request]
   (let [{:keys [code] :as data} (ex-data err)]
     (cond
       (= code :spec-validation)
@@ -93,6 +94,11 @@
 
       (= code :request-body-too-large)
       {::yrs/status 413 ::yrs/body data}
+
+      (= code :invalid-image)
+      (binding [l/*context* (request->context request)]
+        (l/error :hint "unexpected error on processing image" :cause err)
+        {::yrs/status 400 ::yrs/body data})
 
       :else
       {::yrs/status 400 ::yrs/body data})))
