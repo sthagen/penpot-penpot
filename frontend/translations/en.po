@@ -2142,6 +2142,15 @@ msgstr "Are you sure you want to delete this annotation?"
 msgid "modals.delete-component-annotation.title"
 msgstr "Delete annotation"
 
+msgid "modals.publish-empty-library.title"
+msgstr "Publish empty library"
+
+msgid "modals.publish-empty-library.message"
+msgstr "Your library is empty. Are you sure you want to publish it?"
+
+msgid "modals.publish-empty-library.accept"
+msgstr "Publish"
+
 #: src/app/main/ui/dashboard/team.cljs
 msgid "notifications.invitation-email-sent"
 msgstr "Invitation sent successfully"
@@ -3040,8 +3049,12 @@ msgstr[0] "%s item selected"
 msgstr[1] "%s items selected"
 
 #: src/app/main/ui/workspace/sidebar/assets.cljs
-msgid "workspace.assets.shared"
-msgstr "SHARED"
+msgid "workspace.assets.shared-library"
+msgstr "Shared library"
+
+msgid "workspace.assets.open-library"
+msgstr "Open library file"
+
 
 #: src/app/main/ui/workspace/sidebar/assets.cljs, src/app/main/ui/workspace/sidebar/assets.cljs
 msgid "workspace.assets.typography"
@@ -4960,3 +4973,7 @@ msgstr "Student or teacher"
 
 msgid "workspace.layout_grid.editor.title"
 msgstr "Editing grid"
+
+#: src/app/main/data/common.cljs
+msgid "notifications.by-code.upgrade-version"
+msgstr "A new version is available, please refresh the page"

@@ -13,6 +13,12 @@
 ### :heart: Community contributions by (Thank you!)
 
 
+## 1.19.1
+
+### :bug: Bugs fixed
+
+- Fix components not registered as updated [Taiga #5725](https://tree.taiga.io/project/penpot/issue/5725)
+
 ## 1.19.0
 
 ### :boom: Breaking changes & Deprecations
@@ -32,6 +38,8 @@
 - Add support for local caching of google fonts (this avoids exposing the final user IP to
   goolge and reduces the amount of request sent to google)
 - Set smooth/instant autoscroll depending on distance [GitHub #3377](https://github.com/penpot/penpot/issues/3377)
+- New component icon [Taiga #5290](https://tree.taiga.io/project/penpot/us/5290)
+- Show a confirmation dialog when an user tries to publish an empty library [Taiga #5294](https://tree.taiga.io/project/penpot/us/5294)
 
 ### :bug: Bugs fixed
 

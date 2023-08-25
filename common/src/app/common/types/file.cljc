@@ -114,13 +114,20 @@
 
 (defn find-component
   "Retrieve a component from libraries, iterating over all of them."
-  [libraries component-id & {:keys [included-delete?] :or {included-delete? false}}]
-  (some #(ctkl/get-component (:data %) component-id included-delete?) (vals libraries)))
+  [libraries component-id & {:keys [include-deleted?] :or {include-deleted? false}}]
+  (some #(ctkl/get-component (:data %) component-id include-deleted?) (vals libraries)))
 
 (defn get-component
   "Retrieve a component from a library."
-  [libraries library-id component-id & {:keys [included-delete?] :or {included-delete? false}}]
-   (ctkl/get-component (dm/get-in libraries [library-id :data]) component-id included-delete?))
+  [libraries library-id component-id & {:keys [include-deleted?] :or {include-deleted? false}}]
+  (ctkl/get-component (dm/get-in libraries [library-id :data]) component-id include-deleted?))
+
+(defn resolve-component
+  "Retrieve the referenced component, from the local file or from a library"
+  [shape file libraries & params]
+  (if (= (:component-file shape) (:id file))
+    (ctkl/get-component (:data file) (:component-id shape) params)
+    (get-component libraries (:component-file shape) (:component-id shape) params)))
 
 (defn get-component-library
   "Retrieve the library the component belongs to."
@@ -162,11 +169,35 @@
       (dm/get-in component [:objects shape-id]))))
 
 (defn get-ref-shape
-  "Retrieve the shape in the component that is referenced by the
-  instance shape."
+  "Retrieve the shape in the component that is referenced by the instance shape."
   [file-data component shape]
   (when (:shape-ref shape)
     (get-component-shape file-data component (:shape-ref shape))))
+
+(defn find-ref-shape
+  "Locate the near component in the local file or libraries, and retrieve the shape
+   referenced by the instance shape."
+  [file page libraries shape]
+  (let [root-shape     (ctn/get-component-shape (:objects page) shape)
+        component-file (if (= (:component-file root-shape) (:id file))
+                         file
+                         (get libraries (:component-file root-shape)))
+        component      (when component-file
+                         (ctkl/get-component (:data component-file) (:component-id root-shape)))]
+    (when component
+      (get-ref-shape (:data component-file) component shape))))
+
+(defn find-remote-shape
+  "Recursively go back by the :shape-ref of the shape until find the correct shape of the original component"
+  [container libraries shape]
+  (let [top-instance        (ctn/get-top-instance (:objects container) shape nil)
+        component-file      (get-in libraries [(:component-file top-instance) :data])
+        component           (ctkl/get-component component-file (:component-id top-instance) true)
+        remote-shape        (get-ref-shape component-file component shape)
+        component-container (get-component-container component-file component)]
+    (if (nil? remote-shape)
+      shape
+      (find-remote-shape component-container libraries remote-shape))))
 
 (defn get-component-shapes
   "Retrieve all shapes of the component"
@@ -432,7 +463,8 @@
                                              library-data
                                              position
                                              (dm/get-in file-data [:options :components-v2])
-                                             {:main-instance true})
+                                             {:main-instance? true
+                                              :keep-ids? true})
 
                 main-instance-shapes
                 (map #(cond-> %
@@ -570,107 +602,537 @@
       (d/not-empty? used-typographies)
       (absorb-typographies used-typographies))))
 
-
 ;; Debug helpers
 
+(declare dump-shape-component-info)
+
+(defn dump-shape
+  "Display a summary of a shape and its relationships, and recursively of all children."
+  [shape-id level objects file libraries {:keys [show-ids show-touched] :as flags}]
+  (let [shape (get objects shape-id)]
+    (println (str/pad (str (str/repeat "  " level)
+                           (when (:main-instance shape) "{")
+                           (:name shape)
+                           (when (:main-instance shape) "}")
+                           (when (seq (:touched shape)) "*")
+                           (when show-ids (str/format " %s" (:id shape))))
+                      {:length 20
+                       :type :right})
+             (dump-shape-component-info shape objects file libraries flags))
+    (when show-touched
+      (when (seq (:touched shape))
+        (println (str (str/repeat "  " level)
+                      "    "
+                      (str (:touched shape)))))
+      (when (:remote-synced shape)
+        (println (str (str/repeat "  " level)
+                      "    (remote-synced)"))))
+    (when (:shapes shape)
+      (dorun (for [shape-id (:shapes shape)]
+               (dump-shape shape-id
+                           (inc level)
+                           objects
+                           file
+                           libraries
+                           flags))))))
+
+(defn dump-shape-component-info
+  "If the shape is inside a component, display the information of the relationship."
+  [shape objects file libraries {:keys [show-ids]}]
+  (if (nil? (:shape-ref shape))
+    (if (:component-root shape)
+      (str " #" (when show-ids (str/format " [Component %s]" (:component-id shape))))
+      "")
+    (let [root-shape        (ctn/get-component-shape objects shape)
+          component-id      (when root-shape (:component-id root-shape))
+          component-file-id (when root-shape (:component-file root-shape))
+          component-file    (when component-file-id (get libraries component-file-id nil))
+          component         (when component-id
+                              (if component-file
+                                (ctkl/get-component (:data component-file) component-id true)
+                                (ctkl/get-component (:data file) component-id true)))
+          component-shape   (when component
+                              (if component-file
+                                (get-ref-shape (:data component-file) component shape)
+                                (get-ref-shape (:data file) component shape)))]
+
+      (str/format " %s--> %s%s%s%s%s"
+                  (cond (:component-root shape) "#"
+                        (:component-id shape) "@"
+                        :else "-")
+
+                  (when component-file (str/format "<%s> " (:name component-file)))
+
+                  (or (:name component-shape)
+                      (str/format "?%s"
+                                  (when show-ids
+                                    (str " " (:shape-ref shape)))))
+
+                  (when (and show-ids component-shape)
+                    (str/format " %s" (:id component-shape)))
+
+                  (if (or (:component-root shape)
+                          (nil? (:component-id shape))
+                          true)
+                    ""
+                    (let [component-id      (:component-id shape)
+                          component-file-id (:component-file shape)
+                          component-file    (when component-file-id (get libraries component-file-id nil))
+                          component         (if component-file
+                                              (ctkl/get-component (:data component-file) component-id true)
+                                              (ctkl/get-component (:data file) component-id true))]
+                      (str/format " (%s%s)"
+                                  (when component-file (str/format "<%s> " (:name component-file)))
+                                  (:name component))))
+
+                  (when (and show-ids (:component-id shape))
+                    (str/format " [Component %s]" (:component-id shape)))))))
+
+(defn dump-component
+  "Display a summary of a component and the links to the main instance.
+   If the component contains an :objects, display also all shapes inside."
+  [component file libraries {:keys [show-ids show-modified] :as flags}]
+  (println (str/format "[%sComponent: %s]%s%s"
+                       (when (:deleted component) "DELETED ")
+                       (:name component)
+                       (when show-ids (str " " (:id component)))
+                       (when show-modified (str " " (:modified-at component)))))
+  (when (:main-instance-page component)
+    (let [page (get-component-page (:data file) component)
+          root (get-component-root (:data file) component)]
+      (if-not show-ids
+        (println (str "  --> [" (:name page) "] " (:name root)))
+        (do
+          (println (str "  " (:name page) (str/format " %s" (:id page))))
+          (println (str "  " (:name root) (str/format " %s" (:id root))))))))
+
+  (when (and (:main-instance-page component)
+             (seq (:objects component)))
+    (println))
+
+  (when (seq (:objects component))
+    (let [root (ctk/get-component-root component)]
+      (dump-shape (:id root)
+                  1
+                  (:objects component)
+                  file
+                  libraries
+                  flags))))
+
+(defn dump-page
+  "Display a summary of a page, and of all shapes inside."
+  [page file libraries {:keys [show-ids root-id] :as flags
+                        :or {root-id uuid/zero}}]
+  (let [objects (:objects page)
+        root    (get objects root-id)]
+    (println (str/format "[Page: %s]%s"
+                         (:name page)
+                         (when show-ids (str " " (:id page)))))
+    (dump-shape (:id root)
+                1
+                objects
+                file
+                libraries
+                flags)))
+
+(defn dump-library
+  "Display a summary of a library, and of all components inside."
+  [library file libraries {:keys [show-ids only include-deleted?] :as flags}]
+  (let [lib-components (ctkl/components (:data library) {:include-deleted? include-deleted?})]
+    (println)
+    (println (str/format "========= %s%s"
+                         (if (= (:id library) (:id file))
+                           "Local library"
+                           (str/format "Library %s" (:name library)))
+                         (when show-ids
+                           (str/format " %s" (:id library)))))
+
+    (if (seq lib-components)
+      (dorun (for [component (vals lib-components)]
+               (when (or (nil? only) (only (:id component)))
+                 (do
+                   (println)
+                   (dump-component component
+                                   library
+                                   libraries
+                                   flags)))))
+      (do
+        (println)
+        (println "(no components)")))))
+
 (defn dump-tree
-  ([file-data page-id libraries]
-   (dump-tree file-data page-id libraries false false false))
+  "Display all shapes in the given page, and also all components of the local
+   library and all linked libraries."
+  [file page-id libraries flags]
+  (let [page (ctpl/get-page (:data file) page-id)]
 
-  ([file-data page-id libraries show-ids]
-   (dump-tree file-data page-id libraries show-ids false false))
+    (dump-page page file libraries flags)
 
-  ([file-data page-id libraries show-ids show-touched]
-   (dump-tree file-data page-id libraries show-ids show-touched false))
+    (dump-library file
+                  file
+                  libraries
+                  flags)
 
-  ([file-data page-id libraries show-ids show-touched show-modified]
-   (let [page       (ctpl/get-page file-data page-id)
-         objects    (:objects page)
-         components (ctkl/components file-data)
-         root       (d/seek #(nil? (:parent-id %)) (vals objects))]
+    (dorun (for [library (vals libraries)]
+             (dump-library library
+                           file
+                           libraries
+                           flags)))
+    (println)))
 
-     (letfn [(show-shape [shape-id level objects]
-               (let [shape (get objects shape-id)]
-                 (println (str/pad (str (str/repeat "  " level)
-                                        (when (:main-instance shape) "{")
-                                        (:name shape)
-                                        (when (:main-instance shape) "}")
-                                        (when (seq (:touched shape)) "*")
-                                        (when show-ids (str/format " <%s>" (:id shape))))
-                                   {:length 20
-                                    :type :right})
-                          (show-component-info shape objects))
-                 (when show-touched
-                   (when (seq (:touched shape))
-                     (println (str (str/repeat "  " level)
-                                   "    "
-                                   (str (:touched shape)))))
-                   (when (:remote-synced shape)
-                     (println (str (str/repeat "  " level)
-                                   "    (remote-synced)"))))
-                 (when (:shapes shape)
-                   (dorun (for [shape-id (:shapes shape)]
-                            (show-shape shape-id (inc level) objects))))))
+(defn dump-subtree
+  "Display all shapes in the context of the given shape, and also the components
+   used by any of the shape or children."
+  [file page-id shape-id libraries flags]
+  (let [libraries* (assoc libraries (:id file) file)]
+    (letfn [(add-component
+              [libs-to-show library-id component-id]
+              ;; libs-to-show is a structure like {<lib1-id> #{<comp1-id> <comp2-id>}
+              ;;                                   <lib2-id> #{<comp3-id>}
+              (let [component-ids (conj (get libs-to-show library-id #{})
+                                        component-id)]
+                (assoc libs-to-show library-id component-ids)))
 
-             (show-component-info [shape objects]
-               (if (nil? (:shape-ref shape))
-                 (if (:component-root shape) " #" "")
-                 (let [root-shape        (ctn/get-component-shape objects shape)
-                       component-id      (when root-shape (:component-id root-shape))
-                       component-file-id (when root-shape (:component-file root-shape))
-                       component-file    (when component-file-id (get libraries component-file-id nil))
-                       component         (when component-id
-                                           (if component-file
-                                             (ctkl/get-component (:data component-file) component-id)
-                                             (get components component-id)))
-                       component-shape   (when component
-                                           (if component-file
-                                             (get-ref-shape (:data component-file) component shape)
-                                             (get-ref-shape file-data component shape)))]
+            (find-used-components
+              [page root]
+              (let [children (cph/get-children-with-self (:objects page) (:id root))]
+                (reduce (fn [libs-to-show shape]
+                          (if (ctk/instance-head? shape)
+                            (add-component libs-to-show (:component-file shape) (:component-id shape))
+                            libs-to-show))
+                        {}
+                        children)))
 
-                   (str/format " %s--> %s%s%s"
-                               (cond (:component-root shape) "#"
-                                     (:component-id shape) "@"
-                                     :else "-")
+            (find-used-components-cumulative
+              [libs-to-show page root]
+              (let [sublibs-to-show (find-used-components page root)]
+                (reduce (fn [libs-to-show [library-id components]]
+                          (reduce (fn [libs-to-show component-id]
+                                    (let [library   (get libraries* library-id)
+                                          component (get-component libraries* library-id component-id {:include-deleted? true})
+                                          ;; page      (get-component-page (:data library) component)
+                                          root      (when component
+                                                      (get-component-root (:data library) component))]
+                                      (if (nil? component)
+                                        (do
+                                          (println (str/format "(Cannot find component %s in library %s)"
+                                                               component-id library-id))
+                                          libs-to-show)
+                                        (if (get-in libs-to-show [library-id (:id root)])
+                                          libs-to-show
+                                          (-> libs-to-show
+                                              (add-component library-id component-id)
+                                              ;; (find-used-components-cumulative page root)
+                                              )))))
+                                  libs-to-show
+                                  components))
+                        libs-to-show
+                        sublibs-to-show)))]
 
-                               (when component-file (str/format "<%s> " (:name component-file)))
+      (let [page (ctpl/get-page (:data file) page-id)
+            shape (ctst/get-shape page shape-id)
+            root (or (ctn/get-instance-root (:objects page) shape)
+                     shape) ; If not in a component, start by the shape itself
 
-                               (or (:name component-shape) "?")
+            libs-to-show (find-used-components-cumulative {} page root)]
 
-                               (if (or (:component-root shape)
-                                       (nil? (:component-id shape))
-                                       true)
-                                 ""
-                                 (let [component-id      (:component-id shape)
-                                       component-file-id (:component-file shape)
-                                       component-file    (when component-file-id (get libraries component-file-id nil))
-                                       component         (if component-file
-                                                           (ctkl/get-component (:data component-file) component-id)
-                                                           (get components component-id))]
-                                   (str/format " (%s%s)"
-                                               (when component-file (str/format "<%s> " (:name component-file)))
-                                               (:name component))))))))
+        (if (nil? root)
+          (println (str "Cannot find shape " shape-id))
+          (do
+            (dump-page page file libraries (assoc flags :root-id (:id root)))
+            (dorun (for [[library-id component-ids] libs-to-show]
+                     (let [library (get libraries* library-id)]
+                       (dump-library library
+                                     file
+                                     libraries
+                                     (assoc flags
+                                            :only component-ids
+                                            :include-deleted? true))
+                       (dorun (for [component-id component-ids]
+                                (let [library   (get libraries* library-id)
+                                      component (get-component libraries* library-id component-id {:include-deleted? true})
+                                      page      (get-component-page (:data library) component)
+                                      root      (get-component-root (:data library) component)]
+                                  (when-not (:deleted component)
+                                    (println)
+                                    (dump-page page file libraries* (assoc flags :root-id (:id root))))))))))))))))
 
-             (show-component-instance [component]
-               (let [page (get-component-page file-data component)
-                     root (get-component-root file-data component)]
-                 (if-not show-ids
-                   (println (str "  [" (:name page) "] / " (:name root)))
-                   (do
-                     (println (str "  " (:name page) (str/format " <%s>" (:id page))))
-                     (println (str "  " (:name root) (str/format " <%s>" (:id root))))))))]
+;; Validation
 
-       (println (str "[Page: " (:name page) "]"))
-       (show-shape (:id root) 0 objects)
+(declare validate-shape)
 
-       (dorun (for [component (vals components)]
-                (do
-                  (println)
-                  (println (str/format "[%s]%s%s"
-                                       (:name component)
-                                       (when show-ids (str " " (:id component)))
-                                       (when show-modified (str " " (:modified-at component)))))
-                  (when (:objects component)
-                    (show-shape (:id component) 0 (:objects component)))
-                  (when (:main-instance-page component)
-                    (show-component-instance component)))))))))
+(defn validate-parent-children
+  "Validate parent and children exists, and the link is bidirectional."
+  [shape file page report-error]
+  (let [parent (ctst/get-shape page (:parent-id shape))]
+    (if (nil? parent)
+      (report-error :parent-not-found
+                    (str/format "Parent %s not found" (:parent-id shape))
+                    shape file page)
+      (do
+        (when-not (cph/root? shape)
+          (when-not (some #{(:id shape)} (:shapes parent))
+            (report-error :child-not-in-parent
+                          (str/format "Shape %s not in parent's children list" (:id shape))
+                          shape file page)))
+
+        (doseq [child-id (:shapes shape)]
+          (when (nil? (ctst/get-shape page child-id))
+            (report-error :child-not-found
+                          (str/format "Child %s not found" child-id)
+                          shape file page)))))))
+
+(defn validate-component-main-head
+  "Validate shape is a main instance head, component exists and its main-instance points to this shape."
+  [shape file page libraries report-error]
+  (when (nil? (:main-instance shape))
+    (report-error :component-not-main
+                  (str/format "Shape expected to be main instance")
+                  shape file page))
+  (let [component (resolve-component shape file libraries {:include-deleted? true})]
+    (if (nil? component)
+      (report-error :component-not-found
+                    (str/format "Component %s not found in file" (:component-id shape) (:component-file shape))
+                    shape file page)
+      (do
+        (when-not (= (:main-instance-id component) (:id shape))
+          (report-error :invalid-main-instance-id
+                        (str/format "Main instance id of component %s is not valid" (:component-id shape))
+                        shape file page))
+        (when-not (= (:main-instance-page component) (:id page))
+          (report-error :invalid-main-instance-page
+                        (str/format "Main instance page of component %s is not valid" (:component-id shape))
+                        shape file page))))))
+
+(defn validate-component-not-main-head
+  "Validate shape is a not-main instance head, component exists and its main-instance does not point to this shape."
+  [shape file page libraries report-error]
+  (when (some? (:main-instance shape))
+    (report-error :component-not-main
+                  (str/format "Shape not expected to be main instance")
+                  shape file page))
+  (let [component (resolve-component shape file libraries {:include-deleted? true})]
+    (if (nil? component)
+      (report-error :component-not-found
+                    (str/format "Component %s not found in file" (:component-id shape) (:component-file shape))
+                    shape file page)
+      (do
+        (when (and (= (:main-instance-id component) (:id shape))
+                   (= (:main-instance-page component) (:id page)))
+          (report-error :invalid-main-instance
+                        (str/format "Main instance of component %s should not be this shape" (:id component))
+                        shape file page))))))
+
+(defn validate-component-not-main-not-head
+  "Validate that this shape is not main instance and not head."
+  [shape file page report-error]
+  (when (some? (:main-instance shape))
+    (report-error :component-main
+                  (str/format "Shape not expected to be main instance")
+                  shape file page))
+  (when (or (some? (:component-id shape))
+            (some? (:component-file shape)))
+    (report-error :component-main
+                  (str/format "Shape not expected to be component head")
+                  shape file page)))
+
+(defn validate-component-root
+  "Validate that this shape is an instance root."
+  [shape file page report-error]
+  (when (nil? (:component-root shape))
+    (report-error :missing-component-root
+                  (str/format "Shape should be component root")
+                  shape file page)))
+
+(defn validate-component-not-root
+  "Validate that this shape is not an instance root."
+  [shape file page report-error]
+  (when (some? (:component-root shape))
+    (report-error :missing-component-root
+                  (str/format "Shape should not be component root")
+                  shape file page)))
+
+(defn validate-component-ref
+  "Validate that the referenced shape exists in the near component."
+  [shape file page libraries report-error]
+  (let [ref-shape (find-ref-shape file page libraries shape)]
+    (when (nil? ref-shape)
+      (report-error :missing-component-root
+                    (str/format "Referenced shape %s not found in near component" (:shape-ref shape))
+                    shape file page))))
+ 
+(defn validate-component-not-ref
+  "Validate that this shape does not reference other one."
+  [shape file page report-error]
+  (when (some? (:shape-ref shape))
+    (report-error :shape-ref-in-main
+                  (str/format "Shape inside main instance should not have shape-ref")
+                  shape file page)))
+
+(defn validate-shape-main-root-top
+  "Root shape of a top main instance
+     :main-instance
+     :component-id
+     :component-file
+     :component-root"
+  [shape file page libraries report-error]
+  (validate-component-main-head shape file page libraries report-error)
+  (validate-component-root shape file page report-error)
+  (validate-component-not-ref shape file page report-error)
+  (doseq [child-id (:shapes shape)]
+    (validate-shape child-id file page libraries :context :main-top :report-error report-error)))
+
+(defn validate-shape-main-root-nested
+  "Root shape of a nested main instance
+     :main-instance
+     :component-id
+     :component-file"
+  [shape file page libraries report-error]
+  (validate-component-main-head shape file page libraries report-error)
+  (validate-component-not-root shape file page report-error)
+  (validate-component-not-ref shape file page report-error)
+  (doseq [child-id (:shapes shape)]
+    (validate-shape child-id file page libraries :context :main-nested :report-error report-error)))
+
+(defn validate-shape-copy-root-top
+  "Root shape of a top copy instance
+     :component-id
+     :component-file
+     :component-root
+     :shape-ref"
+  [shape file page libraries report-error]
+  (validate-component-not-main-head shape file page libraries report-error)
+  (validate-component-root shape file page report-error)
+  (validate-component-ref shape file page libraries report-error)
+  (doseq [child-id (:shapes shape)]
+    (validate-shape child-id file page libraries :context :copy-top :report-error report-error)))
+
+(defn validate-shape-copy-root-nested
+  "Root shape of a nested copy instance
+     :component-id
+     :component-file
+     :shape-ref"
+  [shape file page libraries report-error]
+  (validate-component-not-main-head shape file page libraries report-error)
+  (validate-component-not-root shape file page report-error)
+  (validate-component-ref shape file page libraries report-error)
+  (doseq [child-id (:shapes shape)]
+    (validate-shape child-id file page libraries :context :copy-nested :report-error report-error)))
+
+(defn validate-shape-main-not-root
+  "Not-root shape of a main instance
+     (not any attribute)"
+  [shape file page libraries report-error]
+  (validate-component-not-main-not-head shape file page report-error)
+  (validate-component-not-root shape file page report-error)
+  (validate-component-not-ref shape file page report-error)
+  (doseq [child-id (:shapes shape)]
+    (validate-shape child-id file page libraries :context :main-any :report-error report-error)))
+
+(defn validate-shape-copy-not-root
+  "Not-root shape of a copy instance
+     :shape-ref"
+  [shape file page libraries report-error]
+  (validate-component-not-main-not-head shape file page report-error)
+  (validate-component-not-root shape file page report-error)
+  (validate-component-ref shape file page libraries report-error)
+  (doseq [child-id (:shapes shape)]
+    (validate-shape child-id file page libraries :context :copy-any :report-error report-error)))
+
+(defn validate-shape-not-component
+  "Shape is not in a component or is a fostered children
+     (not any attribute)"
+  [shape file page libraries report-error]
+  (validate-component-not-main-not-head shape file page report-error)
+  (validate-component-not-root shape file page report-error)
+  (validate-component-not-ref shape file page report-error)
+  (doseq [child-id (:shapes shape)]
+    (validate-shape child-id file page libraries :context :not-component :report-error report-error)))
+
+(defn validate-shape
+  "Validate referential integrity and semantic coherence of a shape and all its children.
+   
+   The context is the situation of the parent in respect to components:
+     :not-component
+     :main-top
+     :main-nested
+     :copy-top
+     :copy-nested
+     :main-any
+     :copy-any"
+  [shape-id file page libraries & {:keys [context throw? report-error]
+                                   :or {context :not-component throw? false}}]
+  (let [shape (ctst/get-shape page shape-id)
+        errors (volatile! [])
+
+        report-error (or report-error
+                         (fn [code msg shape file page]
+                           (if throw?
+                             (throw (ex-info msg {:type :validation
+                                                  :code code
+                                                  :hint msg
+                                                  ::explain (str/format "file %s\npage %s\nshape %s"
+                                                                        (:id file)
+                                                                        (:id page)
+                                                                        (:id shape))}))
+                             (vswap! errors conj {:hint msg
+                                                  :code code
+                                                  :shape shape
+                                                  :file file
+                                                  :page page}))))]
+
+    (dm/assert! (str/format "Shape %s not found" shape-id) (some? shape))
+
+    (validate-parent-children shape file page report-error)
+
+    (if (ctk/main-instance? shape)
+
+      (if (ctk/instance-root? shape)
+        (if (not= context :not-component)
+          (report-error :root-main-not-allowed
+                        (str/format "Root main component not allowed inside other component")
+                        shape file page)
+          (validate-shape-main-root-top shape file page libraries report-error))
+
+        (if (= context :not-component)
+          (report-error :nested-main-not-allowed
+                        (str/format "Nested main component only allowed inside other component")
+                        shape file page)
+          (validate-shape-main-root-nested shape file page libraries report-error)))
+
+      (if (ctk/instance-head? shape)
+
+        (if (ctk/instance-root? shape)
+          (if (not= context :not-component)
+            (report-error :root-copy-not-allowed
+                          (str/format "Root copy not allowed inside other component")
+                          shape file page)
+            (validate-shape-copy-root-top shape file page libraries report-error))
+
+          (if (= context :not-component)
+            (report-error :nested-copy-not-allowed
+                          (str/format "Nested copy only allowed inside other component")
+                          shape file page)
+            (validate-shape-copy-root-nested shape file page libraries report-error)))
+
+        (if (ctn/component-main? (:objects page) shape)
+          (if-not (#{:main-top :main-nested :main-any} context)
+            (report-error :not-head-main-not-allowed
+                          (str/format "Non-root main only allowed inside a main component")
+                          shape file page)
+            (validate-shape-main-not-root shape file page libraries report-error))
+
+          (if (ctk/in-component-copy? shape)
+            (if-not (#{:copy-top :copy-nested :copy-any} context)
+              (report-error :not-head-copy-not-allowed
+                            (str/format "Non-root copy only allowed inside a copy")
+                            shape file page)
+              (validate-shape-copy-not-root shape file page libraries report-error))
+
+            (if (#{:main-top :main-nested :main-any} context)
+              (report-error :not-component-not-allowed
+                            (str/format "Not compoments are not allowed inside a main")
+                            shape file page)
+              (validate-shape-not-component shape file page libraries report-error))))))
+
+    @errors))

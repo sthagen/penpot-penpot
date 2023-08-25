@@ -7,6 +7,7 @@
 (ns debug
   (:require
    [app.common.data :as d]
+   [app.common.data.macros :as dm]
    [app.common.logging :as l]
    [app.common.math :as mth]
    [app.common.transit :as t]
@@ -303,15 +304,35 @@
   ([state show-ids show-touched] (dump-tree' state show-ids show-touched false))
   ([state show-ids show-touched show-modified]
    (let [page-id    (get state :current-page-id)
-         file-data  (get state :workspace-data)
+         file       (assoc (get state :workspace-file)
+                           :data (get state :workspace-data))
          libraries  (get state :workspace-libraries)]
-     (ctf/dump-tree file-data page-id libraries show-ids show-touched show-modified))))
-
+     (ctf/dump-tree file page-id libraries {:show-ids show-ids
+                                            :show-touched show-touched
+                                            :show-modified show-modified}))))
 (defn ^:export dump-tree
   ([] (dump-tree' @st/state))
   ([show-ids] (dump-tree' @st/state show-ids false false))
   ([show-ids show-touched] (dump-tree' @st/state show-ids show-touched false))
   ([show-ids show-touched show-modified] (dump-tree' @st/state show-ids show-touched show-modified)))
+
+(defn ^:export dump-subtree'
+  ([state shape-id] (dump-subtree' state shape-id false false false))
+  ([state shape-id show-ids] (dump-subtree' state shape-id show-ids false false))
+  ([state shape-id show-ids show-touched] (dump-subtree' state shape-id show-ids show-touched false))
+  ([state shape-id show-ids show-touched show-modified]
+   (let [page-id    (get state :current-page-id)
+         file       (assoc (get state :workspace-file)
+                           :data (get state :workspace-data))
+         libraries  (get state :workspace-libraries)]
+     (ctf/dump-subtree file page-id shape-id libraries {:show-ids show-ids
+                                                        :show-touched show-touched
+                                                        :show-modified show-modified}))))
+(defn ^:export dump-subtree
+  ([shape-id] (dump-subtree' @st/state (uuid/uuid shape-id)))
+  ([shape-id show-ids] (dump-subtree' @st/state (uuid/uuid shape-id) show-ids false false))
+  ([shape-id show-ids show-touched] (dump-subtree' @st/state (uuid/uuid shape-id) show-ids show-touched false))
+  ([shape-id show-ids show-touched show-modified] (dump-subtree' @st/state (uuid/uuid shape-id) show-ids show-touched show-modified)))
 
 (when *assert*
   (defonce debug-subscription
@@ -401,6 +422,23 @@
   [read-only?]
   (st/emit! (dw/set-workspace-read-only read-only?)))
 
+
+;; Validation and repair
+
+(defn ^:export validate
+  ([] (validate nil))
+  ([shape-id]
+   (let [file      (assoc (get @st/state :workspace-file)
+                          :data (get @st/state :workspace-data))
+         page      (dm/get-in file [:data :pages-index (get @st/state :current-page-id)])
+         libraries (get @st/state :workspace-libraries)
+         
+         errors    (ctf/validate-shape (or shape-id uuid/zero)
+                                       file
+                                       page
+                                       libraries)]
+   (clj->js errors))))
+
 (defn ^:export fix-orphan-shapes
   []
   (st/emit! (dw/fix-orphan-shapes)))
@@ -413,11 +451,9 @@
   [id shape-ref]
   (st/emit! (dw/set-shape-ref id shape-ref)))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SNAPSHOTS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 (defn ^:export list-available-snapshots
   [file-id]
@@ -432,7 +468,6 @@
                                       (map (fn [row]
                                              (update row :id str))))]
                       (js/console.table (clj->js result))))))))
-
 
 (defn ^:export take-snapshot
   [file-id label]

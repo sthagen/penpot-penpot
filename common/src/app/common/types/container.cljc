@@ -104,16 +104,37 @@
      (cph/root? shape)
      nil
 
-     (and (not (ctk/in-component-copy? shape)) (not allow-main?))
-     nil
-
      (ctk/instance-root? shape)
      shape
+
+     (and (not (ctk/in-component-copy? shape)) (not allow-main?))
+     nil
 
      :else
      (get-component-shape objects (get objects (:parent-id shape)) options))))
 
+(defn get-instance-root
+  "Get the parent shape at the top of the component instance (main or copy)."
+  [objects shape]
+  (cond
+    (nil? shape)
+    nil
 
+    (cph/root? shape)
+    nil
+
+    (ctk/instance-root? shape)
+    shape
+
+    :else
+    (get-instance-root objects (get objects (:parent-id shape)))))
+
+(defn get-copy-root
+  "Get the top shape of the copy."
+  [objects shape]
+  (when (:shape-ref shape)
+    (let [parent (cph/get-parent objects (:id shape))]
+      (or (get-copy-root objects parent) shape))))
 
 (defn component-main?
   "Check if the shape is a component main instance or is inside one."
@@ -220,7 +241,8 @@
          frame-id        (or force-frame-id
                              (ctst/frame-id-by-position objects
                                                         (gpt/add orig-pos delta)
-                                                        {:skip-components? true}))
+                                                        {:skip-components? true
+                                                         :bottom-frames? true}))
          frame-ids-map   (volatile! {})
 
          update-new-shape
@@ -244,7 +266,9 @@
                (not main-instance?)
                (dissoc :main-instance)
 
-               (and (not main-instance?) (nil? (:shape-ref original-shape)))
+               (and (not main-instance?)
+                    (or components-v2                        ; In v1, shape-ref points to the remote instance
+                        (nil? (:shape-ref original-shape)))) ; in v2, shape-ref points to the near instance
                (assoc :shape-ref (:id original-shape))
 
                (nil? (:parent-id original-shape))
@@ -279,3 +303,16 @@
      [(remap-frame-id new-shape)
       (map remap-frame-id new-shapes)])))
 
+(defn get-top-instance
+  "The case of having an instance that contains another instances.
+  The topmost one, that is not part of other instance, is the Top instance"
+  [objects shape current-top]
+  (let [current-top (if (and
+                         (not (ctk/main-instance? shape))
+                         (ctk/instance-head? shape))
+                      shape current-top)
+        parent-id   (:parent-id shape)
+        parent      (get objects parent-id)]
+    (if (= parent-id uuid/zero)
+      current-top
+      (get-top-instance objects parent current-top))))

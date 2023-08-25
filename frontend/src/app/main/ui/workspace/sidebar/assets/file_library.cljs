@@ -58,8 +58,7 @@
                       :collapsed?   (not open?)
                       :on-collapsed  toggle-open
                       :title        (if local?
-                                      (mf/html [:div {:class (dom/classnames (css :special-title) true)} (tr "workspace.assets.local-library")
-                                                [:span {:class (dom/classnames (css :special-subtitle) true)} file-name]])
+                                      (mf/html [:div {:class (dom/classnames (css :special-title) true)} (tr "workspace.assets.local-library")])
 
                                       (mf/html [:div {:class (dom/classnames (css :special-title) true)} file-name]))}
         (when-not local?
@@ -78,12 +77,14 @@
 
        (if local?
          [:*
-          [:span.library-title file-name " (" (tr "workspace.assets.local-library") ")"]
+          [:span.library-title (tr "workspace.assets.local-library")]
           (when shared?
-            [:span.tool-badge (tr "workspace.assets.shared")])]
+            [:span.shared-library {:alt (tr "workspace.assets.shared-library") :title (tr "workspace.assets.shared-library")}
+              i/library]
+            )]
          [:*
-          [:span.library-title file-name]
-          [:span.tool-link.tooltip.tooltip-left {:alt "Open library file"}
+          [:span.library-title {:title file-name} file-name]
+          [:span.tool-link {:alt (tr "workspace.assets.open-library") :title (tr "workspace.assets.open-library")}
            [:a {:href (str "#" url)
                 :target "_blank"
                 :on-click dom/stop-propagation}
