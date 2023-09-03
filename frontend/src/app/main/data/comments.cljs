@@ -83,7 +83,7 @@
     (watch [_ state _]
       (let [page-id (:current-page-id state)
             objects (wsh/lookup-page-objects state page-id)
-            frame-id (ctst/frame-id-by-position objects (:position params))
+            frame-id (ctst/get-frame-id-by-position objects (:position params))
             params (assoc params :frame-id frame-id)]
         (->> (rp/cmd! :create-comment-thread params)
              (rx/mapcat #(rp/cmd! :get-comment-thread {:file-id (:file-id %) :id (:id %)}))
@@ -279,7 +279,10 @@
                  (assoc-in (conj path :position) (:position comment-thread))
                  (assoc-in (conj path :frame-id) (:frame-id comment-thread))))))
            (fetched [[users comments] state]
-             (let [state (-> state
+             (let [pages (-> (get-in state [:workspace-data :pages])
+                             set)
+                   comments (filter #(contains? pages (:page-id %)) comments)
+                   state (-> state
                              (assoc :comment-threads (d/index-by :id comments))
                              (update :current-file-comments-users merge (d/index-by :id users)))]
                (reduce set-comment-threds state comments)))]

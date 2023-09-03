@@ -121,7 +121,9 @@
    (ptk/reify ::select-shape
      ptk/UpdateEvent
      (update [_ state]
-       (update-in state [:workspace-local :selected] d/toggle-selection id toggle?))
+       (-> state
+           (update-in [:workspace-local :selected] d/toggle-selection id toggle?)
+           (assoc-in [:workspace-local :last-selected] id)))
 
      ptk/WatchEvent
      (watch [_ state _]
@@ -184,7 +186,9 @@
   (ptk/reify ::deselect-shape
     ptk/UpdateEvent
     (update [_ state]
-      (update-in state [:workspace-local :selected] disj id))))
+      (-> state
+          (update-in [:workspace-local :selected] disj id)
+          (update :workspace-local dissoc :last-selected)))))
 
 (defn shift-select-shapes
   ([id]
@@ -194,13 +198,15 @@
    (ptk/reify ::shift-select-shapes
      ptk/UpdateEvent
      (update [_ state]
-       (let [objects   (or objects (wsh/lookup-page-objects state))
+       (let [objects (or objects (wsh/lookup-page-objects state))
+             append-to-selection (cph/expand-region-selection objects (into #{} [(get-in state [:workspace-local :last-selected]) id]))
              selection (-> state
                            wsh/lookup-selected
                            (conj id))]
          (-> state
              (assoc-in [:workspace-local :selected]
-                       (cph/expand-region-selection objects selection))))))))
+               (set/union selection append-to-selection))
+             (update :workspace-local assoc :last-selected id)))))))
 
 (defn select-shapes
   [ids]
@@ -318,8 +324,7 @@
             ;; We need to reverse the children because if two children
             ;; overlap we want to select the one that's over (and it's
             ;; in the later vector position
-            selected (->> children
-                          reverse
+            selected (->> (reverse children)
                           (d/seek #(gsh/has-point? % position)))]
         (when selected
           (rx/of (select-shape (:id selected))))))))
@@ -448,7 +453,7 @@
                                    :use-for-thumbnail?)
 
                            (cond->
-                             (or group? bool?)
+                             (or frame? group? bool?)
                              (assoc :shapes []))
 
                            (gsh/move delta)

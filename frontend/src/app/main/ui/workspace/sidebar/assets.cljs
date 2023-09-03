@@ -5,10 +5,11 @@
 ;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.workspace.sidebar.assets
-  (:require-macros [app.main.style :refer [css]])
+  (:require-macros [app.main.style :as stl])
   (:require
    [app.common.data.macros :as dm]
    [app.main.data.modal :as modal]
+   [app.main.data.workspace.assets :as dwa]
    [app.main.refs :as refs]
    [app.main.ui.components.context-menu-a11y :refer [context-menu-a11y]]
    [app.main.ui.components.search-bar :refer [search-bar]]
@@ -68,27 +69,38 @@
   {::mf/wrap [mf/memo]
    ::mf/wrap-props false}
   []
-  (let [components-v2   (mf/use-ctx ctx/components-v2)
-        read-only?      (mf/use-ctx ctx/workspace-read-only?)
-        new-css-system  (mf/use-ctx ctx/new-css-system)
-        filters*      (mf/use-state
+  (let [components-v2  (mf/use-ctx ctx/components-v2)
+        read-only?     (mf/use-ctx ctx/workspace-read-only?)
+        new-css-system (mf/use-ctx ctx/new-css-system)
+        filters*       (mf/use-state
                        {:term ""
                         :section "all"
-                        :ordering :asc
-                        :list-style :thumbs
+                        :ordering (dwa/get-current-assets-ordering)
+                        :list-style (dwa/get-current-assets-list-style)
                         :open-menu false})
-        filters       (deref filters*)
-        term          (:term filters)
-        menu-open?    (:open-menu filters)
-        section       (:section filters)
-        ordering      (:ordering filters)
-        reverse-sort? (= :desc ordering)
+        filters        (deref filters*)
+        term           (:term filters)
+        list-style     (:list-style filters)
+        menu-open?     (:open-menu filters)
+        section        (:section filters)
+        ordering       (:ordering filters)
+        reverse-sort?  (= :desc ordering)
 
         toggle-ordering
-        (mf/use-fn #(swap! filters* update :ordering toggle-values [:asc :desc]))
+        (mf/use-fn
+          (mf/deps ordering)
+          (fn []
+            (let [new-value (toggle-values ordering [:asc :desc])]
+              (swap! filters* assoc :ordering new-value)
+              (dwa/set-current-assets-ordering! new-value))))
 
         toggle-list-style
-        (mf/use-fn #(swap! filters* update :list-style toggle-values [:thumbs :list]))
+        (mf/use-fn
+          (mf/deps list-style)
+          (fn []
+            (let [new-value (toggle-values list-style [:thumbs :list])]
+              (swap! filters* assoc :list-style new-value)
+              (dwa/set-current-assets-list-style! new-value))))
 
         on-search-term-change
         (mf/use-fn
@@ -162,22 +174,22 @@
                   :data-test      "typographies"}]]
 
     (if ^boolean new-css-system
-      [:div  {:class  (css :assets-bar)}
-       [:div {:class  (css :assets-header)}
+      [:div  {:class (stl/css :assets-bar)}
+       [:div {:class (stl/css :assets-header)}
         (when-not ^boolean read-only?
-          [:button {:class (css :libraries-button)
-                    :on-click #(modal/show! :libraries-dialog {})}
-           [:span {:class (css :libraries-icon)}
+          [:button {:class (stl/css :libraries-button)
+                    :on-click show-libraries-dialog}
+           [:span {:class (stl/css :libraries-icon)}
             i/library-refactor]
            (tr "workspace.assets.libraries")])
 
-        [:div {:class (css :search-wrapper)}
+        [:div {:class (stl/css :search-wrapper)}
          [:& search-bar {:on-change on-search-term-change
                         :value term
                         :placeholder (tr "workspace.assets.search")}
          [:button
           {:on-click on-open-menu
-           :class (dom/classnames (css :section-button) true)}
+           :class (stl/css :section-button)}
           i/filter-refactor]]
         [:& context-menu-a11y
          {:on-close on-menu-close
@@ -190,7 +202,7 @@
           :left 64
           :options options
           :workspace? true}]
-         [:button {:class (css :sort-button)
+         [:button {:class (stl/css :sort-button)
                    :on-click toggle-ordering}
           (if reverse-sort?
             i/asc-sort-refactor
@@ -199,7 +211,7 @@
        [:& (mf/provider cmm/assets-filters) {:value filters}
         [:& (mf/provider cmm/assets-toggle-ordering) {:value toggle-ordering}
          [:& (mf/provider cmm/assets-toggle-list-style) {:value toggle-list-style}
-          [:div {:class (dom/classnames (css :libraries-wrapper) true)}
+          [:div {:class (stl/css :libraries-wrapper)}
            [:& assets-local-library {:filters filters}]
            [:& assets-libraries {:filters filters}]]]]]]
 

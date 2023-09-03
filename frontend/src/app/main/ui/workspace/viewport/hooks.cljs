@@ -154,19 +154,20 @@
 
         over-shapes-stream
         (mf/with-memo [move-stream mod-str]
-          (rx/merge
-           ;; This stream works to "refresh" the outlines when the control is pressed
-           ;; but the mouse has not been moved from its position.
-           (->> mod-str
-                (rx/observe-on :async)
-                (rx/map #(deref last-point-ref))
-                (rx/filter some?)
-                (rx/merge-map query-point))
+          (->> (rx/merge
+                ;; This stream works to "refresh" the outlines when the control is pressed
+                ;; but the mouse has not been moved from its position.
+                (->> mod-str
+                     (rx/observe-on :async)
+                     (rx/map #(deref last-point-ref))
+                     (rx/filter some?)
+                     (rx/merge-map query-point))
 
-           (->> move-stream
-                (rx/tap #(reset! last-point-ref %))
-                ;; When transforming shapes we stop querying the worker
-                (rx/merge-map query-point))))]
+                (->> move-stream
+                     (rx/tap #(reset! last-point-ref %))
+                     ;; When transforming shapes we stop querying the worker
+                     (rx/merge-map query-point)))
+               (rx/throttle 100)))]
 
     ;; Refresh the refs on a value change
     (mf/use-effect
@@ -200,13 +201,12 @@
      (mf/deps page-id objects show-measures?)
      (fn [ids]
        (let [selected (mf/ref-val selected-ref)
-             focus (mf/ref-val focus-ref)
-             mod? (mf/ref-val mod-ref)
+             focus    (mf/ref-val focus-ref)
+             mod?     (mf/ref-val mod-ref)
 
-             ids (into
-                  (d/ordered-set)
-                  (remove #(dm/get-in objects [% :blocked]))
-                  (ctt/sort-z-index objects ids {:bottom-frames? mod?}))
+             ids      (into (d/ordered-set)
+                            (remove #(dm/get-in objects [% :blocked]))
+                            (ctt/sort-z-index objects ids {:bottom-frames? mod?}))
 
              grouped? (fn [id]
                         (and (cph/group-shape? objects id)
@@ -217,7 +217,7 @@
 
              root-frame-with-data?
              #(as-> (get objects %) obj
-                (and (cph/is-direct-child-of-root? obj)
+                (and (cph/root-frame? obj)
                      (d/not-empty? (:shapes obj))
                      (not (ctk/instance-head? obj))
                      (not (ctk/main-instance? obj))))
@@ -240,9 +240,10 @@
 
              no-fill-nested-frames?
              (fn [id]
-               (and (cph/frame-shape? objects id)
-                    (not (cph/is-direct-child-of-root? objects id))
-                    (empty? (dm/get-in objects [id :fills]))))
+               (let [shape (get objects id)]
+                 (and (cph/frame-shape? shape)
+                      (not (cph/is-direct-child-of-root? shape))
+                      (empty? (get shape :fills)))))
 
              hover-shape
              (->> ids
@@ -276,7 +277,7 @@
   (let [all-frames             (mf/use-memo (mf/deps objects) #(ctt/get-root-frames-ids objects))
         selected-frames        (mf/use-memo (mf/deps selected) #(->> all-frames (filter selected)))
 
-        xf-selected-frame      (comp (remove cph/is-direct-child-of-root?)
+        xf-selected-frame      (comp (remove cph/root-frame?)
                                      (map #(cph/get-shape-id-root-frame objects %)))
 
         selected-shapes-frames (mf/use-memo (mf/deps selected) #(into #{} xf-selected-frame selected))

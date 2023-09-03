@@ -1912,22 +1912,11 @@ msgid_plural "modals.delete-shared-confirm.accept"
 msgstr[0] "Borrar archivo"
 msgstr[1] "Borrar archivos"
 
-
 #: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
-msgid "modals.delete-shared-confirm.activated.hint"
-msgid_plural "modals.delete-shared-confirm.activated.hint"
+msgid "modals.delete-unpublish-shared-confirm.activated.hint"
+msgid_plural "modals.delete-unpublish-shared-confirm.activated.hint"
 msgstr[0] ""
 "Los elementos que hayan sido utilizados en este archivo permanecerán allí "
-"(¡ningún diseño se romperá!)."
-msgstr[1] ""
-"Los elementos que hayan sido utilizados en este archivo permanecerán allí "
-"(¡ningún diseño se romperá!)."
-
-#: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
-msgid "modals.delete-shared-confirm.activated.hint-many"
-msgid_plural "modals.delete-shared-confirm.activated.hint-many"
-msgstr[0] ""
-"Los elementos que hayan sido utilizados en esos archivos permanecerán allí "
 "(¡ningún diseño se romperá!)."
 msgstr[1] ""
 "Los elementos que hayan sido utilizados en esos archivos permanecerán allí "
@@ -1938,7 +1927,6 @@ msgid "modals.delete-shared-confirm.message"
 msgid_plural "modals.delete-shared-confirm.message"
 msgstr[0] "¿Seguro que quieres borrar este archivo?"
 msgstr[1] "¿Seguro que quieres borrar estos archivos?"
-
 
 #: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
 msgid "modals.delete-shared-confirm.activated.no-files-message"
@@ -1951,12 +1939,6 @@ msgstr[1] ""
 #: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
 msgid "modals.delete-shared-confirm.activated.scd-message"
 msgid_plural "modals.delete-shared-confirm.activated.scd-message"
-msgstr[0] "Esta biblioteca está activa aquí: "
-msgstr[1] "Estas bibliotecas están activas aquí: "
-
-#: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
-msgid "modals.delete-shared-confirm.activated.scd-message-many"
-msgid_plural "modals.delete-shared-confirm.activated.scd-message-many"
 msgstr[0] "Esta biblioteca está activa aquí: "
 msgstr[1] "Estas bibliotecas están activas aquí: "
 
@@ -2120,26 +2102,6 @@ msgstr[0] "Despublicar"
 msgstr[1] "Despublicar"
 
 #: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
-msgid "modals.unpublish-shared-confirm.activated.hint"
-msgid_plural "modals.unpublish-shared-confirm.activated.hint"
-msgstr[0] ""
-"Los elementos que hayan sido utilizados en este archivo permanecerán allí "
-"(¡ningún diseño se romperá!)."
-msgstr[1] ""
-"Los elementos que hayan sido utilizados en este archivo permanecerán allí "
-"(¡ningún diseño se romperá!)."
-
-#: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
-msgid "modals.unpublish-shared-confirm.activated.hint-many"
-msgid_plural "modals.unpublish-shared-confirm.activated.hint-many"
-msgstr[0] ""
-"Los elementos que hayan sido utilizados en esos archivos permanecerán allí "
-"(¡ningún diseño se romperá!)."
-msgstr[1] ""
-"Los elementos que hayan sido utilizados en esos archivos permanecerán allí "
-"(¡ningún diseño se romperá!)."
-
-#: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
 msgid "modals.unpublish-shared-confirm.message"
 msgid_plural "modals.unpublish-shared-confirm.message"
 msgstr[0] "¿Seguro que quieres despublicar esta biblioteca?"
@@ -2153,12 +2115,6 @@ msgstr[1] "No están activas en ningún fichero."
 #: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
 msgid "modals.unpublish-shared-confirm.activated.scd-message"
 msgid_plural "modals.unpublish-shared-confirm.activated.scd-message"
-msgstr[0] "Está activa aquí:"
-msgstr[1] "Están activas aquí:"
-
-#: src/app/main/ui/workspace/header.cljs, src/app/main/ui/dashboard/file_menu.cljs
-msgid "modals.unpublish-shared-confirm.activated.scd-message-many"
-msgid_plural "modals.unpublish-shared-confirm.activated.scd-message-many"
 msgstr[0] "Está activa aquí:"
 msgstr[1] "Están activas aquí:"
 
@@ -2777,6 +2733,9 @@ msgstr "Activar alineación a rejilla de pixel"
 
 msgid "shortcuts.start-editing"
 msgstr "Comenzar edición"
+
+msgid "shortcuts.select-parent-layer"
+msgstr "Seleccionar capa padre"
 
 msgid "shortcuts.start-measure"
 msgstr "Comenzar medida"
@@ -3439,6 +3398,10 @@ msgstr "BIBLIOTECAS"
 #: src/app/main/ui/workspace/libraries.cljs
 msgid "workspace.libraries.library"
 msgstr "BIBLIOTECA"
+
+#: src/app/main/ui/workspace/libraries.cljs
+msgid "workspace.libraries.library-updates"
+msgstr "ACTUALIZACIONES DE BIBLIOTECAS"
 
 #: src/app/main/ui/workspace/libraries.cljs
 msgid "workspace.libraries.no-libraries-need-sync"
@@ -4901,6 +4864,10 @@ msgstr "Operación sobre %s"
 #: src/app/main/ui/workspace/sidebar/history.cljs
 msgid "workspace.undo.title"
 msgstr "Histórico"
+
+#: src/app/main/data/workspace/libraries.cljs
+msgid "workspace.updates.more-info"
+msgstr "Más información"
 
 #: src/app/main/data/workspace/libraries.cljs
 msgid "workspace.updates.dismiss"

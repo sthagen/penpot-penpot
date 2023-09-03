@@ -26,6 +26,7 @@
    [app.util.object :as obj]
    [app.util.text-editor :as ted]
    [app.util.text-svg-position :as tsp]
+   [app.util.timers :as ts]
    [promesa.core :as p]
    [rumext.v2 :as mf]))
 
@@ -79,25 +80,29 @@
 
 (defn- update-text-modifier
   [{:keys [grow-type id] :as shape} node]
+  (->> (tsp/calc-position-data id)
+       (p/fmap (fn [position-data]
+                 (let [props {:position-data position-data}]
+                   (if (contains? #{:auto-height :auto-width} grow-type)
+                     (let [{:keys [width height]} (-> (dom/query node ".paragraph-set") (dom/get-client-size))
+                           width (mth/ceil width)
+                           height (mth/ceil height)]
+                       (if (and (not (mth/almost-zero? width)) (not (mth/almost-zero? height)))
+                         (cond-> props
+                           (= grow-type :auto-width)
+                           (assoc :width width)
 
-  (p/let [position-data (tsp/calc-position-data id)
-          props {:position-data position-data}
-
-          props
-          (if (contains? #{:auto-height :auto-width} grow-type)
-            (let [{:keys [width height]} (-> (dom/query node ".paragraph-set") (dom/get-client-size))
-                  width (mth/ceil width)
-                  height (mth/ceil height)]
-              (if (and (not (mth/almost-zero? width)) (not (mth/almost-zero? height)))
-                (cond-> props
-                  (= grow-type :auto-width)
-                  (assoc :width width)
-
-                  (or (= grow-type :auto-height) (= grow-type :auto-width))
-                  (assoc :height height))
-                props))
-            props)]
-    (st/emit! (dwt/update-text-modifier id props))))
+                           (or (= grow-type :auto-height) (= grow-type :auto-width))
+                           (assoc :height height))
+                         props))
+                     props))))
+       (p/fmap (fn [props]
+                 ;; We need to wait for the text modifier to be updated before
+                 ;; we can update the position data. Otherwise the position data
+                 ;; will be wrong.
+                 ;; TODO: This is a hack. We need to find a better way to do this.
+                 (st/emit! (dwt/update-text-modifier id props))
+                 (ts/schedule 30 #(update-text-shape shape node))))))
 
 (mf/defc text-container
   {::mf/wrap-props false
@@ -120,34 +125,32 @@
 
 (defn text-properties-equal?
   [shape other]
+  ;; FIXME: use dm/get-prop
   (or (identical? shape other)
-      (and
-       ;; Check if both shapes are equivalent removing their geometry data
-       (= (dissoc shape :migrate :points :selrect :height :width :x :y :position-data :modifiers)
-          (dissoc other :migrate :points :selrect :height :width :x :y :position-data :modifiers))
-
-       ;; Check if the position and size is close. If any of these changes the shape has changed
-       ;; and if not there is no geometry relevant change
-       (mth/close? (:x shape) (:x other))
-       (mth/close? (:y shape) (:y other))
-       (mth/close? (:width shape) (:width other))
-       (mth/close? (:height shape) (:height other)))))
+      (and (= (:content shape) (:content other))
+           ;; Check if the position and size is close. If any of these changes the shape has changed
+           ;; and if not there is no geometry relevant change
+           (mth/close? (:x shape) (:x other))
+           (mth/close? (:y shape) (:y other))
+           (mth/close? (:width shape) (:width other))
+           (mth/close? (:height shape) (:height other)))))
 
 (mf/defc text-changes-renderer
   {::mf/wrap-props false}
   [props]
-  (let [text-shapes (obj/get props "text-shapes")
+  (let [text-shapes      (unchecked-get props "text-shapes")
         prev-text-shapes (hooks/use-previous text-shapes)
 
         ;; We store in the state the texts still pending to be calculated so we can
         ;; get its position
-        pending-update (mf/use-state {})
+        pending-update* (mf/use-state {})
+        pending-update  (deref pending-update*)
 
         text-change?
         (fn [id]
           (let [new-shape (get text-shapes id)
                 old-shape (get prev-text-shapes id)
-                remote? (some? (-> new-shape meta :session-id))]
+                remote?   (some? (-> new-shape meta :session-id))]
 
             (or (and (not remote?) ;; changes caused by a remote peer are not re-calculated
                      (not (text-properties-equal? old-shape new-shape)))
@@ -155,9 +158,8 @@
                 (nil? (:position-data new-shape)))))
 
         changed-texts
-        (mf/use-memo
-         (mf/deps text-shapes @pending-update)
-         #(let [pending-shapes (into #{} (vals @pending-update))]
+        (mf/with-memo [text-shapes pending-update]
+          (let [pending-shapes (into #{} (vals pending-update))]
             (->> (keys text-shapes)
                  (filter (fn [id]
                            (or (contains? pending-shapes id)
@@ -165,18 +167,18 @@
                  (map (d/getf text-shapes)))))
 
         handle-update-shape
-        (mf/use-callback
+        (mf/use-fn
          (fn [shape node]
            ;; Unique to indentify the pending state
            (let [uid (js/Symbol)]
-             (swap! pending-update assoc uid (:id shape))
+             (swap! pending-update* assoc uid (:id shape))
              (p/then
               (update-text-shape shape node)
-              #(swap! pending-update dissoc uid)))))]
+              #(swap! pending-update* dissoc uid)))))]
 
     [:.text-changes-renderer
      (for [{:keys [id] :as shape} changed-texts]
-       [:& text-container {:key (str (dm/str "text-container-" id))
+       [:& text-container {:key (dm/str "text-container-" id)
                            :shape shape
                            :on-update handle-update-shape}])]))
 
@@ -208,7 +210,7 @@
 
     [:.text-changes-renderer
      (for [{:keys [id] :as shape} changed-texts]
-       [:& text-container {:key (str (dm/str "text-container-" id))
+       [:& text-container {:key (dm/str "text-container-" id)
                            :shape shape
                            :on-update handle-update-shape}])]))
 

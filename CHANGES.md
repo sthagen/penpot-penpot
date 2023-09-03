@@ -12,6 +12,34 @@
 
 ### :heart: Community contributions by (Thank you!)
 
+## 1.19.3
+
+### :sparkles: New features
+
+- Remember last color mode in colorpicker [Taiga #5508](https://tree.taiga.io/project/penpot/issue/5508)
+- Improve layers multiselection behaviour [Github #5741](https://github.com/penpot/penpot/issues/5741)
+
+### :bug: Bugs fixed
+
+- List view is discarded on tab change on Workspace Assets Sidebar tab [Github #3547](https://github.com/penpot/penpot/issues/3547)
+- Fix message popup remains open when exiting workspace with browser back button [Taiga #5747](https://tree.taiga.io/project/penpot/issue/5747)
+- When editing text if font is changed, the proportions of the rendered shape are wrong [Taiga #5786](https://tree.taiga.io/project/penpot/issue/5786)
+
+## 1.19.2
+
+### :sparkles: New features
+
+- Navigate up in layer hierarchy with Shift+Enter shortcut [Taiga #5734](https://tree.taiga.io/project/penpot/us/5734)
+- Click on the flow tags open viewer with the selected frame [Taiga #5044](https://tree.taiga.io/project/penpot/us/5044)
+- Add Dutch language & update translation files with weblate
+
+### :bug: Bugs fixed
+
+- Fix unexpected output on get-page rpc method when invalid object-id is provided [Github #3546](https://github.com/penpot/penpot/issues/3546)
+- Fix Invalid files amount after moving file from Project to Drafts [Taiga #5638](https://tree.taiga.io/project/penpot/us/5638)
+- Fix deleted pages comments shown in right sidebar [Taiga #5648](https://tree.taiga.io/project/penpot/us/5648)
+- Fix tooltip on toggle visibility and toggle lock buttons [Taiga #5141](https://tree.taiga.io/project/penpot/issue/5141)
+
 
 ## 1.19.1
 

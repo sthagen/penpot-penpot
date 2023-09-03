@@ -15,7 +15,7 @@ const autoprefixer = require("autoprefixer")
 const modules = require("postcss-modules");
 
 const clean = require("postcss-clean");
-const mkdirp = require("mkdirp");
+const {mkdirp} = require("mkdirp");
 const rimraf = require("rimraf");
 const sass = require("sass");
 const gettext = require("gettext-parser");
@@ -49,7 +49,7 @@ function readLocales() {
   const langs = ["ar", "ca", "de", "el", "en", "eu", "it", "es",
                  "fa", "fr", "he", "nb_NO", "pl", "pt_BR", "ro", "id",
                  "ru", "tr", "zh_CN", "zh_Hant", "hr", "gl", "pt_PT",
-                 "cs", "fo", "ko", "lv",
+                 "cs", "fo", "ko", "lv", "nl",
                  // this happens when file does not matches correct
                  // iso code for the language.
                  ["ja_jp", "jpn_JP"],

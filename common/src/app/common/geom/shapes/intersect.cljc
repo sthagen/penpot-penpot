@@ -7,13 +7,15 @@
 (ns app.common.geom.shapes.intersect
   (:require
    [app.common.data :as d]
+   [app.common.data.macros :as dm]
    [app.common.geom.matrix :as gmt]
    [app.common.geom.point :as gpt]
    [app.common.geom.rect :as grc]
    [app.common.geom.shapes.common :as gco]
    [app.common.geom.shapes.path :as gpp]
    [app.common.geom.shapes.text :as gte]
-   [app.common.math :as mth]))
+   [app.common.math :as mth]
+   [app.common.pages.helpers :as cph]))
 
 (defn orientation
   "Given three ordered points gives the orientation
@@ -32,10 +34,10 @@
 (defn on-segment?
   "Given three colinear points p, q, r checks if q lies on segment pr"
   [{qx :x qy :y} {px :x py :y} {rx :x ry :y}]
-  (and (<= qx (max px rx))
-       (>= qx (min px rx))
-       (<= qy (max py ry))
-       (>= qy (min py ry))))
+  (and (<= qx (mth/max px rx))
+       (>= qx (mth/min px rx))
+       (<= qy (mth/max py ry))
+       (>= qy (mth/min py ry))))
 
 ;; Based on solution described here
 ;; https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
@@ -53,16 +55,16 @@
      (and (not= o1 o2) (not= o3 o4))
 
      ;; p1, q1 and p2 colinear and p2 lies on p1q1
-     (and (= o1 :coplanar) (on-segment? p2 p1 q1))
+     (and (= o1 :coplanar) ^boolean (on-segment? p2 p1 q1))
 
      ;; p1, q1 and q2 colinear and q2 lies on p1q1
-     (and (= o2 :coplanar) (on-segment? q2 p1 q1))
+     (and (= o2 :coplanar) ^boolean (on-segment? q2 p1 q1))
 
      ;; p2, q2 and p1 colinear and p1 lies on p2q2
-     (and (= o3 :coplanar) (on-segment? p1 p2 q2))
+     (and (= o3 :coplanar) ^boolean (on-segment? p1 p2 q2))
 
      ;; p2, q2 and p1 colinear and q1 lies on p2q2
-     (and (= o4 :coplanar) (on-segment? q1 p2 q2)))))
+     (and (= o4 :coplanar) ^boolean (on-segment? q1 p2 q2)))))
 
 (defn points->lines
   "Given a set of points for a polygon will return
@@ -71,12 +73,10 @@
    (points->lines points true))
 
   ([points closed?]
-   (map vector
-        points
-        (-> (rest points)
-            (vec)
-            (cond-> closed?
-              (conj (first points)))))))
+   (map vector points
+        (cond-> (rest points)
+          (true? closed?)
+          (concat (list (first points)))))))
 
 (defn intersects-lines?
   "Checks if two sets of lines intersect in any point"
@@ -116,7 +116,7 @@
   ;; Cast a ray from the point in any direction and count the intersections
   ;; if it's odd the point is inside the polygon
   (->> lines
-       (filter #(intersect-ray? p %))
+       (filterv #(intersect-ray? p %))
        (count)
        (odd?)))
 
@@ -335,12 +335,32 @@
   (let [lines (grc/rect->lines rect)]
     (is-point-inside-evenodd? point lines)))
 
-(defn has-point?
-  "Check if the shape contains a point"
+(defn slow-has-point?
   [shape point]
-  (let [lines (points->lines (:points shape))]
-    ;; TODO: Will only work for simple shapes
+  (let [lines (points->lines (dm/get-prop shape :points))]
     (is-point-inside-evenodd? point lines)))
+
+(defn fast-has-point?
+  [shape point]
+  (let [x1 (dm/get-prop shape :x)
+        y1 (dm/get-prop shape :x)
+        x2 (+ x1 (dm/get-prop shape :width))
+        y2 (+ y1 (dm/get-prop shape :height))
+        px (dm/get-prop point :x)
+        py (dm/get-prop point :y)]
+
+    (and (>= px x1)
+         (<= px x2)
+         (>= py y1)
+         (<= py y2))))
+
+(defn has-point?
+  [shape point]
+  (if (or ^boolean (cph/path-shape? shape)
+          ^boolean (cph/bool-shape? shape)
+          ^boolean (cph/circle-shape? shape))
+    (slow-has-point? shape point)
+    (fast-has-point? shape point)))
 
 (defn rect-contains-shape?
   [rect shape]

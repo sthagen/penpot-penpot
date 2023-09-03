@@ -45,7 +45,6 @@
                          (:value color) (dissoc :value)
                          true           (assoc :file-id file-id)))
 
-
         color-id    (:id color)
 
         item-ref    (mf/use-ref)
@@ -304,11 +303,12 @@
          [:div.dragging])])))
 
 (mf/defc colors-group
-  [{:keys [file-id prefix groups open-groups local? selected
+  [{:keys [file-id prefix groups open-groups force-open? local? selected
            multi-colors? multi-assets? on-asset-click on-assets-delete
            on-clear-selection on-group on-rename-group on-ungroup colors
            selected-full]}]
-  (let [group-open?    (get open-groups prefix true)
+  (let [group-open?    (or ^boolean force-open?
+                           ^boolean (get open-groups prefix (if (= prefix "") true false)))
         new-css-system (mf/use-ctx ctx/new-css-system)
         dragging*      (mf/use-state false)
         dragging?      (deref dragging*)
@@ -392,6 +392,7 @@
                                 :key (dm/str "group-" path-item)
                                 :groups content
                                 :open-groups open-groups
+                                :force-open? force-open?
                                 :local? local?
                                 :selected selected
                                 :multi-colors? multi-colors?
@@ -455,6 +456,7 @@
                                 :key (dm/str "group-" path-item)
                                 :groups content
                                 :open-groups open-groups
+                                :force-open? force-open?
                                 :local? local?
                                 :selected selected
                                 :multi-colors? multi-colors?
@@ -469,7 +471,7 @@
                                 :selected-full selected-full}]))])])))
 
 (mf/defc colors-section
-  [{:keys [file-id local? colors open? open-status-ref selected reverse-sort?
+  [{:keys [file-id local? colors open? force-open? open-status-ref selected reverse-sort?
            on-asset-click on-assets-delete on-clear-selection] :as props}]
 
   (let [selected        (:colors selected)
@@ -608,6 +610,7 @@
                         :prefix ""
                         :groups groups
                         :open-groups open-groups
+                        :force-open? force-open?
                         :local? local?
                         :selected selected
                         :multi-colors? multi-colors?

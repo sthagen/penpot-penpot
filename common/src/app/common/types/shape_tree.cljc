@@ -111,23 +111,28 @@
 (defn get-frames
   "Retrieves all frame objects as vector"
   ([objects] (get-frames objects nil))
-  ([objects {:keys [skip-components? skip-copies?] :or {skip-components? false skip-copies? false}}]
+  ([objects {:keys [skip-components? skip-copies?]
+             :or {skip-components? false
+                  skip-copies? false}}]
    (->> (or (-> objects meta ::index-frames)
             (let [lookup (d/getf objects)
                   xform  (comp (remove #(= uuid/zero %))
                                (keep lookup)
                                (filter cph/frame-shape?))]
               (->> (keys objects)
-                   (into [] xform))))
-        (remove #(or (and skip-components? (ctk/instance-head? %))
-                     (and skip-copies? (and (ctk/instance-head? %) (not (ctk/main-instance? %)))))))))
+                   (sequence xform))))
+        (remove #(or (and ^boolean skip-components?
+                          ^boolean (ctk/instance-head? %))
+                     (and ^boolean skip-copies?
+                          (and ^boolean (ctk/instance-head? %)
+                               (not ^boolean (ctk/main-instance? %)))))))))
 
 (defn get-frames-ids
   "Retrieves all frame ids as vector"
   ([objects] (get-frames-ids objects nil))
   ([objects options]
    (->> (get-frames objects options)
-        (mapv :id))))
+        (map :id))))
 
 (defn get-nested-frames
   [objects frame-id]
@@ -195,11 +200,13 @@
     (cond
       ;; The base the base shape, so the other item is below (if not bottom-frames)
       (= base-id base-shape-id)
-      (and bottom-frames? (cph/frame-shape? objects base-id))
+      (and ^boolean bottom-frames?
+           ^boolean (cph/frame-shape? objects base-id))
 
       ;; The base is the testing over, so it's over (if not bottom-frames)
       (= base-id over-shape-id)
-      (or (not bottom-frames?) (not (cph/frame-shape? objects base-id)))
+      (or (not ^boolean bottom-frames?)
+          (not ^boolean (cph/frame-shape? objects base-id)))
 
       ;; Check which index is lower
       :else
@@ -233,30 +240,51 @@
                -1))]
      (sort comp ids))))
 
-(defn frame-id-by-position
-  ([objects position] (frame-id-by-position objects position nil))
-  ([objects position options]
-   (assert (gpt/point? position))
-   (let [sort-with-options (fn [objects ids]
-                             (sort-z-index objects ids options))
-         top-frame
-         (->> (get-frames-ids objects options)
-              (sort-with-options objects)
-              (d/seek #(and position (gsh/has-point? (get objects %) position))))]
-     (or top-frame uuid/zero))))
+(defn sort-z-index-objects
+  ([objects items]
+   (sort-z-index-objects objects items nil))
+  ([objects items {:keys [bottom-frames?]
+                   :or   {bottom-frames? false}}]
+   (d/unstable-sort
+    (fn [obj-a obj-b]
+      (let [id-a (dm/get-prop obj-a :id)
+            id-b (dm/get-prop obj-b :id)]
+        (if (= id-a id-b)
+          0
+          (if ^boolean (is-shape-over-shape? objects id-a id-b bottom-frames?)
+            1
+            -1))))
+    items)))
 
-(defn frame-by-position
-  ([objects position] (frame-by-position objects position nil))
-  ([objects position options]
-   (let [frame-id (frame-id-by-position objects position options)]
-     (get objects frame-id))))
+(defn get-frame-by-position
+  ([objects position]
+   (get-frame-by-position objects position nil))
 
-(defn all-frames-by-position
-  ([objects position] (all-frames-by-position objects position nil))
   ([objects position options]
-   (->> (get-frames-ids objects options)
-        (filter #(and position (gsh/has-point? (get objects %) position)))
-        (sort-z-index objects))))
+   (dm/assert!
+    "expected a point"
+    (gpt/point? position))
+
+   (let [frames    (get-frames objects options)
+         frames    (sort-z-index-objects objects frames options)]
+     (or (d/seek #(and ^boolean (some? position)
+                       ^boolean (gsh/has-point? % position))
+                 frames)
+         (get objects uuid/zero)))))
+
+(defn get-frame-id-by-position
+  ([objects position] (get-frame-id-by-position objects position nil))
+  ([objects position options]
+   (when-let [frame (get-frame-by-position objects position options)]
+     (dm/get-prop frame :id))))
+
+(defn get-frames-by-position
+  ([objects position] (get-frames-by-position objects position nil))
+  ([objects position options]
+   (->> (get-frames objects options)
+        (filter #(and ^boolean (some? position)
+                      ^boolean (gsh/has-point? % position)))
+        (sort-z-index-objects objects))))
 
 (defn top-nested-frame
   "Search for the top nested frame for positioning shapes when moving or creating.
@@ -268,52 +296,36 @@
   ([objects position excluded]
    (assert (or (nil? excluded) (set? excluded)))
 
-   (let [frame-ids (cond->> (all-frames-by-position objects position)
-                     (some? excluded)
-                     (remove excluded)
+   (let [frames (cond->> (get-frames-by-position objects position)
+                  (some? excluded)
+                  (remove (fn [obj]
+                            (let [id (dm/get-prop obj :id)]
+                              (contains? excluded id))))
 
-                     :always
-                     (remove #(or (dm/get-in objects [% :hidden])
-                                  (dm/get-in objects [% :blocked]))))
+                  :always
+                  (remove #(or ^boolean (true? (:hidden %))
+                               ^boolean (true? (:blocked %)))))
 
-         frame-set (set frame-ids)]
+         frame-set (into #{} (map #(dm/get-prop % :id)) frames)]
 
-     (loop [current-id (first frame-ids)]
-       (let [current-shape (get objects current-id)
-             child-frame-id (d/seek #(contains? frame-set %)
-                                    (-> (:shapes current-shape) reverse))]
+     (loop [current-shape (first frames)]
+       (let [child-frame-id (d/seek #(contains? frame-set %)
+                                    (reverse (:shapes current-shape)))]
          (if (nil? child-frame-id)
-           (or current-id uuid/zero)
-           (recur child-frame-id)))))))
-
-(defn top-nested-frame-ids
-  "Search the top nested frame in a list of ids"
-  [objects ids]
-
-  (let [frame-ids (->> ids
-                       (filter #(cph/frame-shape? objects %))
-                       (remove #(or (dm/get-in objects [% :hidden])
-                                    (dm/get-in objects [% :blocked]))))
-        frame-set (set frame-ids)]
-    (loop [current-id (first frame-ids)]
-      (let [current-shape (get objects current-id)
-            child-frame-id (d/seek #(contains? frame-set %)
-                                   (-> (:shapes current-shape) reverse))]
-        (if (nil? child-frame-id)
-          (or current-id uuid/zero)
-          (recur child-frame-id))))))
+           (or (:id current-shape) uuid/zero)
+           (recur (get objects child-frame-id))))))))
 
 (defn get-viewer-frames
   ([objects]
    (get-viewer-frames objects nil))
 
   ([objects {:keys [all-frames?]}]
-   (into []
-         (comp (map (d/getf objects))
-               (if all-frames?
-                 identity
-                 (remove :hide-in-viewer)))
-         (sort-z-index objects (get-frames-ids objects)))))
+   (->> (get-frames objects)
+        (sort-z-index-objects objects)
+        (into []
+              (if all-frames?
+                (map identity)
+                (remove :hide-in-viewer))))))
 
 (defn start-page-index
   [objects]
