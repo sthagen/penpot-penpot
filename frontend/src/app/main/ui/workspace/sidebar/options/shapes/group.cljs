@@ -67,6 +67,7 @@
         [layout-item-ids layout-item-values] (get-attrs [shape] objects :layout-item)]
 
     [:div.options
+     [:& layer-menu {:type type :ids layer-ids :values layer-values}]
      [:& measures-menu {:type type :ids measure-ids :values measure-values :shape shape}]
      [:& component-menu {:ids comp-ids :values comp-values :shape shape}] ;;remove this in components-v2
      [:& layout-container-menu {:type type :ids [(:id shape)] :values layout-container-values :multiple false}]
@@ -89,7 +90,7 @@
      (when (or (not is-layout-child?) is-layout-child-absolute?)
        [:& constraints-menu {:ids constraint-ids :values constraint-values}])
 
-     [:& layer-menu {:type type :ids layer-ids :values layer-values}]
+
 
      (when-not (empty? fill-ids)
        [:& fill-menu {:type type :ids fill-ids :values fill-values}])
@@ -97,11 +98,10 @@
      (when-not (empty? stroke-ids)
        [:& stroke-menu {:type type :ids stroke-ids :values stroke-values}])
 
-     (when (> (count objects) 2)
-       [:& color-selection-menu {:type type
-                                 :shapes (vals objects)
-                                 :file-id file-id
-                                 :shared-libs shared-libs}])
+     [:& color-selection-menu {:type type
+                               :shapes (vals objects)
+                               :file-id file-id
+                               :shared-libs shared-libs}]
 
      (when-not (empty? shadow-ids)
        [:& shadow-menu {:type type :ids shadow-ids :values shadow-values}])

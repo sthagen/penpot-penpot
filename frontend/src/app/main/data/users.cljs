@@ -105,9 +105,15 @@
 
     ptk/EffectEvent
     (effect [_ state _]
-      (when-let [profile (:profile state)]
-        (swap! storage assoc :profile profile)
-        (i18n/set-locale! (:lang profile))))))
+      (let [profile          (:profile state)
+            email            (:email profile)
+            previous-profile (:profile @storage)
+            previous-email   (:email previous-profile)]
+        (when profile
+          (swap! storage assoc :profile profile)
+          (i18n/set-locale! (:lang profile))
+        (when (not= previous-email email)
+          (swap! storage dissoc ::current-team-id)))))))
 
 (defn fetch-profile
   []
@@ -125,7 +131,7 @@
   accepting invitation, or third party auth signup or singin."
   [profile]
   (letfn [(get-redirect-event []
-            (let [team-id (:default-team-id profile)
+            (let [team-id (get-current-team-id profile)
                   redirect-url (:redirect-url @storage)]
               (if (some? redirect-url)
                 (do
@@ -247,7 +253,8 @@
 
      ptk/EffectEvent
      (effect [_ _ _]
-       (reset! storage {})
+       ;; We prefer to keek some stuff in the storage like the current-team-id and the profile
+       (swap! storage dissoc :redirect-url)
        (i18n/reset-locale)))))
 
 (defn logout

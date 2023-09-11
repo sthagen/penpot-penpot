@@ -305,30 +305,27 @@
 (defn overlaps?
   "General case to check for overlapping between shapes and a rectangle"
   [shape rect]
-  (let [stroke-width (/ (or (:stroke-width shape) 0) 2)
-        rect (-> rect
-                 (update :x - stroke-width)
-                 (update :y - stroke-width)
-                 (update :width + (* 2 stroke-width))
-                 (update :height + (* 2 stroke-width)))]
+  (let [swidth (/ (or (:stroke-width shape) 0) 2)
+        rect   (-> rect
+                   (update :x - swidth)
+                   (update :y - swidth)
+                   (update :width + (* 2 swidth))
+                   (update :height + (* 2 swidth)))]
     (or (not shape)
-        (let [path? (= :path (:type shape))
-              circle? (= :circle (:type shape))
-              text? (= :text (:type shape))]
-          (cond
-            path?
-            (and (overlaps-rect-points? rect (:points shape))
-                 (overlaps-path? shape rect))
+        (cond
+          (cph/path-shape? shape)
+          (and (overlaps-rect-points? rect (:points shape))
+               (overlaps-path? shape rect))
 
-            circle?
-            (and (overlaps-rect-points? rect (:points shape))
-                 (overlaps-ellipse? shape rect))
+          (cph/circle-shape? shape)
+          (and (overlaps-rect-points? rect (:points shape))
+               (overlaps-ellipse? shape rect))
 
-            text?
-            (overlaps-text? shape rect)
+          (cph/text-shape? shape)
+          (overlaps-text? shape rect)
 
-            :else
-            (overlaps-rect-points? rect (:points shape)))))))
+          :else
+          (overlaps-rect-points? rect (:points shape))))))
 
 (defn has-point-rect?
   [rect point]
@@ -343,12 +340,11 @@
 (defn fast-has-point?
   [shape point]
   (let [x1 (dm/get-prop shape :x)
-        y1 (dm/get-prop shape :x)
+        y1 (dm/get-prop shape :y)
         x2 (+ x1 (dm/get-prop shape :width))
         y2 (+ y1 (dm/get-prop shape :height))
         px (dm/get-prop point :x)
         py (dm/get-prop point :y)]
-
     (and (>= px x1)
          (<= px x2)
          (>= py y1)

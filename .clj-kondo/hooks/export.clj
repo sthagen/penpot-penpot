@@ -41,18 +41,35 @@
 
 (defn penpot-with-atomic
   [{:keys [node]}]
-  (let [[_ params & other] (:children node)
+  (let [[params & body] (rest (:children node))]
+    (if (api/vector-node? params)
+      (let [[sym val opts] (:children params)]
+        (when-not (and sym val)
+          (throw (ex-info "No sym and val provided" {})))
+        {:node (api/list-node
+                (list*
+                 (api/token-node 'let)
+                 (api/vector-node [sym val])
+                 opts
+                 body))})
 
-        result (if (api/vector-node? params)
-                 (api/list-node
-                  (into [(api/token-node (symbol "clojure.core" "with-open")) params] other))
-                 (api/list-node
-                  (into [(api/token-node (symbol "clojure.core" "with-open"))
-                         (api/vector-node [params params])]
-                        other)))
+      {:node (api/list-node
+              (into [(api/token-node 'let)
+                     (api/vector-node [params params])]
+                    body))})))
 
-        ]
-    {:node result}))
+(defn rumext-fnc
+  [{:keys [node]}]
+  (let [[cname mdata params & body] (rest (:children node))
+        [params body] (if (api/vector-node? mdata)
+                        [mdata (cons params body)]
+                        [params body])]
+    (let [result (api/list-node
+                  (into [(api/token-node 'fn)
+                         params]
+                        (cons mdata body)))]
+      {:node result})))
+
 
 (defn penpot-defrecord
   [{:keys [:node]}]

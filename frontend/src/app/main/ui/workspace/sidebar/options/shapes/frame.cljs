@@ -56,6 +56,9 @@
         parents-by-ids-ref (mf/use-memo (mf/deps ids) #(refs/parents-by-ids ids))
         parents (mf/deref parents-by-ids-ref)]
     [:*
+     [:& layer-menu {:ids ids
+                     :type type
+                     :values layer-values}]
      [:& measures-menu {:ids [(:id shape)]
                         :values measure-values
                         :type type
@@ -84,20 +87,17 @@
          :is-layout-container? is-layout-container?
          :shape shape}])
 
-     [:& layer-menu {:ids ids
-                     :type type
-                     :values layer-values}]
+
      [:& fill-menu {:ids ids
                     :type type
                     :values (select-keys shape fill-attrs-shape)}]
      [:& stroke-menu {:ids ids
                       :type type
                       :values stroke-values}]
-          (when (> (count objects) 2)
-            [:& color-selection-menu {:type type
-                                      :shapes (vals objects)
-                                      :file-id file-id
-                                      :shared-libs shared-libs}])
+     [:& color-selection-menu {:type type
+                               :shapes (vals objects)
+                               :file-id file-id
+                               :shared-libs shared-libs}]
      [:& shadow-menu {:ids ids
                       :values (select-keys shape [:shadow])}]
      [:& blur-menu {:ids ids
