@@ -12,8 +12,10 @@
    [app.common.files.features :as ffeat]
    [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
+   [app.common.logging :as l]
    [app.common.pages.helpers :as cph]
    [app.common.schema :as sm]
+   [app.common.text :as ct]
    [app.common.types.color :as ctc]
    [app.common.types.colors-list :as ctcl]
    [app.common.types.component :as ctk]
@@ -177,15 +179,26 @@
 (defn find-ref-shape
   "Locate the near component in the local file or libraries, and retrieve the shape
    referenced by the instance shape."
-  [file page libraries shape]
+  [file page libraries shape & {:keys [include-deleted?] :or {include-deleted? false}}]
   (let [root-shape     (ctn/get-component-shape (:objects page) shape)
         component-file (if (= (:component-file root-shape) (:id file))
                          file
                          (get libraries (:component-file root-shape)))
         component      (when component-file
-                         (ctkl/get-component (:data component-file) (:component-id root-shape)))]
-    (when component
-      (get-ref-shape (:data component-file) component shape))))
+                         (ctkl/get-component (:data component-file) (:component-id root-shape) include-deleted?))
+        ref-shape (when component
+                    (get-ref-shape (:data component-file) component shape))]
+
+    (if (some? ref-shape)  ; There is a case when we have a nested orphan copy. In this case there is no near
+      ref-shape            ; component for this copy, so shape-ref points to the remote main.
+      (let [head-shape     (ctn/get-head-shape (:objects page) shape)
+            head-file (if (= (:component-file head-shape) (:id file))
+                        file
+                        (get libraries (:component-file head-shape)))
+            head-component      (when (some? head-file)
+                                  (ctkl/get-component (:data head-file) (:component-id head-shape) include-deleted?))]
+        (when (some? head-component)
+          (get-ref-shape (:data head-file) head-component shape))))))
 
 (defn find-remote-shape
   "Recursively go back by the :shape-ref of the shape until find the correct shape of the original component"
@@ -645,17 +658,13 @@
       (str " #" (when show-ids (str/format " [Component %s]" (:component-id shape))))
       "")
     (let [root-shape        (ctn/get-component-shape objects shape)
-          component-id      (when root-shape (:component-id root-shape))
           component-file-id (when root-shape (:component-file root-shape))
           component-file    (when component-file-id (get libraries component-file-id nil))
-          component         (when component-id
-                              (if component-file
-                                (ctkl/get-component (:data component-file) component-id true)
-                                (ctkl/get-component (:data file) component-id true)))
-          component-shape   (when component
-                              (if component-file
-                                (get-ref-shape (:data component-file) component shape)
-                                (get-ref-shape (:data file) component shape)))]
+          component-shape (find-ref-shape file
+                                          {:objects objects}
+                                          libraries
+                                          shape
+                                          :include-deleted? true)]
 
       (str/format " %s--> %s%s%s%s%s"
                   (cond (:component-root shape) "#"
@@ -974,7 +983,7 @@
       (report-error :missing-component-root
                     (str/format "Referenced shape %s not found in near component" (:shape-ref shape))
                     shape file page))))
- 
+
 (defn validate-component-not-ref
   "Validate that this shape does not reference other one."
   [shape file page report-error]
@@ -1065,7 +1074,7 @@
 
 (defn validate-shape
   "Validate referential integrity and semantic coherence of a shape and all its children.
-   
+
    The context is the situation of the parent in respect to components:
      :not-component
      :main-top
@@ -1149,3 +1158,61 @@
               (validate-shape-not-component shape file page libraries report-error))))))
 
     @errors))
+
+;; Export
+
+(defn- get-component-ref-file
+  [objects shape]
+
+  (cond
+    (contains? shape :component-file)
+    (get shape :component-file)
+
+    (contains? shape :shape-ref)
+    (recur objects (get objects (:parent-id shape)))
+
+    :else
+    nil))
+
+(defn detach-external-references
+  [file file-id]
+  (let [detach-text
+        (fn [content]
+          (->> content
+               (ct/transform-nodes
+                #(cond-> %
+                   (not= file-id (:fill-color-ref-file %))
+                   (dissoc :fill-color-ref-id :fill-color-ref-file)
+
+                   (not= file-id (:typography-ref-file %))
+                   (dissoc :typography-ref-id :typography-ref-file)))))
+
+        detach-shape
+        (fn [objects shape]
+          (l/debug :hint "detach-shape"
+                   :file-id file-id
+                   :component-ref-file (get-component-ref-file objects shape)
+                   ::l/sync? true)
+          (cond-> shape
+            (not= file-id (:fill-color-ref-file shape))
+            (dissoc :fill-color-ref-id :fill-color-ref-file)
+
+            (not= file-id (:stroke-color-ref-file shape))
+            (dissoc :stroke-color-ref-id :stroke-color-ref-file)
+
+            (not= file-id (get-component-ref-file objects shape))
+            (dissoc :component-id :component-file :shape-ref :component-root)
+
+            (= :text (:type shape))
+            (update :content detach-text)))
+
+        detach-objects
+        (fn [objects]
+          (update-vals objects #(detach-shape objects %)))
+
+        detach-pages
+        (fn [pages-index]
+          (update-vals pages-index #(update % :objects detach-objects)))]
+
+    (-> file
+        (update-in [:data :pages-index] detach-pages))))
