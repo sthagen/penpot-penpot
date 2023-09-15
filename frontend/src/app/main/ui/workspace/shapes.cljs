@@ -13,6 +13,7 @@
   common."
   (:require
    [app.common.data.macros :as dm]
+   [app.common.geom.rect :as grc]
    [app.common.pages.helpers :as cph]
    [app.common.uuid :as uuid]
    [app.main.ui.context :as ctx]
@@ -49,15 +50,14 @@
   (let [objects       (obj/get props "objects")
         active-frames (obj/get props "active-frames")
         shapes        (cph/get-immediate-children objects)
+        vbox          (mf/use-ctx ctx/current-vbox)
 
-        ;; vbox          (mf/use-ctx ctx/current-vbox)
-        ;; shapes        (mf/with-memo [shapes vbox]
-        ;;                 (if (some? vbox)
-        ;;                   (filter (fn [shape]
-        ;;                             (grc/overlaps-rects? vbox (dm/get-prop shape :selrect)))
-        ;;                           shapes)
-        ;;                   shapes))
-        ]
+        shapes        (mf/with-memo [shapes vbox]
+                        (if (some? vbox)
+                          (filter (fn [shape]
+                                    (grc/overlaps-rects? vbox (dm/get-prop shape :selrect)))
+                                  shapes)
+                          shapes))]
 
     [:g {:id (dm/str "shape-" uuid/zero)}
      [:& (mf/provider ctx/active-frames) {:value active-frames}
@@ -99,8 +99,8 @@
         rawsvg?       (= :svg-raw shape-type)
         wrapper-elem  (if ^boolean rawsvg? mf/Fragment "g")
         wrapper-props (if ^boolean rawsvg?
-                        #js {:className "workspace-shape-wrapper"}
-                        #js {})]
+                        #js {}
+                        #js {:className "workspace-shape-wrapper"})]
 
     (when (and (some? shape)
                (not ^boolean (:hidden shape)))
