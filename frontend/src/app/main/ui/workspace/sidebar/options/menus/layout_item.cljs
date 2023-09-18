@@ -531,10 +531,9 @@
               :on-focus #(dom/select-target %)
               :on-change #(on-change-z-index %)
               :nillable true
-              :disabled (not is-absolute?)
               :value (:layout-item-z-index values)}]])]
 
-        (when is-layout-child?
+        (when (and is-layout-child? is-flex-parent?)
           [:div {:class (stl/css :second-row)}
            [:& align-self-row {:is-col? is-col?
                                :align-self align-self
@@ -668,7 +667,7 @@
                                 :on-change-behaviour-v-refactor on-change-behaviour-v
                                 :on-change on-change-behaviour}]]
 
-         (when is-layout-child?
+         (when (and is-layout-child? is-flex-parent?)
            [:div.layout-row
             [:div.row-title "Align"]
             [:div.btn-wrapper

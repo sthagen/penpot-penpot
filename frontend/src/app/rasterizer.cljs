@@ -4,8 +4,8 @@
 ;;
 ;; Copyright (c) KALEIDOS INC
 
-(ns app.thumbnail-renderer
-  "A main entry point for the thumbnail renderer process that is
+(ns app.rasterizer
+  "A main entry point for the rasterizer process that is
   executed on a separated iframe."
   (:require
    [app.common.data :as d]
@@ -178,22 +178,35 @@
 
        (constantly nil)))))
 
-(defn- render
-  "Renders a thumbnail using it's SVG and returns an ArrayBuffer of the image."
+(defn- render-image-bitmap
+  "Renders a thumbnail using it's SVG and returns an ImageBitmap of the image."
   [payload]
   (let [data   (unchecked-get payload "data")
         styles (unchecked-get payload "styles")
-        width  (d/nilv (unchecked-get payload "width") 300)]
+        width  (d/nilv (unchecked-get payload "width") 300)
+        quality (d/nilv (unchecked-get payload "quality") "medium")]
     (->> (svg-prepare data styles width)
          (rx/map #(wapi/create-blob % "image/svg+xml"))
          (rx/map wapi/create-uri)
          (rx/mapcat (fn [uri]
                       (->> (create-image uri)
                            (rx/mapcat #(wapi/create-image-bitmap % #js {:resizeWidth width
-                                                                        :resizeQuality "medium"}))
-                           (rx/tap #(wapi/revoke-uri uri)))))
+                                                                        :resizeQuality quality}))
+                           (rx/tap #(wapi/revoke-uri uri))))))))
 
-         (rx/mapcat bitmap->blob))))
+(defn- render-blob
+  "Renders a thumbnail using it's SVG and returns a Blob of the image."
+  [payload]
+  (->> (render-image-bitmap payload)
+       (rx/mapcat bitmap->blob)))
+
+(defn- render
+  "Renders a thumbnail and returns a stream."
+  [payload]
+  (let [result (d/nilv (unchecked-get payload "result") "blob")]
+    (case result
+      "image-bitmap" (render-image-bitmap payload)
+      (render-blob payload))))
 
 (defn- on-message
   "Handles messages from the main thread."
@@ -205,7 +218,7 @@
             payload (unchecked-get evdata "payload")
             scope   (unchecked-get evdata "scope")]
         (when (and (some? payload)
-                   (= scope "penpot/thumbnail-renderer"))
+                   (= scope "penpot/rasterizer"))
           (->> (render payload)
                (rx/subs (partial send-success! id)
                         (partial send-failure! id))))))))
@@ -220,7 +233,7 @@
   [id type payload]
   (let [message #js {:id id
                      :type type
-                     :scope "penpot/thumbnail-renderer"
+                     :scope "penpot/rasterizer"
                      :payload payload}]
     (when-not (identical? js/window js/parent)
       (.postMessage js/parent message parent-origin))))

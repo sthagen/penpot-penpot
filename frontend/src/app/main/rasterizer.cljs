@@ -4,13 +4,14 @@
 ;;
 ;; Copyright (c) KALEIDOS INC
 
-(ns app.main.thumbnail-renderer
-  "A main entry point for the thumbnail renderer API interface.
+(ns app.main.rasterizer
+  "A main entry point for the rasterizer API interface.
 
-  This ns is responsible to provide an API for create thumbnail
-  renderer iframes and interact with them using asyncrhonous
+  This ns is responsible to provide an API for create rasterizer
+  iframes and interact with them using asyncrhonous
   messages."
   (:require
+   [app.common.data :as d]
    [app.common.data.macros :as dm]
    [app.common.uuid :as uuid]
    [app.config :as cf]
@@ -23,7 +24,7 @@
 (defonce instance nil)
 (defonce msgbus (rx/subject))
 (defonce origin
-  (dm/str (assoc cf/thumbnail-renderer-uri :path "/thumbnail-renderer.html")))
+  (dm/str (assoc cf/rasterizer-uri :path "/rasterizer.html")))
 
 (declare send-message!)
 
@@ -35,7 +36,7 @@
       (recur (.shift ^js queue)))))
 
 (defn- on-message
-  "Handles a message from the thumbnail renderer."
+  "Handles a message from the rasterizer."
   [event]
   (let [evorigin (unchecked-get event "origin")
         evdata   (unchecked-get event "data")]
@@ -43,14 +44,14 @@
     (when (and (object? evdata) (str/starts-with? origin evorigin))
       (let [scope (unchecked-get evdata "scope")
             type  (unchecked-get evdata "type")]
-        (when (= "penpot/thumbnail-renderer" scope)
+        (when (= "penpot/rasterizer" scope)
           (when (= type "ready")
             (set! ready? true)
             (process-queued-messages!))
           (rx/push! msgbus evdata))))))
 
 (defn- send-message!
-  "Sends a message to the thumbnail renderer."
+  "Sends a message to the rasterizer."
   [message]
   (let [window (.-contentWindow ^js instance)]
     (.postMessage ^js window message origin)))
@@ -61,12 +62,14 @@
   (.push ^js queue message))
 
 (defn render
-  "Renders a thumbnail."
-  [{:keys [data styles width] :as params}]
-  (let [id      (dm/str (uuid/next))
-        payload #js {:data data :styles styles :width width}
+  "Renders an SVG"
+  [{:keys [data styles width result] :as params}]
+  (let [styles  (d/nilv styles "")
+        result  (d/nilv result "blob")
+        id      (dm/str (uuid/next))
+        payload #js {:data data :styles styles :width width :result result}
         message #js {:id id
-                     :scope "penpot/thumbnail-renderer"
+                     :scope "penpot/rasterizer"
                      :payload payload}]
 
     (if ^boolean ready?
@@ -81,8 +84,17 @@
                         "failure" (rx/throw (js/Error. (unchecked-get msg "payload"))))))
          (rx/take 1))))
 
+(defn render-node
+  "Renders an SVG using a node"
+  [{:keys [node styles width result] :as params}]
+  (let [width  (d/nilv width (dom/get-attribute node "width"))
+        styles (d/nilv styles "")
+        data   (dom/node->xml node)
+        result (d/nilv result "blob")]
+    (render {:data data :styles styles :width width :result result})))
+
 (defn init!
-  "Initializes the thumbnail renderer."
+  "Initializes the rasterizer."
   []
   (let [iframe (dom/create-element "iframe")]
     (dom/set-attribute! iframe "src" origin)

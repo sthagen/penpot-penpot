@@ -126,6 +126,9 @@
   [id]
   (l/derived #(contains? % id) selected-shapes))
 
+(def highlighted-shapes
+  (l/derived :highlighted workspace-local))
+
 (def export-in-progress?
   (l/derived :export-in-progress? export))
 
@@ -476,10 +479,10 @@
   (l/derived #(get % :workspace-thumbnails {}) st/state))
 
 (defn thumbnail-frame-data
-  [page-id frame-id]
+  [frame-id]
   (l/derived
    (fn [thumbnails]
-     (get thumbnails (dm/str page-id frame-id)))
+     (get thumbnails (dm/str frame-id)))
    thumbnail-data))
 
 (def workspace-text-modifier
