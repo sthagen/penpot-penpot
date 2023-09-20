@@ -15,6 +15,7 @@
    [app.common.geom.shapes.grid-layout :as gsg]
    [app.common.geom.shapes.points :as gpo]
    [app.common.math :as mth]
+   [app.common.pages.helpers :as cph]
    [app.common.types.modifiers :as ctm]
    [app.common.types.shape.layout :as ctl]
    [app.main.data.workspace.grid-layout.editor :as dwge]
@@ -435,11 +436,11 @@
 
         [width height]
         (if (= type :column)
-          [(max 0 (- layout-gap-col (/ 10 zoom)) (/ 16 zoom))
+          [(max 0 (- layout-gap-col (/ 10 zoom)) (/ 8 zoom))
            (+ row-total-size row-total-gap)]
 
           [(+ column-total-size column-total-gap)
-           (max 0 (- layout-gap-row (/ 10 zoom)) (/ 16 zoom))])
+           (max 0 (- layout-gap-row (/ 10 zoom)) (/ 8 zoom))])
 
         start-p
         (cond-> start-p
@@ -470,7 +471,6 @@
                (cur/get-dynamic "resize-ew" (:rotation shape))
                (cur/get-dynamic "resize-ns" (:rotation shape)))
       :style {:fill "transparent"
-              :opacity 0.5
               :stroke-width 0}}]))
 
 (mf/defc track-marker
@@ -734,13 +734,16 @@
 
         children
         (mf/use-memo
-         (mf/deps shape modifiers)
+         (mf/deps objects shape modifiers)
          (fn []
-           (->> (:shapes shape)
-                (map (d/getf objects))
-                (map #(gsh/transform-shape % (dm/get-in modifiers [(:id %) :modifiers])))
-                (remove :hidden)
-                (map #(vector (gpo/parent-coords-bounds (:points %) (:points shape)) %)))))
+           (let [ids (cph/get-children-ids objects (:id shape))
+                 objects (-> objects
+                             (gsh/apply-objects-modifiers (select-keys modifiers ids))
+                             (gsh/update-shapes-geometry (reverse ids)))]
+             (->> (:shapes shape)
+                  (map (d/getf objects))
+                  (remove :hidden)
+                  (map #(vector (gpo/parent-coords-bounds (:points %) (:points shape)) %))))))
 
         children (hooks/use-equal-memo children)
 

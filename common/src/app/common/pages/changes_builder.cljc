@@ -82,6 +82,15 @@
                ::file-data fdata
                ::applied-changes-count 0)))
 
+(defn with-file-data
+  [changes fdata]
+  (let [page-id (::page-id (meta changes))
+        fdata (assoc-in fdata [:pages-index uuid/zero]
+                        (get-in fdata [:pages-index page-id]))]
+    (vary-meta changes assoc
+               ::file-data fdata
+               ::applied-changes-count 0)))
+
 (defn with-library-data
   [changes data]
   (vary-meta changes assoc
@@ -376,14 +385,23 @@
                   attrs (seq attrs)]
              (if-let [attr (first attrs)]
                (let [old-val (get old attr)
-                     new-val (get new attr)]
+                     new-val (get new attr)
+                     changed? (not= old-val new-val)
 
-                 (recur (conj rops {:type :set :attr attr :val new-val
-                                    :ignore-geometry ignore-geometry?
-                                    :ignore-touched ignore-touched})
-                        (conj uops {:type :set :attr attr :val old-val
-                                    :ignore-touched true})
-                        (rest attrs)))
+                     rops
+                     (cond-> rops
+                       changed?
+                       (conj  {:type :set :attr attr :val new-val
+                               :ignore-geometry ignore-geometry?
+                               :ignore-touched ignore-touched}))
+
+                     uops
+                     (cond-> uops
+                       changed?
+                       (conj  {:type :set :attr attr :val old-val
+                               :ignore-touched true}))]
+
+                 (recur rops uops (rest attrs)))
                [rops uops])))
 
          update-shape
@@ -702,14 +720,18 @@
                                       :id id
                                       :name (:name new-component)
                                       :path (:path new-component)
+                                      :main-instance-id (:main-instance-id new-component)
+                                      :main-instance-page (:main-instance-page new-component)
                                       :annotation (:annotation new-component)
                                       :objects (:objects new-component)}) ;; this won't exist in components-v2
           (update :undo-changes conj {:type :mod-component
-                                           :id id
-                                           :name (:name prev-component)
-                                           :path (:path prev-component)
-                                           :annotation (:annotation prev-component)
-                                           :objects (:objects prev-component)}))
+                                      :id id
+                                      :name (:name prev-component)
+                                      :path (:path prev-component)
+                                      :main-instance-id (:main-instance-id prev-component)
+                                      :main-instance-page (:main-instance-page prev-component)
+                                      :annotation (:annotation prev-component)
+                                      :objects (:objects prev-component)}))
       changes)))
 
 (defn delete-component

@@ -76,7 +76,6 @@
       [:index {:optional true} [:maybe :int]]
       [:ignore-touched {:optional true} :boolean]]]
 
-
     [:mod-obj
      [:map {:title "ModObjChange"}
       [:type [:= :mod-obj]]
@@ -367,7 +366,7 @@
                  (comp first first))
 
                 new-shapes
-                (into [] (sort-by id->idx < old-shapes))]
+                (into [] (sort-by #(d/nilv (id->idx %) -1) < old-shapes))]
 
             (reset! changed? (not= old-shapes new-shapes))
 
