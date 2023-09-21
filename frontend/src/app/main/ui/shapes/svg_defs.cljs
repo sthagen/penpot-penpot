@@ -12,7 +12,7 @@
    [app.common.geom.rect :as grc]
    [app.common.geom.shapes :as gsh]
    [app.common.geom.shapes.bounds :as gsb]
-   [app.util.svg :as usvg]
+   [app.common.svg :as csvg]
    [rumext.v2 :as mf]))
 
 (defn add-matrix [attrs transform-key transform-matrix]
@@ -30,7 +30,7 @@
     :else
     (let [{:keys [tag attrs content]} node
 
-          transform-gradient? (and (contains? usvg/gradient-tags tag)
+          transform-gradient? (and (contains? csvg/gradient-tags tag)
                                    (= "userSpaceOnUse" (get attrs :gradientUnits "objectBoundingBox")))
 
           transform-pattern?  (and (= :pattern tag)
@@ -39,7 +39,7 @@
           transform-clippath? (and (= :clipPath tag)
                                    (= "userSpaceOnUse" (get attrs :clipPathUnits "userSpaceOnUse")))
 
-          transform-filter?   (and (contains? usvg/filter-tags tag)
+          transform-filter?   (and (contains? csvg/filter-tags tag)
                                    (= "userSpaceOnUse" (get attrs :filterUnits "objectBoundingBox")))
 
           transform-mask?     (and (= :mask tag)
@@ -47,8 +47,8 @@
 
           attrs
           (-> attrs
-              (usvg/update-attr-ids prefix-id)
-              (usvg/clean-attrs)
+              (csvg/update-attr-ids prefix-id)
+              (csvg/clean-attrs)
               ;; This clasname will be used to change the transform on the viewport
               ;; only necessary for groups because shapes have their own transform
               (cond-> (and (or transform-gradient?
@@ -90,40 +90,42 @@
                         :transform transform
                         :bounds bounds}])]])))
 
-(defn svg-def-bounds [svg-def shape transform]
-  (let [{:keys [tag]} svg-def]
-    (if (or (= tag :mask) (contains? usvg/filter-tags tag))
-      (-> (grc/make-rect (d/parse-double (get-in svg-def [:attrs :x]))
-                         (d/parse-double (get-in svg-def [:attrs :y]))
-                         (d/parse-double (get-in svg-def [:attrs :width]))
-                         (d/parse-double (get-in svg-def [:attrs :height])))
-          (gsh/transform-rect transform))
-      (gsb/get-shape-filter-bounds shape))))
+(defn- get-svg-def-bounds
+  [{:keys [tag attrs] :as node} shape transform]
+  (if (or (= tag :mask) (contains? csvg/filter-tags tag))
+    (some-> (grc/make-rect (d/parse-double (get attrs :x))
+                           (d/parse-double (get attrs :y))
+                           (d/parse-double (get attrs :width))
+                           (d/parse-double (get attrs :height)))
+            (gsh/transform-rect transform))
+    (gsb/get-shape-filter-bounds shape)))
 
-(mf/defc svg-defs [{:keys [shape render-id]}]
-  (let [svg-defs (:svg-defs shape)
+(mf/defc svg-defs
+  {::mf/wrap-props false}
+  [{:keys [shape render-id]}]
+  (let [defs      (:svg-defs shape)
 
-        transform (mf/use-memo
-                   (mf/deps shape)
-                   #(if (= :svg-raw (:type shape))
+        transform (mf/with-memo [shape]
+                    (if (= :svg-raw (:type shape))
                       (gmt/matrix)
-                      (usvg/svg-transform-matrix shape)))
+                      (csvg/svg-transform-matrix shape)))
 
         ;; Paths doesn't have transform so we have to transform its gradients
         transform (if (some? (:svg-transform shape))
                     (gmt/multiply transform (:svg-transform shape))
                     transform)
 
-        prefix-id
-        (fn [id]
-          (cond->> id
-            (contains? svg-defs id) (str render-id "-")))]
+        ;; FIXME: naming
+        prefix-id (mf/use-fn
+                   (mf/deps render-id defs)
+                   (fn [id]
+                     (cond->> id
+                       (contains? defs id) (str render-id "-"))))]
 
-    (when (seq svg-defs)
-      (for [[key svg-def] svg-defs]
-        [:& svg-node {:key (dm/str key)
-                      :type (:type shape)
-                      :node svg-def
-                      :prefix-id prefix-id
-                      :transform transform
-                      :bounds (svg-def-bounds svg-def shape transform)}]))))
+    (for [[key node] defs]
+      [:& svg-node {:key (dm/str key)
+                    :type (:type shape)
+                    :node node
+                    :prefix-id prefix-id
+                    :transform transform
+                    :bounds (get-svg-def-bounds node shape transform)}])))

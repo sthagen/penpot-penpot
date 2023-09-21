@@ -10,10 +10,10 @@
    [app.common.data :as d]
    [app.common.data.macros :as dm]
    [app.common.geom.shapes :as gsh]
+   [app.common.svg :as csvg]
    [app.common.types.shape :refer [stroke-caps-line stroke-caps-marker]]
    [app.common.types.shape.radius :as ctsr]
    [app.util.object :as obj]
-   [app.util.svg :as usvg]
    [cuerdas.core :as str]))
 
 (defn- stroke-type->dasharray
@@ -160,14 +160,10 @@
              (empty? attrs))
       #js {}
       (-> attrs
-          ;; TODO: revisit, why we need to execute it each render? Can
-          ;; we do this operation on importation and avoid unnecesary
-          ;; work on render?
-          (usvg/clean-attrs)
-          (usvg/update-attr-ids
+          (csvg/update-attr-ids
            (fn [id]
              (if (contains? defs id)
-               (str render-id "-" id)
+               (dm/str render-id "-" id)
                id)))
           (dissoc :id)
           (obj/map->obj)))))
@@ -217,8 +213,8 @@
                (= :group shape-type))
            (empty? shape-fills))
       (let [wstyle (get shape :wrapper-styles)
-            fill    (obj/get wstyle "fill")
-            fill    (d/nilv fill clr/black)]
+            fill   (obj/get wstyle "fill")
+            fill   (d/nilv fill clr/black)]
         (obj/set! style "fill" fill))
 
       (d/not-empty? shape-fills)
