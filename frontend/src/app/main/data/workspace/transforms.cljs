@@ -611,7 +611,9 @@
                                        (ctl/swap-shapes id (:id next-cell)))))
                                  parent))]
                 (-> changes
-                    (pcb/update-shapes [(:id parent)] (fn [shape] (assoc shape :layout-grid-cells layout-grid-cells)))
+                    (pcb/update-shapes [(:id parent)] (fn [shape] (-> shape
+                                                                      (assoc :layout-grid-cells layout-grid-cells)
+                                                                      (ctl/assign-cells))))
                     (pcb/reorder-grid-children [(:id parent)]))))
 
             changes
@@ -710,7 +712,6 @@
 (defn update-position
   "Move shapes to a new position"
   [id position]
-  (js/console.log "DEBUG" (pr-str position))
   (dm/assert! (uuid? id))
 
   (ptk/reify ::update-position
@@ -731,8 +732,31 @@
 
             modif-tree (dwm/create-modif-tree [id] (ctm/move-modifiers delta))]
 
-        (rx/of (dwm/set-modifiers modif-tree false true)
-               (dwm/apply-modifiers))))))
+        (rx/of (dwm/apply-modifiers {:modifiers modif-tree
+                                     :ignore-constraints false
+                                     :ignore-snap-pixel true}))))))
+
+(defn position-shapes
+  [shapes]
+  (ptk/reify ::position-shapes
+    ptk/WatchEvent
+    (watch [_ state _]
+      (let [objects (wsh/lookup-page-objects state)
+            shapes  (d/index-by :id shapes)
+
+            modif-tree
+            (dwm/build-modif-tree
+             (keys shapes)
+             objects
+             (fn [cshape]
+               (let [oshape (get shapes (:id cshape))
+                     cpos   (-> cshape :points first gpt/point)
+                     opos   (-> oshape :points first gpt/point)]
+                 (ctm/move-modifiers (gpt/subtract opos cpos)))))]
+
+        (rx/of (dwm/apply-modifiers {:modifiers modif-tree
+                                     :ignore-constraints false
+                                     :ignore-snap-pixel true}))))))
 
 (defn- move-shapes-to-frame
   [ids frame-id drop-index]
