@@ -167,7 +167,8 @@
   (let [components-v2 (dm/get-in file-data [:options :components-v2])]
     (if (and components-v2 (not (:deleted component)))
       (let [component-page (get-component-page file-data component)]
-        (ctn/get-shape component-page shape-id))
+        (when component-page
+          (ctn/get-shape component-page shape-id)))
       (dm/get-in component [:objects shape-id]))))
 
 (defn get-ref-shape
@@ -181,9 +182,10 @@
    referenced by the instance shape."
   [file page libraries shape & {:keys [include-deleted?] :or {include-deleted? false}}]
   (let [root-shape     (ctn/get-component-shape (:objects page) shape)
-        component-file (if (= (:component-file root-shape) (:id file))
-                         file
-                         (get libraries (:component-file root-shape)))
+        component-file (when root-shape
+                         (if (= (:component-file root-shape) (:id file))
+                           file
+                           (get libraries (:component-file root-shape))))
         component      (when component-file
                          (ctkl/get-component (:data component-file) (:component-id root-shape) include-deleted?))
         ref-shape (when component
@@ -579,13 +581,13 @@
                             libraries    (assoc-in libraries [(:id file-data) :data] file-data)
                             library      (get libraries (:component-file root))
                             component    (ctkl/get-component (:data library) (:component-id root) true)
-                            direct-shape (ctst/get-shape component (:shape-ref shape))]
+                            direct-shape (get-component-shape (:data library) component (:shape-ref shape))]
                         (if (some? direct-shape)
                           ; If it exists, there is nothing else to do.
                           container
                           ; If not found, find the near shape.
                           (let [near-shape (d/seek #(= (:shape-ref %) (:shape-ref shape))
-                                                   (ctn/shapes-seq component))]
+                                                   (get-component-shapes (:data library) component))]
                             (if (some? near-shape)
                               ; If found, update the ref to point to the near shape.
                               (ctn/update-shape container (:id shape) #(assoc % :shape-ref (:id near-shape)))
@@ -594,7 +596,7 @@
                               (let [head           (ctn/get-head-shape (:objects container) shape)
                                     library-2      (get libraries (:component-file head))
                                     component-2    (ctkl/get-component (:data library-2) (:component-id head) true)
-                                    direct-shape-2 (ctst/get-shape component-2 (:shape-ref shape))]
+                                    direct-shape-2 (get-component-shape (:data library-2) component-2 (:shape-ref shape))]
                                 (if (some? direct-shape-2)
                                   ; If it exists, there is nothing else to do.
                                   container
