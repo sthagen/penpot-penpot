@@ -227,8 +227,7 @@
 
   ([objects ids {:keys [bottom-frames?] :as options
                  :or   {bottom-frames? false}}]
-   (letfn [
-           (comp [id-a id-b]
+   (letfn [(comp [id-a id-b]
              (cond
                (= id-a id-b)
                0
@@ -370,7 +369,14 @@
    (let [new-id (cond
                   (some? force-id) force-id
                   keep-ids? (:id object)
-                  :else (uuid/next))]
+                  :else (uuid/next))
+
+         ;; Assign the correct frame-id for the given parent.
+         ;; It's the parent-id (if frame) or the parent's frame-id otherwise.
+         frame-id
+         (if (cph/frame-shape? objects parent-id)
+           parent-id
+           (dm/get-in objects [parent-id :frame-id]))]
 
      (loop [child-ids (seq (:shapes object))
             new-direct-children []
@@ -381,7 +387,8 @@
          (let [new-object (cond-> object
                             :always
                             (assoc :id new-id
-                                   :parent-id parent-id)
+                                   :parent-id parent-id
+                                   :frame-id frame-id)
 
                             (some? (:shapes object))
                             (assoc :shapes (mapv :id new-direct-children)))
