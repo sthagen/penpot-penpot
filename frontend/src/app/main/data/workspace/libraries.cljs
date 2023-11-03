@@ -450,7 +450,7 @@
                 page-id   (:main-instance-page component)
                 root-id   (:main-instance-id component)]
             (rx/of
-             (dwt/clear-thumbnail (:current-file-id state) page-id root-id)
+             (dwt/clear-thumbnail (:current-file-id state) page-id root-id "component")
              (dwsh/delete-shapes page-id #{root-id}))) ;; Deleting main root triggers component delete
           (let [changes (-> (pcb/empty-changes it)
                             (pcb/with-library-data data)
@@ -615,7 +615,7 @@
 
     ptk/WatchEvent
     (watch [_ _ _]
-      (->> (rp/cmd! :get-file-object-thumbnails {:file-id library-id})
+      (->> (rp/cmd! :get-file-object-thumbnails {:file-id library-id :tag "component"})
            (rx/map (fn [thumbnails]
                      (fn [state]
                        (assoc-in state [:workspace-libraries library-id :thumbnails] thumbnails))))))))
@@ -775,7 +775,7 @@
             component       (ctkl/get-component data component-id)
             page-id         (:main-instance-page component)
             root-id         (:main-instance-id component)]
-           (rx/of (dwt/request-thumbnail file-id page-id root-id))))))
+           (rx/of (dwt/request-thumbnail file-id page-id root-id "component"))))))
 
 (defn- find-shape-index
   [objects id shape-id]
@@ -841,6 +841,15 @@
 
 (def valid-asset-types
   #{:colors :components :typographies})
+
+(defn set-updating-library
+  [updating?]
+  (ptk/reify ::set-updating-library
+    ptk/UpdateEvent
+    (update [_ state]
+      (if updating?
+        (assoc state :updating-library true)
+        (dissoc state :updating-library)))))
 
 (defn sync-file
   "Synchronize the given file from the given library. Walk through all
@@ -912,7 +921,8 @@
                                                               (:redo-changes changes)
                                                               file))
            (rx/concat
-            (rx/of (msg/hide-tag :sync-dialog))
+            (rx/of (set-updating-library false)
+                   (msg/hide-tag :sync-dialog))
             (when (seq (:redo-changes changes))
               (rx/of (dch/commit-changes (assoc changes ;; TODO a ver qué pasa con esto
                                                 :file-id file-id))))
@@ -1136,7 +1146,7 @@
               (rx/map (fn [file]
                         (fn [state]
                           (assoc-in state [:workspace-libraries library-id] file)))))
-         (->> (rp/cmd! :get-file-object-thumbnails {:file-id library-id})
+         (->> (rp/cmd! :get-file-object-thumbnails {:file-id library-id :tag "component"})
               (rx/map (fn [thumbnails]
                         (fn [state]
                           (assoc-in state [:workspace-libraries library-id :thumbnails] thumbnails))))))))))
