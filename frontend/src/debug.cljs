@@ -99,21 +99,21 @@
        (rf result input)))))
 
 (defn prettify
-  "Prepare x fror cleaner output when logged."
+  "Prepare x for cleaner output when logged."
   [x]
   (cond
     (map? x) (d/mapm #(prettify %2) x)
     (vector? x) (mapv prettify x)
     (seq? x) (map prettify x)
-    (set? x) (into #{} (map prettify x))
+    (set? x) (into #{} (map prettify) x)
     (number? x) (mth/precision x 4)
-    (uuid? x) (str "#uuid " x)
+    (uuid? x) (str/concat "#uuid " x)
     :else x))
 
 (defn ^:export logjs
   ([str] (tap (partial logjs str)))
   ([str val]
-   (js/console.log str (clj->js (prettify val)))
+   (js/console.log str (clj->js (prettify val) :keyword-fn (fn [v] (str/concat v))))
    val))
 
 (when (exists? js/window)
@@ -402,9 +402,7 @@
      (ptk/reify ::repair-current-file
        ptk/WatchEvent
        (watch [_ state _]
-         (let [features  (cond-> #{}
-                           (features/active-feature? state :components-v2)
-                           (conj "components/v2"))
+         (let [features  (features/get-team-enabled-features state)
                sid       (:session-id state)
                file      (get state :workspace-file)
                file-data (get state :workspace-data)

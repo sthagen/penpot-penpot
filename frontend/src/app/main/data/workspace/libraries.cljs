@@ -8,7 +8,8 @@
   (:require
    [app.common.data :as d]
    [app.common.data.macros :as dm]
-   [app.common.files.features :as ffeat]
+   [app.common.files.libraries-helpers :as cflh]
+   [app.common.files.shapes-helpers :as cfsh]
    [app.common.geom.point :as gpt]
    [app.common.logging :as log]
    [app.common.pages :as cp]
@@ -305,9 +306,9 @@
             parents  (into #{} (map :parent-id) shapes)]
         (when-not (empty? shapes)
           (let [[root _ changes]
-                (dwlh/generate-add-component it shapes objects page-id file-id components-v2
+                (cflh/generate-add-component it shapes objects page-id file-id components-v2
                                              dwg/prepare-create-group
-                                             dwsh/prepare-create-artboard-from-selection)]
+                                             cfsh/prepare-create-artboard-from-selection)]
             (when-not (empty? (:redo-changes changes))
               (rx/of (dch/commit-changes changes)
                      (dws/select-shapes (d/ordered-set (:id root)))
@@ -326,7 +327,7 @@
             selected      (->> (wsh/lookup-selected state)
                                (cph/clean-loops objects)
                                (remove #(ctn/has-any-copy-parent? objects (get objects %)))) ;; We don't want to change the structure of component copies
-            components-v2 (features/active-feature? state :components-v2)]
+            components-v2 (features/active-feature? state "components/v2")]
         (rx/of (add-component2 selected components-v2))))))
 
 (defn add-multiple-components
@@ -335,7 +336,7 @@
   (ptk/reify ::add-multiple-components
     ptk/WatchEvent
     (watch [_ state _]
-      (let [components-v2    (features/active-feature? state :components-v2)
+      (let [components-v2    (features/active-feature? state "components/v2")
             objects       (wsh/lookup-page-objects state)
             selected      (->> (wsh/lookup-selected state)
                                (cph/clean-loops objects)
@@ -362,7 +363,7 @@
           (rx/empty)
           (let [data          (get state :workspace-data)
                 [path name]   (cph/parse-path-name new-name)
-                components-v2 (features/active-feature? state :components-v2)
+                components-v2 (features/active-feature? state "components/v2")
 
                 update-fn
                 (fn [component]
@@ -409,7 +410,7 @@
             component      (ctkl/get-component (:data library) component-id)
             new-name       (:name component)
 
-            components-v2  (features/active-feature? state :components-v2)
+            components-v2  (features/active-feature? state "components/v2")
 
             main-instance-page  (when components-v2
                                   (ctf/get-component-page (:data library) component))
@@ -445,7 +446,7 @@
     ptk/WatchEvent
     (watch [it state _]
       (let [data (get state :workspace-data)]
-        (if (features/active-feature? state :components-v2)
+        (if (features/active-feature? state "components/v2")
           (let [component (ctkl/get-component data id)
                 page-id   (:main-instance-page component)
                 root-id   (:main-instance-id component)]
@@ -637,7 +638,7 @@
             container (cph/get-container file :page page-id)
 
             components-v2
-            (features/active-feature? state :components-v2)
+            (features/active-feature? state "components/v2")
 
             changes
             (-> (pcb/empty-changes it)
@@ -684,7 +685,7 @@
              local-file    (wsh/get-local-file state)
              container     (cph/get-container local-file :page page-id)
              shape         (ctn/get-shape container id)
-             components-v2 (features/active-feature? state :components-v2)]
+             components-v2 (features/active-feature? state "components/v2")]
 
          (when (ctk/instance-head? shape)
            (let [libraries (wsh/get-libraries state)
@@ -1014,7 +1015,7 @@
   (ptk/reify ::watch-component-changes
     ptk/WatchEvent
     (watch [_ state stream]
-      (let [components-v2? (features/active-feature? state :components-v2)
+      (let [components-v2? (features/active-feature? state "components/v2")
 
             stopper-s
             (->> stream
@@ -1136,9 +1137,7 @@
 
     ptk/WatchEvent
     (watch [_ state _]
-      (let [features (cond-> ffeat/enabled
-                       (features/active-feature? state :components-v2)
-                       (conj "components/v2"))]
+      (let [features (features/get-team-enabled-features state)]
         (rx/merge
          (->> (rp/cmd! :link-file-to-library {:file-id file-id :library-id library-id})
               (rx/ignore))

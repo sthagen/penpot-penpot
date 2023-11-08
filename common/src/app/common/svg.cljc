@@ -6,7 +6,12 @@
 
 (ns app.common.svg
   (:require
-   #?(:cljs ["./svg_optimizer.js" :as svgo])
+   #?(:cljs ["./svg/optimizer.js" :as svgo])
+   #?(:clj  [clojure.xml :as xml]
+      :cljs [tubax.core :as tubax])
+   #?(:clj [integrant.core :as ig])
+   #?(:clj [app.common.jsrt :as jsrt])
+   #?(:clj [app.common.logging :as l])
    [app.common.data :as d]
    [app.common.data.macros :as dm]
    [app.common.geom.matrix :as gmt]
@@ -14,7 +19,15 @@
    [app.common.geom.shapes :as gsh]
    [app.common.math :as mth]
    [app.common.uuid :as uuid]
-   [cuerdas.core :as str]))
+   [cuerdas.core :as str])
+  #?(:clj
+     (:import
+      clojure.lang.XMLHandler
+      java.io.InputStream
+      javax.xml.XMLConstants
+      javax.xml.parsers.SAXParserFactory
+      org.apache.commons.io.IOUtils)))
+
 
 ;; Regex for XML ids per Spec
 ;; https://www.w3.org/TR/2008/REC-xml-20081126/#sec-common-syn
@@ -1035,11 +1048,58 @@
   (let [redfn (fn [acc {:keys [tag attrs]}]
                 (cond-> acc
                   (= :image tag)
-                  (conj (or (:href attrs) (:xlink:href attrs)))))]
+                  (conj {:href (or (:href attrs) (:xlink:href attrs))
+                         :width (d/parse-integer (:width attrs) 0)
+                         :height (d/parse-integer (:height attrs) 0)})))]
     (reduce-nodes redfn [] svg-data )))
 
 #?(:cljs
    (defn optimize
      ([input] (optimize input nil))
      ([input options]
-      (svgo/optimize input (clj->js options)))))
+      (svgo/optimize input (clj->js options))))
+   :clj
+   (defn optimize
+     [pool data]
+     (dm/assert! "expected a valid pool" (jsrt/pool? pool))
+     (dm/assert! "expect data to be a string" (string? data))
+     (jsrt/run! pool
+                (fn [context]
+                  (jsrt/set! context "svgData" data)
+                  (jsrt/eval! context "penpotSvgo.optimize(svgData, {})")))))
+
+#?(:clj
+   (defn- secure-parser-factory
+     [^InputStream input ^XMLHandler handler]
+     (.. (doto (SAXParserFactory/newInstance)
+           (.setFeature XMLConstants/FEATURE_SECURE_PROCESSING true)
+           (.setFeature "http://apache.org/xml/features/disallow-doctype-decl" true))
+         (newSAXParser)
+         (parse input handler))))
+
+(defn strip-doctype
+  [data]
+  (cond-> data
+    (str/includes? data "<!DOCTYPE")
+    (str/replace #"<\!DOCTYPE[^>]*>" "")))
+
+
+(defn parse
+  [text]
+  #?(:cljs (tubax/xml->clj text)
+     :clj  (let [text (strip-doctype text)]
+             (dm/with-open [istream (IOUtils/toInputStream text "UTF-8")]
+               (xml/parse istream secure-parser-factory)))))
+
+#?(:clj
+   (defmethod ig/init-key ::optimizer
+     [_ _]
+     (l/info :hint "initializing svg optimizer pool")
+     (let [init (jsrt/resource->source "app/common/svg/optimizer.js")]
+       (jsrt/pool :init init))))
+
+#?(:clj
+   (defmethod ig/halt-key! ::optimizer
+     [_ pool]
+     (l/info :hint "stopping svg optimizer pool")
+     (.close ^java.lang.AutoCloseable pool)))
