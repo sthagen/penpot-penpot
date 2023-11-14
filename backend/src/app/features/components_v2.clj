@@ -13,6 +13,7 @@
    [app.common.files.libraries-helpers :as cflh]
    [app.common.files.migrations :as pmg]
    [app.common.files.shapes-helpers :as cfsh]
+   [app.common.files.validate :as cfv]
    [app.common.geom.point :as gpt]
    [app.common.geom.rect :as grc]
    [app.common.geom.shapes :as gsh]
@@ -579,39 +580,41 @@
 
 (defn- migrate-graphics
   [fdata]
-  (let [[fdata page-id position]
-        (ctf/get-or-add-library-page fdata grid-gap)
+  (if (empty? (:media fdata))
+    fdata
+    (let [[fdata page-id position]
+          (ctf/get-or-add-library-page fdata grid-gap)
 
-        media (->> (vals (:media fdata))
-                   (map (fn [{:keys [width height] :as media}]
-                          (let [points (-> (grc/make-rect 0 0 width height)
-                                           (grc/rect->points))]
-                            (assoc media :points points)))))
+          media (->> (vals (:media fdata))
+                     (map (fn [{:keys [width height] :as media}]
+                            (let [points (-> (grc/make-rect 0 0 width height)
+                                             (grc/rect->points))]
+                              (assoc media :points points)))))
 
         ;; FIXME: think about what to do with existing media entries ??
-        grid  (ctst/generate-shape-grid media position grid-gap)]
+          grid  (ctst/generate-shape-grid media position grid-gap)]
 
-    (when (some? *stats*)
-      (let [total (count media)]
-        (swap! *stats* (fn [stats]
-                         (-> stats
-                             (update :processed/graphics (fnil + 0) total)
-                             (assoc :current/graphics total))))))
+      (when (some? *stats*)
+        (let [total (count media)]
+          (swap! *stats* (fn [stats]
+                           (-> stats
+                               (update :processed/graphics (fnil + 0) total)
+                               (assoc :current/graphics total))))))
 
-    (->> (d/zip media grid)
-         (reduce (fn [fdata [mobj position]]
-                   (try
-                     (process-media-object fdata page-id mobj position)
-                     (catch Throwable cause
-                       (l/warn :hint "unable to process file media object (skiping)"
-                               :file-id (str (:id fdata))
-                               :id (str (:id mobj))
-                               :cause cause)
+      (->> (d/zip media grid)
+           (reduce (fn [fdata [mobj position]]
+                     (try
+                       (process-media-object fdata page-id mobj position)
+                       (catch Throwable cause
+                         (l/warn :hint "unable to process file media object (skiping)"
+                                 :file-id (str (:id fdata))
+                                 :id (str (:id mobj))
+                                 :cause cause)
 
-                       (if-not *skip-on-error*
-                         (throw cause)
-                         fdata))))
-                 fdata))))
+                         (if-not *skip-on-error*
+                           (throw cause)
+                           fdata))))
+                   fdata)))))
 
 (defn- migrate-file-data
   [fdata libs]
@@ -623,7 +626,7 @@
         (update fdata :options assoc :components-v2 true)))))
 
 (defn- process-file
-  [{:keys [id] :as file}]
+  [{:keys [id] :as file} & {:keys [validate?]}]
   (let [conn (::db/conn *system*)]
     (binding [pmap/*tracked* (atom {})
               pmap/*load-fn* (partial files/load-pointer conn id)
@@ -632,21 +635,21 @@
               cfeat/*wrap-with-objects-map-fn*
               (if (contains? (:features file) "fdata/objectd-map") omap/wrap identity)]
 
-      (let [libs (sequence
-                  (map (fn [{:keys [id] :as lib}]
-                         (binding [pmap/*load-fn* (partial files/load-pointer conn id)]
-                           (-> (db/get conn :file {:id id})
-                               (files/decode-row)
-                               (files/process-pointers deref) ; ensure all pointers resolved
-                               (pmg/migrate-file)))))
-                  (files/get-file-libraries conn id))
-
-            libs (-> (d/index-by :id libs)
-                     (assoc (:id file) file))
-
-            file (-> file
+      (let [file (-> file
                      (update :data blob/decode)
                      (update :data assoc :id id)
+                     (pmg/migrate-file))
+
+            libs (->> (files/get-file-libraries conn id)
+                      (into [file] (map (fn [{:keys [id]}]
+                                          (binding [pmap/*load-fn* (partial files/load-pointer conn id)]
+                                            (-> (db/get conn :file {:id id})
+                                                (files/decode-row)
+                                                (files/process-pointers deref) ; ensure all pointers resolved
+                                                (pmg/migrate-file))))))
+                      (d/index-by :id))
+
+            file (-> file
                      (update :data migrate-file-data libs)
                      (update :features conj "components/v2"))]
 
@@ -659,10 +662,18 @@
                      :revn (:revn file)}
                     {:id (:id file)})
 
+        (when validate?
+          (let [errors (cfv/validate-file file libs)]
+            (when (seq errors)
+              (l/err :hint "migrate:file:validation-error"
+                     :file-id (str (:id file))
+                     :file-name (:name file)
+                     :errors errors))))
+
         (dissoc file :data)))))
 
 (defn migrate-file!
-  [system file-id]
+  [system file-id & {:keys [validate?]}]
   (let [tpoint  (dt/tpoint)
         file-id (if (string? file-id)
                   (parse-uuid file-id)
@@ -678,7 +689,7 @@
                       (binding [*system* system]
                         (-> (db/get conn :file {:id file-id})
                             (update :features db/decode-pgarray #{})
-                            (process-file))))))
+                            (process-file :validate? validate?))))))
 
       (finally
         (let [elapsed (tpoint)
@@ -701,9 +712,8 @@
                                    (assoc :elapsed/total-by-file total)
                                    (assoc :processed/files completed)))))))))))
 
-
 (defn migrate-team!
-  [system team-id]
+  [system team-id & {:keys [validate?]}]
   (let [tpoint  (dt/tpoint)
         team-id (if (string? team-id)
                   (parse-uuid team-id)
@@ -737,7 +747,7 @@
                               rows (->> (db/exec! conn [sql team-id])
                                         (map :id))]
 
-                          (run! (partial migrate-file! system) rows)
+                          (run! #(migrate-file! system % :validate? validate?) rows)
                           (some-> *stats* (swap! assoc :current/files (count rows)))
 
                           (let [features (-> features

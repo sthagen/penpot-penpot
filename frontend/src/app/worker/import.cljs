@@ -14,6 +14,7 @@
    [app.common.geom.shapes.path :as gpa]
    [app.common.logging :as log]
    [app.common.media :as cm]
+   [app.common.pprint :as pp]
    [app.common.text :as ct]
    [app.common.uuid :as uuid]
    [app.main.repo :as rp]
@@ -316,36 +317,59 @@
 
 (defn resolve-media
   [context file-id node]
-  (if (and (not (cip/close? node))
-           (cip/has-image? node))
-    (let [name     (cip/get-image-name node)
-          image-data (cip/get-image-data node)
-          image-fill (cip/get-image-fill node)]
-      (->> (upload-media-files context file-id name image-data)
-           (rx/catch #(do (.error js/console "Error uploading media: " name)
-                          (rx/of node)))
+  (if (or (and (not (cip/close? node))
+            (cip/has-image? node))
+        (cip/has-stroke-images? node)
+        (cip/has-fill-images? node))
+    (let [name               (cip/get-image-name node)
+          has-image          (cip/has-image? node)
+          image-data         (cip/get-image-data node)
+          image-fill         (cip/get-image-fill node)
+          fill-images-data   (->> (cip/get-fill-images-data node)
+                                  (map #(assoc % :type :fill)))
+          stroke-images-data (->> (cip/get-stroke-images-data node)
+                                  (map #(assoc % :type :stroke)))
+          
+          images-data        (concat
+                               fill-images-data
+                               stroke-images-data
+                               (when has-image
+                                 [{:href image-data}]))]
+      (->> (rx/from images-data)
+           (rx/mapcat (fn [image-data]
+                        (->> (upload-media-files context file-id name (:href image-data))
+                             (rx/catch #(do (.error js/console "Error uploading media: " name)
+                                          (rx/of node)))
+                             (rx/map #(vector (:id image-data) %)))))
+           (rx/reduce (fn [acc [id data]] (assoc acc id data)) {})
            (rx/map
-            (fn [media]
-              (-> node
-                  (assoc-in [:attrs :penpot:media-id]     (:id media))
-                  (assoc-in [:attrs :penpot:media-width]  (:width media))
-                  (assoc-in [:attrs :penpot:media-height] (:height media))
-                  (assoc-in [:attrs :penpot:media-mtype]  (:mtype media))
+             (fn [images]
+               (let [media (get images nil)]
+                 (-> node
+                     (assoc :images images)
+                     (cond-> (some? media)
+                       (->
+                        (assoc-in [:attrs :penpot:media-id]     (:id media))
+                        (assoc-in [:attrs :penpot:media-width]  (:width media))
+                        (assoc-in [:attrs :penpot:media-height] (:height media))
+                        (assoc-in [:attrs :penpot:media-mtype]  (:mtype media))
 
-                  (assoc-in [:attrs :penpot:fill-color]  (:fill image-fill))
-                  (assoc-in [:attrs :penpot:fill-color-ref-file]  (:fill-color-ref-file image-fill))
-                  (assoc-in [:attrs :penpot:fill-color-ref-id]  (:fill-color-ref-id image-fill))
-                  (assoc-in [:attrs :penpot:fill-opacity]  (:fill-opacity image-fill))
-                  (assoc-in [:attrs :penpot:fill-color-gradient]  (:fill-color-gradient image-fill)))))))
+                        (assoc-in [:attrs :penpot:fill-color]           (:fill image-fill))
+                        (assoc-in [:attrs :penpot:fill-color-ref-file]  (:fill-color-ref-file image-fill))
+                        (assoc-in [:attrs :penpot:fill-color-ref-id]    (:fill-color-ref-id image-fill))
+                        (assoc-in [:attrs :penpot:fill-opacity]         (:fill-opacity image-fill))
+                        (assoc-in [:attrs :penpot:fill-color-gradient]  (:fill-color-gradient image-fill))))))))))
 
     ;; If the node is not an image just return the node
     (->> (rx/of node)
          (rx/observe-on :async))))
 
 (defn media-node? [node]
-  (and (cip/shape? node)
-       (cip/has-image? node)
-       (not (cip/close? node))))
+  (or (and (cip/shape? node)
+        (cip/has-image? node)
+        (not (cip/close? node)))
+    (cip/has-stroke-images? node)
+    (cip/has-fill-images? node)))
 
 (defn import-page
   [context file [page-id page-name content]]
@@ -378,7 +402,8 @@
              (rx/mapcat
               (fn [node]
                 (->> (resolve-media context file-id node)
-                     (rx/map (fn [result] [node result])))))
+                     (rx/map (fn [result]
+                               [node result])))))
              (rx/reduce conj {}))]
 
     (->> pre-process-images
@@ -639,6 +664,7 @@
                              (let [error (or (.-message data) (tr "dashboard.import.analyze-error"))]
                                (rx/of {:uri (:uri file) :error error}))))))))))
 
+
 (defmethod impl/handler :import-files
   [{:keys [project-id files features]}]
 
@@ -648,52 +674,60 @@
         zip-files (filter #(= "application/zip" (:type %)) files)
         binary-files (filter #(= "application/octet-stream" (:type %)) files)]
 
-    (->> (rx/merge
-          (->> (create-files context zip-files)
-               (rx/flat-map
-                (fn [[file data]]
-                  (->> (uz/load-from-url (:uri data))
-                       (rx/map #(-> context (assoc :zip %) (merge data)))
-                       (rx/merge-map
-                        (fn [context]
-                          ;; process file retrieves a stream that will emit progress notifications
-                          ;; and other that will emit the files once imported
-                          (let [[progress-stream file-stream] (process-file context file)]
-                            (rx/merge progress-stream
-                                      (->> file-stream
-                                           (rx/map
-                                            (fn [file]
-                                              {:status :import-finish
-                                               :errors (:errors file)
-                                               :file-id (:file-id data)})))))))
-                       (rx/catch (fn [cause]
-                                   (log/error :hint (ex-message cause) :file-id (:file-id data) :cause cause)
-                                   (rx/of {:status :import-error
-                                           :file-id (:file-id data)
-                                           :error (ex-message cause)
-                                           :error-data (ex-data cause)})))))))
+    (rx/merge
+     (->> (create-files context zip-files)
+          (rx/flat-map
+           (fn [[file data]]
+             (->> (uz/load-from-url (:uri data))
+                  (rx/map #(-> context (assoc :zip %) (merge data)))
+                  (rx/merge-map
+                   (fn [context]
+                     ;; process file retrieves a stream that will emit progress notifications
+                     ;; and other that will emit the files once imported
+                     (let [[progress-stream file-stream] (process-file context file)]
+                       (rx/merge progress-stream
+                                 (->> file-stream
+                                      (rx/map
+                                       (fn [file]
+                                         {:status :import-finish
+                                          :errors (:errors file)
+                                          :file-id (:file-id data)})))))))
+                  (rx/catch (fn [cause]
+                              (log/error :hint (ex-message cause)
+                                         :file-id (:file-id data)
+                                         :cause cause)
+                              (rx/of {:status :import-error
+                                      :file-id (:file-id data)
+                                      :error (ex-message cause)
+                                      :error-data (ex-data cause)})))))))
 
-          (->> (rx/from binary-files)
-               (rx/flat-map
-                (fn [data]
-                  (->> (http/send!
-                        {:uri (:uri data)
-                         :response-type :blob
-                         :method :get})
-                       (rx/map :body)
-                       (rx/mapcat #(rp/cmd! :import-binfile {:file %
-                                                                 :project-id project-id}))
-                       (rx/map
-                        (fn [_]
-                          {:status :import-finish
-                           :file-id (:file-id data)})))))))
+     (->> (rx/from binary-files)
+          (rx/flat-map
+           (fn [data]
+             (->> (http/send!
+                   {:uri (:uri data)
+                    :response-type :blob
+                    :method :get})
+                  (rx/map :body)
+                  (rx/mapcat #(rp/cmd! :import-binfile {:file % :project-id project-id}))
+                  (rx/map (fn [_]
+                            {:status :import-finish
+                             :file-id (:file-id data)}))
+                  (rx/catch (fn [cause]
+                              (log/error :hint "unexpected error on import process"
+                                         :project-id project-id
+                                         ::log/sync? true)
+                              ;; TODO: consider do thi son logging directly ?
 
-         (rx/catch (fn [cause]
-                     (log/error :hint "unexpected error on import process"
-                                :project-id project-id
-                                :cause cause)
-                     (if (map? cause)
-                       (js/console.error (pr-str cause))
-                       (js/console.error cause)))))))
+                              (when (map? cause)
+                                (println "Error data:")
+                                (pp/pprint (dissoc cause :explain) {:level 2 :length 10}))
 
+                              (when (string? (:explain cause))
+                                (js/console.log (:explain cause)))
+
+                              (rx/of {:status :import-error
+                                      :file-id (:file-id data)
+                                      :error (:hint cause)
+                                      :error-data cause}))))))))))
 
