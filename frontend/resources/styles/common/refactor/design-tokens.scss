@@ -17,11 +17,11 @@
   // BUTTONS
 
   --button-foreground-hover: var(--color-accent-primary);
-  --button-background-focus: var(--color-background-secondary);
-  --button-foreground-focus: var(--color-foreground-primary);
-  --button-border-focus: var(--color-accent-primary);
+  --button-background-color-focus: var(--color-background-secondary);
+  --button-foreground-color-focus: var(--color-foreground-primary);
+  --button-border-color-focus: var(--color-accent-primary);
   --button-foreground-color-disabled: var(--color-foreground-secondary);
-  --button-background-color-disabled: var(--color-background-primary);
+  --button-background-color-disabled: var(--color-foreground-disabled);
   --button-border-color-disabled: var(--color-background-quaternary);
 
   --button-primary-background-color-rest: var(--color-accent-primary);
@@ -250,4 +250,13 @@
   --comment-bullet-foreground-color-resolved: var(--color-foreground-secondary);
   --comment-bullet-border-color-resolved: var(--color-background-quaternary);
   --comment-modal-background-color: var(--color-background-primary);
+
+  // GRID LAYOUT
+  --grid-editor-marker-color: var(--color-foreground-tertiary);
+  --grid-editor-marker-text: var(--color-foreground-tertiary);
+  --grid-editor-area-background: var(--color-foreground-tertiary);
+  --grid-editor-area-text: var(--color-foreground-tertiary);
+  --grid-editor-line-color: var(--color-foreground-tertiary);
+  --grid-editor-plus-btn-foreground: var(--white);
+  --grid-editor-plus-btn-background: var(--color-foreground-tertiary);
 }
