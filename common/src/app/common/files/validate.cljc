@@ -46,7 +46,8 @@
     :nested-copy-not-allowed
     :not-head-main-not-allowed
     :not-head-copy-not-allowed
-    :not-component-not-allowed})
+    :not-component-not-allowed
+    :component-nil-objects-not-allowed})
 
 (def validation-error
   [:map {:title "ValidationError"}
@@ -328,8 +329,7 @@
 
 (defn validate-shape!
   "Validate referential integrity and semantic coherence of
-  a shape and all its children. Raises an exception on first
-  error found.
+  a shape and all its children. Report all errors found.
 
   The context is the situation of the parent in respect to components:
    - :not-component
@@ -406,11 +406,25 @@
             (validate-shape-not-component! shape file page libraries)))))))
 
 (defn validate-shape
-  "Validate referential integrity and semantic coherence of
-  a shape and all its children. Returns a list of errors."
+  "Validate a shape and all its children. Returns a list of errors."
   [shape-id file page libraries]
   (binding [*errors* (volatile! [])]
     (validate-shape! shape-id file page libraries)
+    (deref *errors*)))
+
+(defn validate-component!
+  "Validate semantic coherence of a component. Report all errors found."
+  [component file]
+  (when (and (contains? component :objects) (nil? (:objects component)))
+    (report-error! :component-nil-objects-not-allowed
+                   "Objects list cannot be nil"
+                   component file nil)))
+
+(defn validate-component
+  "Validate a component. Returns a list of errors."
+  [component file]
+  (binding [*errors* (volatile! [])]
+    (validate-component! component file)
     (deref *errors*)))
 
 (def valid-fdata?
@@ -439,12 +453,14 @@
                :file-id id
                ::sm/explain (get-fdata-explain data)))
 
-   ;; If `libraries` is provided, this means the fill file
+   ;; If `libraries` is provided, this means the full file
    ;; validation is activated so we proceed to execute the
    ;; validation
-   (when (seq libraries)
+   (when (some? libraries)
      (doseq [page (filter :id (ctpl/pages-seq data))]
-       (validate-shape! uuid/zero file page libraries)))
+       (validate-shape! uuid/zero file page libraries))
+     (doseq [component (vals (:components data))]
+       (validate-component! component file)))
 
    file))
 
