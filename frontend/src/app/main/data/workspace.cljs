@@ -36,7 +36,6 @@
    [app.main.data.workspace.bool :as dwb]
    [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.collapse :as dwco]
-   [app.main.data.workspace.common :as dwc]
    [app.main.data.workspace.drawing :as dwd]
    [app.main.data.workspace.drawing.common :as dwdc]
    [app.main.data.workspace.edition :as dwe]
@@ -65,6 +64,7 @@
    [app.main.data.workspace.viewport :as dwv]
    [app.main.data.workspace.zoom :as dwz]
    [app.main.features :as features]
+   [app.main.features.pointer-map :as fpmap]
    [app.main.repo :as rp]
    [app.main.streams :as ms]
    [app.main.worker :as uw]
@@ -145,7 +145,6 @@
     (watch [_ _ stream]
       (let [team-id   (:id team)
             file-id   (:id file)
-            file-data (:data file)
             stoper-s  (rx/filter (ptk/type? ::bundle-fetched) stream)]
 
         (->> (rx/concat
@@ -166,7 +165,8 @@
                ;; FIXME: move to bundle fetch stages
 
                ;; Load main file
-               (->> (dwc/resolve-file-data file-id file-data)
+               (->> (fpmap/resolve-file file)
+                    (rx/map :data)
                     (rx/mapcat (fn [{:keys [pages-index] :as data}]
                                  (->> (rx/from (seq pages-index))
                                       (rx/mapcat
@@ -186,10 +186,7 @@
                      (fn [{:keys [id synced-at]}]
                        (->> (rp/cmd! :get-file {:id id :features features})
                             (rx/map #(assoc % :synced-at synced-at)))))
-                    (rx/merge-map
-                     (fn [{:keys [id data] :as file}]
-                       (->> (dwc/resolve-file-data id data)
-                            (rx/map (fn [data] (assoc file :data data))))))
+                    (rx/merge-map fpmap/resolve-file)
                     (rx/merge-map
                      (fn [{:keys [id] :as file}]
                        (->> (rp/cmd! :get-file-object-thumbnails {:file-id id :tag "component"})
@@ -286,12 +283,14 @@
              (rx/take-until
               (rx/filter (ptk/type? ::fetch-bundle) stream)))))))
 
+(declare go-to-component)
+
 (defn- fetch-bundle
   "Multi-stage file bundle fetch coordinator"
   [project-id file-id]
   (ptk/reify ::fetch-bundle
     ptk/WatchEvent
-    (watch [_ _ stream]
+    (watch [_ state stream]
       (->> (rx/merge
             (rx/of (fetch-bundle-stage-1 project-id file-id))
 
@@ -305,10 +304,17 @@
                  (rx/filter (ptk/type? ::bundle-stage-2))
                  (rx/observe-on :async)
                  (rx/map deref)
-                 (rx/map bundle-fetched)))
+                 (rx/map bundle-fetched))
 
-           (rx/take-until
-            (rx/filter (ptk/type? ::fetch-bundle) stream))))))
+            (when-let [component-id (get-in state [:route :query-params :component-id])]
+              (->> stream
+                   (rx/filter (ptk/type? ::workspace-initialized))
+                   (rx/observe-on :async)
+                   (rx/take 1)
+                   (rx/map #(go-to-component (uuid/uuid component-id))))))
+
+                (rx/take-until
+                 (rx/filter (ptk/type? ::fetch-bundle) stream))))))
 
 (defn initialize-file
   [project-id file-id]
@@ -603,7 +609,7 @@
 (dm/export layout/toggle-layout-flag)
 (dm/export layout/remove-layout-flag)
 
-;; --- Nudge
+;; --- Profile
 
 (defn update-nudge
   [{:keys [big small] :as params}]
@@ -623,6 +629,26 @@
     (watch [_ state _]
       (let [nudge (get-in state [:profile :props :nudge])]
         (rx/of (du/update-profile-props {:nudge nudge}))))))
+
+(defn toggle-theme
+  []
+  (ptk/reify ::toggle-theme
+    ptk/UpdateEvent
+    (update [_ state]
+      (update-in
+       state
+       [:profile :theme]
+       (fn [theme]
+         (cond
+           (= theme "default")
+           "light"
+
+           :else
+           "default"))))
+
+    ptk/WatchEvent
+    (watch [_ state _]
+      (rx/of (du/update-profile (:profile state))))))
 
 ;; --- Set element options mode
 

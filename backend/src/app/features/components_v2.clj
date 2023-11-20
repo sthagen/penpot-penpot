@@ -626,7 +626,7 @@
 
                              (if-not *skip-on-error*
                                (throw cause)
-                               fdata))
+                               nil))
                            (finally
                              (l/trc :hint "graphic processed"
                                     :file-id (str (:id fdata))
@@ -642,7 +642,8 @@
                       (px/submit! executor (partial process mobj position))))
                (reduce (fn [fdata promise]
                          (if-let [changes (deref promise)]
-                           (cp/process-changes fdata changes false)
+                           (-> (assoc-in fdata [:options :components-v2] true)
+                               (cp/process-changes changes false))
                            fdata))
                        fdata))
           (finally
@@ -658,7 +659,7 @@
         (update fdata :options assoc :components-v2 true)))))
 
 (defn- process-file
-  [{:keys [id] :as file} & {:keys [validate?]}]
+  [{:keys [id] :as file} & {:keys [validate? throw-on-validate?]}]
   (let [conn (::db/conn *system*)]
     (binding [pmap/*tracked* (atom {})
               pmap/*load-fn* (partial files/load-pointer conn id)
@@ -695,17 +696,18 @@
                     {:id (:id file)})
 
         (when validate?
-          (let [errors (cfv/validate-file file libs)]
-            (when (seq errors)
+          (if throw-on-validate?
+            (cfv/validate-file! file libs)
+            (doseq [error (cfv/validate-file file libs)]
               (l/wrn :hint "migrate:file:validation-error"
                      :file-id (str (:id file))
                      :file-name (:name file)
-                     :errors errors))))
+                     :error error))))
 
         (dissoc file :data)))))
 
 (defn migrate-file!
-  [system file-id & {:keys [validate?]}]
+  [system file-id & {:keys [validate? throw-on-validate?]}]
 
   (let [tpoint  (dt/tpoint)
         file-id (if (string? file-id)
@@ -719,11 +721,11 @@
           (db/tx-run! system
                       (fn [{:keys [::db/conn] :as system}]
                         (binding [*system* system]
-                          (fsnap/take-file-snapshot! system {:file-id file-id
-                                                             :label "migration/components-v2"})
+                          (fsnap/take-file-snapshot! system {:file-id file-id :label "migration/components-v2"})
                           (-> (db/get conn :file {:id file-id})
                               (update :features db/decode-pgarray #{})
-                              (process-file :validate? validate?))))))
+                              (process-file :validate? validate?
+                                            :throw-on-validate? throw-on-validate?))))))
 
         (finally
           (let [elapsed    (tpoint)
@@ -740,7 +742,7 @@
             (some-> *team-stats* (swap! update :processed/files (fnil inc 0)))))))))
 
 (defn migrate-team!
-  [system team-id & {:keys [validate?]}]
+  [system team-id & {:keys [validate? throw-on-validate?]}]
   (let [tpoint  (dt/tpoint)
         team-id (if (string? team-id)
                   (parse-uuid team-id)
@@ -770,12 +772,13 @@
                                       "SELECT f.id FROM file AS f "
                                       "  JOIN project AS p ON (p.id = f.project_id) "
                                       "WHERE p.team_id = ? AND f.deleted_at IS NULL AND p.deleted_at IS NULL "
-                                      "FOR UPDATE")
+                                      "FOR UPDATE")]
 
-                                rows (->> (db/exec! conn [sql team-id])
-                                          (map :id))]
-
-                            (run! #(migrate-file! system % :validate? validate?) rows)
+                            (doseq [file-id (->> (db/exec! conn [sql team-id])
+                                                 (map :id))]
+                              (migrate-file! system file-id
+                                             :validate? validate?
+                                             :throw-on-validate? throw-on-validate?))
 
                             (let [features (-> features
                                                (disj "ephimeral/v2-migration")

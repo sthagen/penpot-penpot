@@ -117,7 +117,7 @@
   Team features are defined as: all features found on team plus all
   no-migration features enabled globally."
   [flags team]
-  (let [enabled-features (into #{} xf-flag-to-feature flags)
+  (let [enabled-features (get-enabled-features flags)
         team-features    (into #{} xf-remove-ephimeral (:features team))]
     (-> enabled-features
         (set/intersection no-migration-features)

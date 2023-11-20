@@ -307,7 +307,9 @@
         workspace-libraries (deref refs/workspace-libraries)
         current-file        {:id current-file-id :data workspace-data}
 
-        find-component      #(ctf/resolve-component % current-file workspace-libraries)
+        find-component      (fn [shape include-deleted?]
+                              (ctf/resolve-component
+                               shape current-file workspace-libraries {:include-deleted? include-deleted?}))
 
         local-or-exists     (fn [shape]
                               (let [library-id (:component-file shape)]
@@ -315,11 +317,11 @@
                                     (some? (get workspace-libraries library-id)))))
 
         restorable-copies   (->> copies
-                                 (filter #(nil? (find-component %)))
+                                 (filter #(nil? (find-component % false)))
                                  (filter #(local-or-exists %)))
 
         touched-not-dangling (filter #(and (cfh/component-touched? objects (:id %))
-                                           (find-component %)) copies)
+                                           (find-component % false)) copies)
         can-reset-overrides? (or (not components-v2) (seq touched-not-dangling))
 
 
@@ -332,7 +334,7 @@
         library-id          (:component-file shape)
 
         local-component?    (= library-id current-file-id)
-        component           (find-component shape)
+        component           (find-component shape false)
         lacks-annotation?   (nil? (:annotation component))
         is-dangling?        (nil? component)
 
@@ -352,17 +354,6 @@
 
         do-reset-component
         #(st/emit! (dwl/reset-components (map :id touched-not-dangling)))
-
-        do-restore-component
-        #(let [;; Extract a map of component-id -> component-file in order to avoid duplicates
-               comps-to-restore (reduce (fn [id-file-map {:keys [component-id component-file]}]
-                                          (assoc id-file-map component-id component-file))
-                                        {}
-                                        restorable-copies)]
-
-           (st/emit! (dwl/restore-components comps-to-restore)
-                     (when (= 1 (count comps-to-restore))
-                       (dw/go-to-main-instance (val (first comps-to-restore)) (key (first comps-to-restore))))))
 
         do-update-component-sync
         #(st/emit! (dwl/update-component-sync id library-id))
@@ -384,23 +375,37 @@
            (do-update-component-sync)
            (do-update-remote-component))
 
-        do-show-local-component
-        #(st/emit! (dw/go-to-component component-id))
-
         do-show-in-assets
         #(st/emit! (if components-v2
                      (dw/show-component-in-assets component-id)
                      (dw/go-to-component component-id)))
+
         do-create-annotation
         #(st/emit! (dw/set-annotations-id-for-create id))
 
-        do-navigate-component-file
-        #(st/emit! (dw/go-to-main-instance library-id component-id))
+        do-show-local-component
+        #(st/emit! (dw/go-to-component component-id))
+
+        do-show-remote-component
+        #(let [comp (find-component shape true)] ;; When the show-remote is after a restore, the component may still be deleted
+           (when comp
+             (st/emit! (dwl/nav-to-component-file library-id comp))))
 
         do-show-component
         #(if local-component?
            (do-show-local-component)
-           (do-navigate-component-file))
+           (do-show-remote-component))
+
+        do-restore-component
+        #(let [;; Extract a map of component-id -> component-file in order to avoid duplicates
+               comps-to-restore (reduce (fn [id-file-map {:keys [component-id component-file]}]
+                                          (assoc id-file-map component-id component-file))
+                                        {}
+                                        restorable-copies)]
+
+           (st/emit! (dwl/restore-components comps-to-restore))
+           (when (= 1 (count comps-to-restore))
+             (ts/schedule 1000 do-show-component)))
 
         menu-entries [(when (and (not multi) main-instance?)
                         {:msg "workspace.shape.menu.show-in-assets"

@@ -27,7 +27,6 @@
    [app.main.data.modal :as modal]
    [app.main.data.workspace :as-alias dw]
    [app.main.data.workspace.changes :as dch]
-   [app.main.data.workspace.common :as dwc]
    [app.main.data.workspace.groups :as dwg]
    [app.main.data.workspace.libraries-helpers :as dwlh]
    [app.main.data.workspace.notifications :as-alias dwn]
@@ -38,6 +37,7 @@
    [app.main.data.workspace.thumbnails :as dwt]
    [app.main.data.workspace.undo :as dwu]
    [app.main.features :as features]
+   [app.main.features.pointer-map :as fpmap]
    [app.main.refs :as refs]
    [app.main.repo :as rp]
    [app.main.store :as st]
@@ -589,16 +589,17 @@
         (rx/of (dch/commit-changes changes))))))
 
 (defn nav-to-component-file
-  [file-id]
+  [file-id component]
   (dm/assert! (uuid? file-id))
+  (dm/assert! (some? component))
   (ptk/reify ::nav-to-component-file
     ptk/WatchEvent
     (watch [_ state _]
-      (let [file         (get-in state [:workspace-libraries file-id])
-            path-params  {:project-id (:project-id file)
-                          :file-id (:id file)}
-            query-params {:page-id (first (get-in file [:data :pages]))
-                          :layout :assets}]
+      (let [project-id   (get-in state [:workspace-libraries file-id :project-id])
+            path-params  {:project-id project-id
+                          :file-id file-id}
+            query-params {:page-id (:main-instance-page component)
+                          :component-id (:id component)}]
         (rx/of (rt/nav-new-window* {:rname :workspace
                                     :path-params path-params
                                     :query-params query-params}))))))
@@ -1144,9 +1145,7 @@
          (->> (rp/cmd! :link-file-to-library {:file-id file-id :library-id library-id})
               (rx/ignore))
          (->> (rp/cmd! :get-file {:id library-id :features features})
-              (rx/merge-map (fn [{:keys [id data] :as file}]
-                              (->> (dwc/resolve-file-data id data)
-                                   (rx/map (fn [data] (assoc file :data data))))))
+              (rx/merge-map fpmap/resolve-file)
               (rx/map (fn [file]
                         (fn [state]
                           (assoc-in state [:workspace-libraries library-id] file)))))
