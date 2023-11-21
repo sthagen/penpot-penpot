@@ -64,7 +64,7 @@
 (def ^:dynamic *errors* nil)
 
 (defn report-error!
-  [code hint shape file page & args]
+  [code hint shape file page & {:as args}]
   (if (some? *errors*)
     (vswap! *errors* conj {:code code
                            :hint hint
@@ -122,11 +122,12 @@
                            shape file page)))
 
         (doseq [child-id (:shapes shape)]
-          (when (nil? (ctst/get-shape page child-id))
-            (report-error! :child-not-found
-                           (str/ffmt "Child % not found" child-id)
-                           shape file page
-                           :child-id child-id)))))))
+          (let [child (ctst/get-shape page child-id)]
+            (when (or (nil? child) (not= (:parent-id child) (:id shape)))
+              (report-error! :child-not-found
+                (str/ffmt "Child % not found" child-id)
+                shape file page
+                :child-id child-id))))))))
 
 (defn validate-frame!
   "Validate that the frame-id shape exists and is indeed a frame. Also
@@ -461,15 +462,16 @@
   "Validate full referential integrity and semantic coherence on file data.
 
   Raises a validation exception on first error found."
-  [{:keys [data] :as file} libraries]
+  [{:keys [data features] :as file} libraries]
+  (when (contains? features "components/v2")
 
-  (doseq [page (filter :id (ctpl/pages-seq data))]
-    (validate-shape! uuid/zero file page libraries))
+    (doseq [page (filter :id (ctpl/pages-seq data))]
+      (validate-shape! uuid/zero file page libraries))
 
-  (doseq [component (vals (:components data))]
-    (validate-component! component file))
+    (doseq [component (vals (:components data))]
+      (validate-component! component file)))
 
-   file)
+  file)
 
 (defn validate-file
   "Validate structure, referencial integrity and semantic coherence of
