@@ -17,6 +17,7 @@
    [app.common.geom.shapes :as gsh]
    [app.common.record :as cr]
    [app.common.types.component :as ctk]
+   [app.common.types.container :as ctn]
    [app.common.types.file :as ctf]
    [app.common.types.page :as ctp]
    [app.common.types.shape.interactions :as ctsi]
@@ -26,6 +27,7 @@
    [app.main.data.workspace.changes :as dch]
    [app.main.data.workspace.collapse :as dwc]
    [app.main.data.workspace.libraries-helpers :as dwlh]
+   [app.main.data.workspace.specialized-panel :as-alias dwsp]
    [app.main.data.workspace.state-helpers :as wsh]
    [app.main.data.workspace.undo :as dwu]
    [app.main.data.workspace.zoom :as dwz]
@@ -123,14 +125,15 @@
      (update [_ state]
        (-> state
            (update-in [:workspace-local :selected] d/toggle-selection id toggle?)
-           (assoc-in [:workspace-local :last-selected] id)
-           (dissoc :specialized-panel)))
+           (assoc-in [:workspace-local :last-selected] id)))
 
      ptk/WatchEvent
      (watch [_ state _]
        (let [page-id (:current-page-id state)
              objects (wsh/lookup-page-objects state page-id)]
-         (rx/of (dwc/expand-all-parents [id] objects)))))))
+         (rx/of
+          (dwc/expand-all-parents [id] objects)
+          ::dwsp/interrupt))))))
 
 (defn select-prev-shape
   ([]
@@ -185,12 +188,14 @@
   [id]
   (dm/assert! (uuid? id))
   (ptk/reify ::deselect-shape
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (rx/of ::dwsp/interrupt))
     ptk/UpdateEvent
     (update [_ state]
       (-> state
           (update-in [:workspace-local :selected] disj id)
-          (update :workspace-local dissoc :last-selected)
-          (dissoc :specialized-panel)))))
+          (update :workspace-local dissoc :last-selected)))))
 
 (defn shift-select-shapes
   ([id]
@@ -198,6 +203,9 @@
 
   ([id objects]
    (ptk/reify ::shift-select-shapes
+     ptk/WatchEvent
+     (watch [_ _ _]
+       (rx/of ::dwsp/interrupt))
      ptk/UpdateEvent
      (update [_ state]
        (let [objects (or objects (wsh/lookup-page-objects state))
@@ -207,9 +215,8 @@
                            (conj id))]
          (-> state
              (assoc-in [:workspace-local :selected]
-               (set/union selection append-to-selection))
-             (update :workspace-local assoc :last-selected id)
-             (dissoc :specialized-panel)))))))
+                       (set/union selection append-to-selection))
+             (update :workspace-local assoc :last-selected id)))))))
 
 (defn select-shapes
   [ids]
@@ -226,14 +233,14 @@
             ids (if (d/not-empty? focus)
                   (cpf/filter-not-focus objects focus ids)
                   ids)]
-        (-> state
-            (assoc-in  [:workspace-local :selected] ids)
-            (dissoc :specialized-panel))))
+        (assoc-in state [:workspace-local :selected] ids)))
 
     ptk/WatchEvent
     (watch [_ state _]
       (let [objects (wsh/lookup-page-objects state)]
-        (rx/of (dwc/expand-all-parents ids objects))))))
+        (rx/of
+         (dwc/expand-all-parents ids objects)
+         ::dwsp/interrupt)))))
 
 (defn select-all
   []
@@ -272,6 +279,9 @@
 
   ([check-modal]
    (ptk/reify ::deselect-all
+     ptk/WatchEvent
+     (watch [_ _ _]
+       (rx/of ::dwsp/interrupt))
      ptk/UpdateEvent
      (update [_ state]
 
@@ -282,9 +292,7 @@
          (update :workspace-local
                  #(-> %
                       (assoc :selected (d/ordered-set))
-                      (dissoc :selected-frame)))
-         :allways
-         (dissoc :specialized-panel))))))
+                      (dissoc :selected-frame))))))))
 
 ;; --- Select Shapes (By selrect)
 
@@ -428,14 +436,18 @@
            bool?       (cfh/bool-shape? obj)
            new-id      (ids-map (:id obj))
            parent-id   (or parent-id frame-id)
+           parent      (get objects parent-id)
            name        (:name obj)
 
-           is-component-root? (or (:saved-component-root obj)
-                                  ;; Backward compatibility
-                                  (:saved-component-root? obj)
-                                  (ctk/instance-root? obj))
+           is-component-root?     (or (:saved-component-root obj)
+                                      ;; Backward compatibility
+                                      (:saved-component-root? obj)
+                                      (ctk/instance-root? obj))
            duplicating-component? (or duplicating-component? (ctk/instance-head? obj))
-           is-component-main? (ctk/main-instance? obj)
+           is-component-main?     (ctk/main-instance? obj)
+           into-component?        (and duplicating-component?
+                                       (ctn/in-any-component? objects parent))
+
            regenerate-component
            (fn [changes shape]
              (let [components-v2 (dm/get-in library-data [:options :components-v2])
@@ -453,8 +465,10 @@
                        :main-instance
                        :use-for-thumbnail)
 
-               (cond->
-                   (or frame? group? bool?)
+               (cond-> into-component?
+                 (dissoc :component-root))
+
+               (cond-> (or frame? group? bool?)
                  (assoc :shapes []))
 
                (gsh/move delta)

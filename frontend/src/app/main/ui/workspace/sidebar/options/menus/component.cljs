@@ -442,12 +442,12 @@
 
         on-component-back
         (mf/use-fn
-         #(st/emit! :interrupt))
+         #(st/emit! ::dwsp/interrupt))
 
         open-component-panel
         (mf/use-fn
          (mf/deps can-swap? shapes)
-         #(when can-swap? (st/emit! (dwsp/open-specialized-panel :component-swap shapes))))
+         #(when can-swap? (st/emit! (dwsp/open-specialized-panel :component-swap))))
 
         menu-entries         (cmm/generate-components-menu-entries shapes components-v2)
         show-menu?           (seq menu-entries)]
@@ -492,7 +492,7 @@
               [:div {:class (stl/css :component-parent-name)}
                (cfh/merge-path-item (:path component) (:name component))])]]
           (when swap-opened?
-            [:& component-swap {:shapes shapes}])
+            [:& component-swap {:shapes copies}])
 
           (when (and (not swap-opened?) (not multi) components-v2)
             [:& component-annotation {:id id :shape shape :component component}])])])))
