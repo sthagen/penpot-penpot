@@ -18,7 +18,6 @@
    [app.main.refs :as refs]
    [app.main.store :as st]
    [app.main.ui.context :as ctx]
-   [app.main.ui.shapes.embed :as embed]
    [app.main.ui.shapes.frame :as frame]
    [app.main.ui.shapes.shape :refer [shape-container]]
    [app.main.ui.workspace.shapes.common :refer [check-shape-props]]
@@ -44,9 +43,8 @@
                          (refs/children-objects shape-id))
             childs     (mf/deref childs-ref)]
 
-        [:& (mf/provider embed/context) {:value true}
          [:& shape-container {:shape shape :ref ref :disable-shadows? (cfh/is-direct-child-of-root? shape)}
-          [:& frame-shape {:shape shape :childs childs}]]]))))
+          [:& frame-shape {:shape shape :childs childs}]]))))
 
 (defn check-props
   [new-props old-props]
@@ -125,6 +123,7 @@
 
             tries-ref      (mf/use-ref 0)
             imposter-ref   (mf/use-ref nil)
+            task-ref       (mf/use-ref nil)
 
             on-load        (mf/use-fn #(mf/set-ref-val! tries-ref 0))
             on-error       (mf/use-fn
@@ -137,14 +136,20 @@
                                                       (when-not (nil? imposter)
                                                         (dom/set-attribute! imposter "href" thumbnail-uri))))]
                                 (when (< new-tries 8)
-                                  (tm/schedule delay-in-ms retry-fn)))))]
+                                  (mf/set-ref-val! task-ref (tm/schedule delay-in-ms retry-fn))))))]
 
         ;; NOTE: we don't add deps because we want this to be executed
         ;; once on mount with only referenced the initial data
         (mf/with-effect []
           (when-not (some? thumbnail-uri)
             (tm/schedule-on-idle
-             #(st/emit! (dwt/request-thumbnail file-id page-id frame-id "frame")))))
+             #(st/emit! (dwt/request-thumbnail file-id page-id frame-id "frame"))))
+          #(when-let [task (mf/ref-val task-ref)]
+             (d/close! task)))
+
+        (mf/with-effect [thumbnail-uri]
+          (when-let [task (mf/ref-val task-ref)]
+            (d/close! task)))
 
         (fdm/use-dynamic-modifiers objects (mf/ref-val content-ref) modifiers)
 

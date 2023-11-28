@@ -36,6 +36,11 @@
    [potok.core :as ptk]
    [rumext.v2 :as mf]))
 
+(def drag-data* (atom {:local? false}))
+
+(defn set-drag-data! [data]
+  (reset! drag-data* data))
+
 (defn- get-component-root-and-container
   [file-id component components-v2]
   (if (= file-id (:id @refs/workspace-file))
@@ -64,7 +69,7 @@
   {::mf/wrap-props false}
   [{:keys [component renaming listing-thumbs? selected
            file-id on-asset-click on-context-menu on-drag-start do-rename
-           cancel-rename selected-full selected-paths]}]
+           cancel-rename selected-full selected-paths local]}]
   (let [item-ref       (mf/use-ref)
 
         dragging*      (mf/use-state false)
@@ -90,40 +95,45 @@
 
         on-component-click
         (mf/use-fn
-         (mf/deps component selected)
+         (mf/deps component-id)
          (fn [event]
            (dom/stop-propagation event)
            (on-asset-click component-id unselect-all event)))
 
         on-component-double-click
         (mf/use-fn
-         (mf/deps file-id component-id)
+         (mf/deps file-id component local)
          (fn [event]
            (dom/stop-propagation event)
-           (st/emit! (dw/go-to-main-instance file-id component-id))))
+           (if local
+             (st/emit! (dw/go-to-component component-id))
+             (st/emit! (dwl/nav-to-component-file file-id component)))))
 
         on-drop
         (mf/use-fn
-         (mf/deps component dragging* selected selected-full selected-paths)
+         (mf/deps component dragging* selected selected-full selected-paths local drag-data*)
          (fn [event]
-           (cmm/on-drop-asset event component dragging* selected selected-full
-                              selected-paths dwl/rename-component-and-main-instance)))
+           (when (and local (:local? @drag-data*))
+             (cmm/on-drop-asset event component dragging* selected selected-full
+                                selected-paths dwl/rename-component-and-main-instance))))
 
         on-drag-enter
         (mf/use-fn
-         (mf/deps component dragging* selected selected-paths)
+         (mf/deps component dragging* selected selected-paths local drag-data*)
          (fn [event]
-           (cmm/on-drag-enter-asset event component dragging* selected selected-paths)))
+           (when (and local (:local? @drag-data*))
+             (cmm/on-drag-enter-asset event component dragging* selected selected-paths))))
 
         on-drag-leave
         (mf/use-fn
-         (mf/deps dragging*)
+         (mf/deps dragging* local drag-data*)
          (fn [event]
-           (cmm/on-drag-leave-asset event dragging*)))
+           (when (and local (:local? @drag-data*))
+             (cmm/on-drag-leave-asset event dragging*))))
 
         on-component-drag-start
         (mf/use-fn
-         (mf/deps file-id component selected item-ref on-drag-start read-only?)
+         (mf/deps file-id component selected item-ref on-drag-start read-only? local)
          (fn [event]
            (if read-only?
              (dom/prevent-default event)
@@ -221,7 +231,7 @@
   {::mf/wrap-props false}
   [{:keys [file-id prefix groups open-groups force-open? renaming listing-thumbs? selected on-asset-click
            on-drag-start do-rename cancel-rename on-rename-group on-group on-ungroup on-context-menu
-           selected-full]}]
+           selected-full local]}]
 
   (let [group-open?    (or ^boolean force-open?
                            ^boolean (get open-groups prefix (if (= prefix "") true false)))
@@ -229,27 +239,31 @@
         dragging*      (mf/use-state false)
         dragging?      (deref dragging*)
 
+
         selected-paths (mf/with-memo [selected-full]
                          (into #{}
                                (comp (map :path) (d/nilv ""))
                                selected-full))
         on-drag-enter
         (mf/use-fn
-         (mf/deps dragging* prefix selected-paths)
+         (mf/deps dragging* prefix selected-paths local drag-data*)
          (fn [event]
-           (cmm/on-drag-enter-asset-group event dragging* prefix selected-paths)))
+           (when (and local (:local? @drag-data*))
+             (cmm/on-drag-enter-asset-group event dragging* prefix selected-paths))))
 
         on-drag-leave
         (mf/use-fn
-         (mf/deps dragging*)
+         (mf/deps dragging* local drag-data*)
          (fn [event]
-           (cmm/on-drag-leave-asset event dragging*)))
+           (when (and local (:local? @drag-data*))
+             (cmm/on-drag-leave-asset event dragging*))))
 
         on-drop
         (mf/use-fn
-         (mf/deps dragging* prefix selected-paths selected-full)
+         (mf/deps dragging* prefix selected-paths selected-full local drag-data*)
          (fn [event]
-           (cmm/on-drop-asset-group event dragging* prefix selected-paths selected-full dwl/rename-component-and-main-instance)))]
+           (when (and local (:local? @drag-data*))
+             (cmm/on-drop-asset-group event dragging* prefix selected-paths selected-full dwl/rename-component-and-main-instance))))]
 
     (if ^boolean new-css-system
       [:div {:class (dom/classnames (css :component-group) true)
@@ -275,7 +289,8 @@
                                 (css :drop-space) (and
                                                    (empty? components)
                                                    (some? groups)
-                                                   (not dragging?)))
+                                                   (not dragging?)
+                                                   local))
                    :on-drag-enter on-drag-enter
                    :on-drag-leave on-drag-leave
                    :on-drag-over dom/prevent-default
@@ -286,7 +301,8 @@
 
 
              (when (and (empty? components)
-                        (some? groups))
+                        (some? groups)
+                        local)
                [:div {:class (dom/classnames (css :drop-space) true)}])
 
              (for [component components]
@@ -304,7 +320,8 @@
                  :on-drag-start on-drag-start
                  :on-group on-group
                  :do-rename do-rename
-                 :cancel-rename cancel-rename}])])
+                 :cancel-rename cancel-rename
+                 :local local}])])
 
           (for [[path-item content] groups]
             (when-not (empty? path-item)
@@ -324,7 +341,8 @@
                                     :on-rename-group on-rename-group
                                     :on-ungroup on-ungroup
                                     :on-context-menu on-context-menu
-                                    :selected-full selected-full}]))])]
+                                    :selected-full selected-full
+                                    :local local}]))])]
 
 
       [:div {:on-drag-enter on-drag-enter
@@ -350,7 +368,8 @@
                                 :drop-space (and
                                              (empty? components)
                                              (some? groups)
-                                             (not dragging?)))
+                                             (not dragging?)
+                                             local))
                    :on-drag-enter on-drag-enter
                    :on-drag-leave on-drag-leave
                    :on-drag-over dom/prevent-default
@@ -360,7 +379,8 @@
                [:div.grid-placeholder "\u00A0"])
 
              (when (and (empty? components)
-                        (some? groups))
+                        (some? groups)
+                        local)
                [:div.drop-space])
 
              (for [component components]
@@ -378,7 +398,8 @@
                  :on-drag-start on-drag-start
                  :on-group on-group
                  :do-rename do-rename
-                 :cancel-rename cancel-rename}])])
+                 :cancel-rename cancel-rename
+                 :local local}])])
 
           (for [[path-item content] groups]
             (when-not (empty? path-item)
@@ -398,7 +419,8 @@
                                     :on-rename-group on-rename-group
                                     :on-ungroup on-ungroup
                                     :on-context-menu on-context-menu
-                                    :selected-full selected-full}]))])])))
+                                    :selected-full selected-full
+                                    :local local}]))])])))
 
 (mf/defc components-section
   {::mf/wrap-props false}
@@ -499,7 +521,8 @@
          (fn [component-id event]
            (dom/prevent-default event)
            (let [pos (dom/get-client-position event)]
-             (when (and local? (not read-only?))
+
+             (when (not read-only?)
                (when-not (contains? selected component-id)
                  (on-clear-selection))
 
@@ -571,16 +594,23 @@
         (mf/use-fn
          (mf/deps file-id)
          (fn [component event]
+           ;; dnd api only allow to acces to the dataTransfer data on on-drop (https://html.spec.whatwg.org/dev/dnd.html#concept-dnd-p)
+           ;; We need to know if the dragged element is from the local library on on-drag-enter, so we need to keep the info elsewhere
+           (set-drag-data! {:local? local?})
+
            (dnd/set-data! event "penpot/component" {:file-id file-id
                                                     :component component})
            (dnd/set-allowed-effect! event "move")))
 
         on-show-main
         (mf/use-fn
-         (mf/deps current-component-id file-id)
+         (mf/deps current-component-id file-id local?)
          (fn [event]
            (dom/stop-propagation event)
-           (st/emit! (dw/go-to-main-instance file-id current-component-id))))
+           (if local?
+             (st/emit! (dw/go-to-component current-component-id))
+             (let [component (d/seek #(= (:id %) current-component-id) components)]
+               (st/emit! (dwl/nav-to-component-file file-id component))))))
 
         on-asset-click
         (mf/use-fn (mf/deps groups on-asset-click) (partial on-asset-click groups))]
@@ -641,45 +671,48 @@
                               :on-group on-group
                               :on-ungroup on-ungroup
                               :on-context-menu on-context-menu
-                              :selected-full selected-full}])
-      (when ^boolean local?
-        [:& cmm/assets-context-menu
-         {:on-close on-close-menu
-          :state @menu-state
-          :options (if new-css-system
-                     [(when-not  (or multi-components? multi-assets?)
-                        {:option-name    (tr "workspace.assets.rename")
-                         :id             "assets-rename-component"
-                         :option-handler on-rename})
-                      (when-not multi-assets?
-                        {:option-name    (if components-v2
-                                           (tr "workspace.assets.duplicate-main")
-                                           (tr "workspace.assets.duplicate"))
-                         :id             "assets-duplicate-component"
-                         :option-handler on-duplicate})
+                              :selected-full selected-full
+                              :local ^boolean local?}])
 
+      [:& cmm/assets-context-menu
+       {:on-close on-close-menu
+        :state @menu-state
+        :options (if new-css-system
+                   [(when (and local? (not (or multi-components? multi-assets? read-only?)))
+                      {:option-name    (tr "workspace.assets.rename")
+                       :id             "assets-rename-component"
+                       :option-handler on-rename})
+                    (when (and local? (not (or multi-assets? read-only?)))
+                      {:option-name    (if components-v2
+                                         (tr "workspace.assets.duplicate-main")
+                                         (tr "workspace.assets.duplicate"))
+                       :id             "assets-duplicate-component"
+                       :option-handler on-duplicate})
+
+                    (when (and local? (not read-only?))
                       {:option-name    (tr "workspace.assets.delete")
                        :id             "assets-delete-component"
-                       :option-handler on-delete}
-                      (when-not multi-assets?
-                        {:option-name   (tr "workspace.assets.group")
-                         :id             "assets-group-component"
-                         :option-handler on-group})
+                       :option-handler on-delete})
+                    (when (and local? (not (or multi-assets? read-only?)))
+                      {:option-name   (tr "workspace.assets.group")
+                       :id             "assets-group-component"
+                       :option-handler on-group})
 
-                      (when (and components-v2 (not multi-assets?))
-                        {:option-name   (tr "workspace.shape.menu.show-main")
-                         :id             "assets-show-main-component"
-                         :option-handler on-show-main})]
+                    (when (and components-v2 (not multi-assets?))
+                      {:option-name   (tr "workspace.shape.menu.show-main")
+                       :id             "assets-show-main-component"
+                       :option-handler on-show-main})]
 
-                     [(when-not (or multi-components? multi-assets?)
-                        [(tr "workspace.assets.rename") on-rename])
-                      (when-not multi-assets?
-                        [(if components-v2
-                           (tr "workspace.assets.duplicate-main")
-                           (tr "workspace.assets.duplicate")) on-duplicate])
-                      [(tr "workspace.assets.delete") on-delete]
-                      (when-not multi-assets?
-                        [(tr "workspace.assets.group") on-group])
-                      (when (and components-v2 (not multi-assets?))
-                        [(tr "workspace.shape.menu.show-main") on-show-main])])}])]]))
+                   [(when (and local? (not (or multi-components? multi-assets? read-only?)))
+                      [(tr "workspace.assets.rename") on-rename])
+                    (when (and local? (not (or multi-assets? read-only?)))
+                      [(if components-v2
+                         (tr "workspace.assets.duplicate-main")
+                         (tr "workspace.assets.duplicate")) on-duplicate])
+                    (when (and local? (not read-only?))
+                      [(tr "workspace.assets.delete") on-delete])
+                    (when (and local? (not (or multi-assets? read-only?)))
+                      [(tr "workspace.assets.group") on-group])
+                    (when (and components-v2 (not multi-assets?))
+                      [(tr "workspace.shape.menu.show-main") on-show-main])])}]]]))
 
