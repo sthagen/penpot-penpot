@@ -25,6 +25,7 @@
    [app.storage :as sto]
    [app.util.services :as sv]
    [app.util.time :as dt]
+   [app.worker :as-alias wrk]
    [clojure.spec.alpha :as s]))
 
 (def valid-weight #{100 200 300 400 500 600 700 800 900 950})
@@ -80,8 +81,8 @@
             perms   (files/get-permissions conn profile-id file-id share-id)]
         (files/check-read-permissions! perms)
         (db/query conn :team-font-variant
-          {:team-id (:team-id project)
-           :deleted-at nil})))))
+                  {:team-id (:team-id project)
+                   :deleted-at nil})))))
 
 
 (declare create-font-variant)
@@ -156,11 +157,11 @@
                          :woff1-file-id (:id woff1)
                          :woff2-file-id (:id woff2)
                          :otf-file-id (:id otf)
-                         :ttf-file-id (:id ttf)}))
-          ]
+                         :ttf-file-id (:id ttf)}))]
 
-    (let [data   (-> (climit/configure cfg :process-font)
-                     (climit/submit! (partial generate-missing! data)))
+    (let [data   (-> (climit/configure cfg :process-font/global)
+                     (climit/run! (partial generate-missing! data)
+                                  (::wrk/executor cfg)))
           assets (persist-fonts-files! data)
           result (insert-font-variant! assets)]
       (vary-meta result assoc ::audit/replace-props (update params :data (comp vec keys))))))

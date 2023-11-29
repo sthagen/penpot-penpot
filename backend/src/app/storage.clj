@@ -18,7 +18,6 @@
    [app.storage.impl :as impl]
    [app.storage.s3 :as ss3]
    [app.util.time :as dt]
-   [app.worker :as wrk]
    [clojure.spec.alpha :as s]
    [datoteka.fs :as fs]
    [integrant.core :as ig]
@@ -40,7 +39,7 @@
                    :fs ::sfs/backend))))
 
 (defmethod ig/pre-init-spec ::storage [_]
-  (s/keys :req [::db/pool ::wrk/executor ::backends]))
+  (s/keys :req [::db/pool ::backends]))
 
 (defmethod ig/init-key ::storage
   [_ {:keys [::backends ::db/pool] :as cfg}]
@@ -404,8 +403,7 @@
                 (do
                   (some->> (seq to-freeze) (mark-freeze-in-bulk conn))
                   (some->> (seq to-delete) (mark-delete-in-bulk conn))
-                  [(count to-freeze) (count to-delete)]))))
-          ]
+                  [(count to-freeze) (count to-delete)]))))]
 
     (fn [_]
       (db/with-atomic [conn pool]

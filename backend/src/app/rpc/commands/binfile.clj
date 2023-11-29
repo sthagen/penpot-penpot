@@ -44,8 +44,8 @@
    [cuerdas.core :as str]
    [datoteka.io :as io]
    [promesa.util :as pu]
-   [yetti.adapter :as yt]
-   [yetti.response :as yrs])
+   [ring.response :as rres]
+   [yetti.adapter :as yt])
   (:import
    com.github.luben.zstd.ZstdInputStream
    com.github.luben.zstd.ZstdOutputStream
@@ -636,8 +636,8 @@
                  input (io/data-input-stream input)]
     (binding [*state* (volatile! {:media [] :index {}})]
       (let [team      (teams/get-team options
-                                     :profile-id profile-id
-                                     :project-id project-id)
+                                      :profile-id profile-id
+                                      :project-id project-id)
 
             validate? (contains? cf/flags :file-validation)
             features  (cfeat/get-team-enabled-features cf/flags team)]
@@ -1069,7 +1069,7 @@
    ::webhooks/event? true}
   [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id file-id include-libraries? embed-assets?] :as params}]
   (files/check-read-permissions! pool profile-id file-id)
-  (let [body (reify yrs/StreamableResponseBody
+  (let [body (reify rres/StreamableResponseBody
                (-write-body-to-stream [_ _ output-stream]
                  (-> cfg
                      (assoc ::file-ids [file-id])
@@ -1078,9 +1078,9 @@
                      (export! output-stream))))]
 
     (fn [_]
-      {::yrs/status 200
-       ::yrs/body body
-       ::yrs/headers {"content-type" "application/octet-stream"}})))
+      {::rres/status 200
+       ::rres/body body
+       ::rres/headers {"content-type" "application/octet-stream"}})))
 
 (s/def ::file ::media/upload)
 (s/def ::import-binfile

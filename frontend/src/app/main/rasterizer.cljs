@@ -13,9 +13,11 @@
   (:require
    [app.common.data :as d]
    [app.common.data.macros :as dm]
+   [app.common.logging :as log]
    [app.common.uuid :as uuid]
    [app.config :as cf]
    [app.util.dom :as dom]
+   [app.util.http :as http]
    [beicon.core :as rx]
    [cuerdas.core :as str]))
 
@@ -61,10 +63,19 @@
   [message]
   (.push ^js queue message))
 
+(defn- replace-uris
+  "Replaces URIs for rasterizer ones in styles"
+  [styles]
+  (let [public-uri (str cf/public-uri)
+        rasterizer-uri (str cf/rasterizer-uri)]
+    (if-not (= public-uri rasterizer-uri)
+      (str/replace styles public-uri rasterizer-uri)
+      styles)))
+
 (defn render
   "Renders an SVG"
   [{:keys [data styles width result] :as params}]
-  (let [styles  (d/nilv styles "")
+  (let [styles  (replace-uris (d/nilv styles ""))
         result  (d/nilv result "blob")
         id      (dm/str (uuid/next))
         payload #js {:data data :styles styles :width width :result result}
@@ -99,7 +110,28 @@
   (let [iframe (dom/create-element "iframe")]
     (dom/set-attribute! iframe "src" origin)
     (dom/set-attribute! iframe "hidden" true)
-    (dom/append-child! js/document.body iframe)
     (.addEventListener js/window "message" on-message)
-    (set! instance iframe)
-    ))
+    (->> (http/fetch {:method :head
+                      :uri cf/rasterizer-uri
+                      :mode :no-cors})
+         (rx/map (fn [response]
+                   (let [allowed? (not (.-redirected response))]
+                     (when-not allowed?
+                       (log/err :hint "rasterizer iframe blocked by adblocker" :origin origin))
+                     allowed?)))
+         (rx/catch (fn [cause]
+                     (log/err :hint "rasterizer iframe blocked by adblocker" :origin origin :cause cause)
+                     (rx/of false)))
+
+         (rx/subs (fn [allowed?]
+                    (if allowed?
+                      (do
+                        (dom/append-child! js/document.body iframe)
+                        (set! instance iframe))
+
+                      (let [new-origin (dm/str (assoc cf/public-uri :path "/rasterizer.html"))]
+                        (log/warn :hint "fallback to main domain" :origin new-origin)
+                        (set! origin new-origin)
+                        (dom/set-attribute! iframe "src" new-origin)
+                        (dom/append-child! js/document.body iframe)
+                        (set! instance iframe))))))))

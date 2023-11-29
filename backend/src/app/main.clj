@@ -160,12 +160,6 @@
    {::mdef/name "penpot_executors_running_threads"
     ::mdef/help "Current number of threads with state RUNNING."
     ::mdef/labels ["name"]
-    ::mdef/type :gauge}
-
-   :executors-queued-submissions
-   {::mdef/name "penpot_executors_queued_submissions"
-    ::mdef/help "Current number of queued submissions."
-    ::mdef/labels ["name"]
     ::mdef/type :gauge}})
 
 (def system-config
@@ -180,13 +174,12 @@
 
    ;; Default thread pool for IO operations
    ::wrk/executor
-   {::wrk/parallelism (cf/get :default-executor-parallelism
-                              (+ 3 (* (px/get-available-processors) 3)))}
+   {}
 
    ::wrk/monitor
    {::mtx/metrics  (ig/ref ::mtx/metrics)
-    ::wrk/name     "default"
-    ::wrk/executor (ig/ref ::wrk/executor)}
+    ::wrk/executor (ig/ref ::wrk/executor)
+    ::wrk/name     "default"}
 
    :app.migrations/migrations
    {::db/pool (ig/ref ::db/pool)}
@@ -217,7 +210,7 @@
    {::db/pool (ig/ref ::db/pool)}
 
    ::http.client/client
-   {::wrk/executor (ig/ref ::wrk/executor)}
+   {}
 
    ::session/manager
    {::db/pool (ig/ref ::db/pool)}
@@ -228,14 +221,12 @@
    ::http.awsns/routes
    {::props              (ig/ref ::setup/props)
     ::db/pool            (ig/ref ::db/pool)
-    ::http.client/client (ig/ref ::http.client/client)
-    ::wrk/executor       (ig/ref ::wrk/executor)}
+    ::http.client/client (ig/ref ::http.client/client)}
 
    ::http/server
    {::http/port                    (cf/get :http-server-port)
     ::http/host                    (cf/get :http-server-host)
     ::http/router                  (ig/ref ::http/router)
-    ::wrk/executor                 (ig/ref ::wrk/executor)
     ::http/io-threads              (cf/get :http-server-io-threads)
     ::http/max-body-size           (cf/get :http-server-max-body-size)
     ::http/max-multipart-body-size (cf/get :http-server-max-multipart-body-size)}
@@ -291,11 +282,9 @@
 
    ::http.debug/routes
    {::db/pool         (ig/ref ::db/pool)
-    ::wrk/executor    (ig/ref ::wrk/executor)
     ::session/manager (ig/ref ::session/manager)
     ::sto/storage     (ig/ref ::sto/storage)
     ::props           (ig/ref ::setup/props)}
-
 
    ::http.ws/routes
    {::db/pool         (ig/ref ::db/pool)
@@ -307,12 +296,10 @@
    {::http.assets/path  (cf/get :assets-path)
     ::http.assets/cache-max-age (dt/duration {:hours 24})
     ::http.assets/cache-max-agesignature-max-age (dt/duration {:hours 24 :minutes 5})
-    ::sto/storage  (ig/ref ::sto/storage)
-    ::wrk/executor (ig/ref ::wrk/executor)}
+    ::sto/storage  (ig/ref ::sto/storage)}
 
    :app.rpc/climit
-   {::mtx/metrics  (ig/ref ::mtx/metrics)
-    ::wrk/executor (ig/ref ::wrk/executor)}
+   {::mtx/metrics  (ig/ref ::mtx/metrics)}
 
    :app.rpc/rlimit
    {::wrk/executor (ig/ref ::wrk/executor)}
@@ -334,8 +321,7 @@
     ::setup/templates    (ig/ref ::setup/templates)
     ::props              (ig/ref ::setup/props)
 
-    :pool                (ig/ref ::db/pool)
-    }
+    :pool                (ig/ref ::db/pool)}
 
    :app.rpc.doc/routes
    {:methods (ig/ref :app.rpc/methods)}
@@ -343,7 +329,6 @@
    :app.rpc/routes
    {::rpc/methods     (ig/ref :app.rpc/methods)
     ::db/pool         (ig/ref ::db/pool)
-    ::wrk/executor    (ig/ref ::wrk/executor)
     ::session/manager (ig/ref ::session/manager)
     ::props           (ig/ref ::setup/props)}
 
@@ -445,7 +430,6 @@
 
    ::sto/storage
    {::db/pool      (ig/ref ::db/pool)
-    ::wrk/executor (ig/ref ::wrk/executor)
     ::sto/backends
     {:assets-s3 (ig/ref [::assets :app.storage.s3/backend])
      :assets-fs (ig/ref [::assets :app.storage.fs/backend])}}
@@ -457,8 +441,7 @@
     ::sto.s3/io-threads (cf/get :storage-assets-s3-io-threads)}
 
    [::assets :app.storage.fs/backend]
-   {::sto.fs/directory (cf/get :storage-assets-fs-directory)}
-   })
+   {::sto.fs/directory (cf/get :storage-assets-fs-directory)}})
 
 
 (def worker-config

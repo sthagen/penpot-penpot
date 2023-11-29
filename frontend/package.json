@@ -1,26 +1,29 @@
 {
-  "name": "app",
-  "version": "0.1.0",
-  "description": "The Open-Source prototyping tool",
-  "author": "Kaleidos Ventures SL",
-  "license": "SEE LICENSE IN <LICENSE>",
+  "name": "frontend",
+  "version": "1.0.0",
+  "license": "MPL-2.0",
+  "author": "Kaleidos INC",
+  "private": true,
+  "packageManager": "yarn@4.0.2",
+  "browserslist": [
+    "defaults"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/penpot/penpot"
   },
-  "browserslist": [
-    "defaults"
-  ],
+  "resolutions": {
+    "@vitejs/plugin-react": "^4.2.0"
+  },
   "scripts": {
+    "fmt:clj:check": "cljfmt check --parallel=false src/ test/",
+    "fmt:clj": "cljfmt fix --parallel=true src/ test/",
     "test:compile": "clojure -M:dev:shadow-cljs compile test --config-merge '{:autorun false}'",
-    "lint:clj": "clj-kondo --parallel --lint src/",
     "lint:scss": "yarn run prettier -c resources/styles -c src/**/*.scss",
     "lint:fix": "yarn run prettier -c resources/styles -c src/**/*.scss -w",
     "test:run": "node target/tests.js",
     "test:watch": "clojure -M:dev:shadow-cljs watch test",
     "test": "yarn run test:compile && yarn run test:run",
-    "test:e2e": "cypress run",
-    "test:e2e-gui": "cypress open",
     "gulp:watch": "gulp watch",
     "watch": "shadow-cljs watch main",
     "validate-translations": "node ./scripts/validate-translations.js",
@@ -45,8 +48,6 @@
     "animate.css": "^4.1.1",
     "autoprefixer": "^10.4.15",
     "concurrently": "^8.2.2",
-    "cypress": "^10.3.0",
-    "cypress-file-upload": "^5.0.8",
     "gettext-parser": "^7.0.1",
     "gulp": "4.0.2",
     "gulp-cached": "^1.1.1",
@@ -74,8 +75,6 @@
     "vite": "^5.0.2"
   },
   "dependencies": {
-    "@sentry/browser": "^6.17.4",
-    "@sentry/tracing": "^6.17.4",
     "date-fns": "^2.30.0",
     "draft-js": "^0.11.7",
     "highlight.js": "^11.8.0",

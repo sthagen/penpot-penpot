@@ -31,7 +31,7 @@
    [clojure.spec.alpha :as s]
    [cuerdas.core :as str]
    [integrant.core :as ig]
-   [yetti.response :as-alias yrs]))
+   [ring.response :as-alias rres]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; HELPERS
@@ -353,8 +353,7 @@
           (get-name [props]
             (let [attr-kw (cf/get :oidc-name-attr "name")
                   attr-ph (parse-attr-path provider attr-kw)]
-              (get-in props attr-ph)))
-          ]
+              (get-in props attr-ph)))]
 
     (let [props (qualify-props provider info)
           email (get-email props)]
@@ -479,8 +478,8 @@
 
 (defn- redirect-response
   [uri]
-  {::yrs/status 302
-   ::yrs/headers {"location" (str uri)}})
+  {::rres/status 302
+   ::rres/headers {"location" (str uri)}})
 
 (defn- generate-error-redirect
   [_ cause]
@@ -557,8 +556,8 @@
                                 :props props
                                 :exp (dt/in-future "4h")})
         uri   (build-auth-uri cfg state)]
-    {::yrs/status 200
-     ::yrs/body {:redirect-uri uri}}))
+    {::rres/status 200
+     ::rres/body {:redirect-uri uri}}))
 
 (defn- callback-handler
   [cfg request]
