@@ -467,7 +467,7 @@
       (d/update-in-when data [:components component-id :objects] reg-objects))))
 
 (defmethod process-change :mov-objects
-  [data {:keys [parent-id shapes index page-id component-id ignore-touched after-shape component-swap]}]
+  [data {:keys [parent-id shapes index page-id component-id ignore-touched after-shape component-swap syncing]}]
   (letfn [(calculate-invalid-targets [objects shape-id]
             (let [reduce-fn #(into %1 (calculate-invalid-targets objects %2))]
               (->> (get-in objects [shape-id :shapes])
@@ -475,14 +475,18 @@
 
           ;; Avoid placing a shape as a direct or indirect child of itself,
           ;; or inside its main component if it's in a copy,
-          ;; or inside a copy
+          ;; or inside a copy, or from a copy
           (is-valid-move? [objects shape-id]
-            (let [invalid-targets (calculate-invalid-targets objects shape-id)]
-              (and (contains? objects shape-id)
+            (let [invalid-targets (calculate-invalid-targets objects shape-id)
+                  shape (get objects shape-id)]
+              (and shape
                    (not (invalid-targets parent-id))
                    (not (cfh/components-nesting-loop? objects shape-id parent-id))
-                   (or component-swap
-                       (not (ctk/in-component-copy? (get objects parent-id))))))) ;; We don't want to change the structure of component copies
+                   (or component-swap ;; On a component swap it's allowed to change the structure of a copy
+                       syncing ;; If we are syncing the changes of a main component, it's allowed to change the structure of a copy
+                       (and
+                        (not (ctk/in-component-copy? (get objects (:parent-id shape)))) ;; We don't want to change the structure of component copies
+                        (not (ctk/in-component-copy? (get objects parent-id))))))))     ;; We need to check the origin and target frames
 
           (insert-items [prev-shapes index shapes]
             (let [prev-shapes (or prev-shapes [])]
@@ -799,4 +803,57 @@
 (defmethod components-changed :default
   [_ _]
   nil)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Copies changes detection
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Analyze one change and checks if if modifies any shape belonging to
+;; a main or a copy. Return the ids of the mains or copies affected
+
+(defn- find-all-heads
+  "Go trough the parents and get all of them that are a head of a component."
+  [id objects]
+    (->> (cfh/get-parents-with-self objects id)
+         (filter ctk/instance-head?)))
+
+(defmulti heads-changed (fn [_ change] (:type change)))
+
+(defmethod heads-changed :mod-obj
+  [file-data {:keys [id page-id _component-id operations]}]
+  (when page-id
+    (let [page       (ctpl/get-page file-data page-id)
+          need-sync? (fn [operation]
+                       ; Check if the shape has changed any
+                       ; attribute that participates in components synchronization.
+                       (and (= (:type operation) :set)
+                            (get ctk/sync-attrs (:attr operation))))
+          any-sync? (some need-sync? operations)]
+      (when any-sync?
+        (find-all-heads id (:objects page))))))
+
+(defmethod heads-changed :mov-objects
+  [file-data {:keys [page-id _component-id parent-id shapes] :as change}]
+  (when page-id
+    (let [page  (ctpl/get-page file-data page-id)]
+      (concat
+       (find-all-heads parent-id (:objects page))
+       (mapcat #(find-all-heads (:parent-id %) (:objects page)) shapes)))))
+
+(defmethod heads-changed :add-obj
+  [file-data {:keys [parent-id page-id _component-id] :as change}]
+  (when page-id
+    (let [page (ctpl/get-page file-data page-id)]
+      (find-all-heads parent-id (:objects page)))))
+
+(defmethod heads-changed :del-obj
+  [file-data {:keys [id page-id _component-id] :as change}]
+  (when page-id
+    (let [page (ctpl/get-page file-data page-id)]
+      (find-all-heads id (:objects page)))))
+
+(defmethod heads-changed :default
+  [_ _]
+  nil)
+
 

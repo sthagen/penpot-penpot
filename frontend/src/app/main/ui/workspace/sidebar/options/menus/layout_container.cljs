@@ -11,11 +11,14 @@
    [app.common.data.macros :as dm]
    [app.common.math :as mth]
    [app.common.types.shape.layout :as ctl]
+   [app.config :as cf]
    [app.main.data.workspace :as udw]
+   [app.main.data.workspace.grid-layout.editor :as dwge]
    [app.main.data.workspace.shape-layout :as dwsl]
    [app.main.features :as features]
    [app.main.refs :as refs]
    [app.main.store :as st]
+   [app.main.ui.components.dropdown :refer [dropdown]]
    [app.main.ui.components.numeric-input :refer [numeric-input*]]
    [app.main.ui.components.radio-buttons :refer [radio-button radio-buttons]]
    [app.main.ui.components.select :refer [select]]
@@ -1003,6 +1006,7 @@
                              :value (:value column)
                              :on-change #(set-column-value type index %)
                              :placeholder "--"
+                             :min 0
                              :disabled (= :auto (:type column))}]]
 
         [:div {:class (stl/css :track-info-unit)}
@@ -1128,6 +1132,9 @@
         layout-type         (:layout values)
         has-layout?         (some? layout-type)
 
+        show-layout-dropdown* (mf/use-state false)
+        show-layout-dropdown? @show-layout-dropdown*
+
         state*              (mf/use-state (if layout-type
                                             true
                                             false))
@@ -1136,9 +1143,10 @@
         toggle-content (mf/use-fn #(swap! state* not))
 
         on-add-layout
-        (fn [type]
-          (st/emit! (dwsl/create-layout type))
-          (reset! state* true))
+        (mf/use-callback
+         (fn [type]
+           (st/emit! (dwsl/create-layout type))
+           (reset! state* true)))
 
         on-set-layout
         (mf/use-fn
@@ -1154,23 +1162,18 @@
           (reset! state* false))
 
         set-flex
-        (fn []
-          (st/emit! (dwsl/remove-layout ids))
-          (on-add-layout :flex))
+        (mf/use-callback
+         (mf/deps on-add-layout)
+         (fn []
+           (st/emit! (dwsl/remove-layout ids))
+           (on-add-layout :flex)))
 
         set-grid
-        (fn []
-          (st/emit! (dwsl/remove-layout ids))
-          (on-add-layout :grid))
-
-        toggle-layout-style
-        (mf/use-fn
-         (fn [value]
-           (if (= "flex" value)
-             (set-flex)
-             (set-grid))))
-
-        ;; Flex-direction
+        (mf/use-callback
+         (mf/deps on-add-layout)
+         (fn []
+           (st/emit! (dwsl/remove-layout ids))
+           (on-add-layout :grid)))
 
         saved-dir (:layout-flex-dir values)
 
@@ -1341,7 +1344,32 @@
            (let [value (cond-> value new-css-system keyword)]
              (if (= type :row)
                (st/emit! (dwsl/update-layout ids {:layout-justify-content value}))
-               (st/emit! (dwsl/update-layout ids {:layout-align-content value}))))))]
+               (st/emit! (dwsl/update-layout ids {:layout-align-content value}))))))
+
+        handle-show-layout-dropdown
+        (mf/use-callback
+         (fn []
+           (swap! show-layout-dropdown* not)))
+
+        handle-close-layout-options
+        (mf/use-callback
+         (fn []
+           (reset! show-layout-dropdown* false)))
+
+        handle-open-flex-help
+        (mf/use-callback
+         (fn []
+           (st/emit! (dom/open-new-window cf/flex-help-uri))))
+
+        handle-open-grid-help
+        (mf/use-callback
+         (fn []
+           (st/emit! (dom/open-new-window cf/grid-help-uri))))
+
+        handle-locate-grid
+        (mf/use-callback
+         (fn []
+           (st/emit! (dwge/locate-board (first ids)))))]
 
     (if new-css-system
       [:div {:class (stl/css :element-set)}
@@ -1353,24 +1381,26 @@
                        :class        (stl/css-case :title-spacing-layout (not has-layout?))}
          (if (and (not multiple) (:layout values))
            [:div {:class (stl/css :title-actions)}
-            (when ^boolean grid-enabled?
-              [:div {:class (stl/css :layout-options)}
-               [:& radio-buttons {:selected (d/name layout-type)
-                                  :on-change toggle-layout-style
-                                  :name "layout-style"
-                                  :wide true}
-                [:& radio-button {:value "flex"
-                                  :id :flex}]
-                [:& radio-button {:value "grid"
-                                  :id :grid}]]])
             [:button {:class (stl/css :remove-layout)
                       :on-click on-remove-layout}
              i/remove-refactor]]
+
            [:div {:class (stl/css :title-actions)}
-            [:button {:class (stl/css :add-layout)
-                      :data-value :flex
-                      :on-click on-set-layout}
-             i/add-refactor]])]]
+            (if ^boolean grid-enabled?
+              [:*
+               [:button {:class (stl/css :add-layout)
+                         :on-click handle-show-layout-dropdown}
+                i/add-refactor]
+
+               [:& dropdown {:show show-layout-dropdown? :on-close handle-close-layout-options}
+                [:div {:class (stl/css :layout-options)}
+                 [:button {:class (stl/css :layout-option) :on-click set-flex} "Flex layout"]
+                 [:button {:class (stl/css :layout-option) :on-click set-grid} "Grid layout"]]]]
+
+              [:button {:class (stl/css :add-layout)
+                        :data-value :flex
+                        :on-click on-set-layout}
+               i/add-refactor])])]]
 
        (when (and open? has-layout?)
          (when (not= :multiple layout-type)
@@ -1388,10 +1418,13 @@
                [:& wrap-row {:wrap-type wrap-type
                              :on-click toggle-wrap-refactor}]]
 
-              [:div {:class (stl/css :second-row)}
+              [:div {:class (stl/css :second-row :help-button-wrapper)}
                [:& justify-content-row {:is-col? is-col?
                                         :justify-content justify-content
-                                        :on-change set-justify-content-refactor}]]
+                                        :on-change set-justify-content-refactor}]
+
+               [:button {:on-click handle-open-flex-help
+                         :class (stl/css :help-button)} i/help-refactor]]
               (when (= :wrap wrap-type)
                 [:div {:class (stl/css :third-row)}
                  [:& align-content-row {:is-col? is-col?
@@ -1411,6 +1444,11 @@
 
              :grid
              [:div {:class (stl/css :grid-layout-menu)}
+              (when (= 1 (count ids))
+                [:div {:class (stl/css :edit-grid-wrapper)}
+                 [:& grid-edit-mode {:id (first ids)}]
+                 [:button {:on-click handle-open-grid-help
+                           :class (stl/css :help-button)} i/help-refactor]])
               [:div {:class (stl/css :row :first-row)}
                [:div {:class (stl/css :direction-edit)}
                 [:div {:class (stl/css :direction)}
@@ -1431,9 +1469,11 @@
                                      :set-justify set-justify-grid}]
                [:& justify-grid-row {:is-col? false
                                      :justify-items grid-justify-content-row
-                                     :set-justify set-justify-grid}]]
-              (when (= 1 (count ids))
-                [:& grid-edit-mode {:id (first ids)}])]
+                                     :set-justify set-justify-grid}]
+
+               [:button {:on-click handle-locate-grid
+                         :class (stl/css :locate-button)}
+                i/locate-refactor]]]
              nil)))]
 
       [:div.element-set
@@ -1671,12 +1711,23 @@
                          :percent 20
                          :fixed 100)]
              (st/emit! (dwsl/change-layout-track ids type index {:value value
-                                                                 :type track-type})))))]
+                                                                 :type track-type})))))
+        handle-open-grid-help
+        (mf/use-callback
+         (fn []
+           (st/emit! (dom/open-new-window cf/grid-help-uri))))
+
+        handle-locate-grid
+        (mf/use-callback
+         (fn []
+           (st/emit! (dwge/locate-board (first ids)))))        ]
 
     (if new-css-system
       [:div {:class (stl/css :grid-layout-menu)}
        [:div {:class (stl/css :row)}
         [:div {:class (stl/css :grid-layout-menu-title)} "GRID LAYOUT"]
+        [:button {:on-click handle-open-grid-help
+                  :class (stl/css :help-button)} i/help-refactor]
         [:button {:class (stl/css :exit-btn)
                   :on-click #(st/emit! udw/clear-edition-mode)}
          (tr "workspace.layout_grid.editor.options.exit")]]
@@ -1701,7 +1752,11 @@
                               :set-justify set-justify-grid}]
         [:& justify-grid-row {:is-col? false
                               :justify-items grid-justify-content-row
-                              :set-justify set-justify-grid}]]
+                              :set-justify set-justify-grid}]
+
+        [:button {:on-click handle-locate-grid
+                  :class (stl/css :locate-button)}
+         i/locate-refactor]]
        [:div {:class (stl/css :row :grid-tracks-row)}
         [:& grid-columns-row {:is-col? true
                               :expanded? @grid-columns-open?

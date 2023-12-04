@@ -404,16 +404,21 @@
   (ptk/reify ::rename-component-and-main-instance
     ptk/WatchEvent
     (watch [_ state _]
-      (when-let [component (dm/get-in state [:workspace-data :components component-id])]
-        (let [name     (cfh/clean-path name)
-              shape-id (:main-instance-id component)
-              page-id  (:main-instance-page component)]
-          (rx/concat
-           (rx/of (rename-component component-id name))
+      (let [name        (str/trim name)
+            clean-name  (cfh/clean-path name)
+            valid?      (and (not (str/ends-with? name "/"))
+                             (string? clean-name)
+                             (not (str/blank? clean-name)))
+            component (dm/get-in state [:workspace-data :components component-id])]
+        (when (and valid? component)
+          (let [shape-id (:main-instance-id component)
+                page-id  (:main-instance-page component)]
+            (rx/concat
+             (rx/of (rename-component component-id clean-name))
 
            ;; NOTE: only when components-v2 is enabled
-           (when (and shape-id page-id)
-             (rx/of (dch/update-shapes [shape-id] #(assoc % :name name) {:page-id page-id :stack-undo? true})))))))))
+             (when (and shape-id page-id)
+               (rx/of (dch/update-shapes [shape-id] #(assoc % :name clean-name) {:page-id page-id :stack-undo? true}))))))))))
 
 (defn duplicate-component
   "Create a new component copied from the one with the given id."
@@ -939,7 +944,19 @@
                                  (when sync-typographies?
                                    (dwlh/generate-sync-file it file-id :typographies asset-id library-id state))])
 
-               changes         (pcb/concat-changes library-changes file-changes)]
+               changes         (pcb/concat-changes library-changes file-changes)
+
+
+               find-heads (fn [change]
+                            (->> (ch/heads-changed file change)
+                                 (map #(assoc %1 :page-id (:page-id change)))))
+
+
+
+               updated-copies (->> changes
+                                    :redo-changes
+                                    (mapcat find-heads)
+                                    distinct)]
 
            (log/debug :msg "SYNC-FILE finished" :js/rchanges (log-changes
                                                               (:redo-changes changes)
@@ -950,6 +967,13 @@
             (when (seq (:redo-changes changes))
               (rx/of (dch/commit-changes (assoc changes ;; TODO a ver qué pasa con esto
                                                 :file-id file-id))))
+            (when-not (empty? updated-copies)
+              (->> (rx/from updated-copies)
+                   (rx/mapcat (fn [shape]
+                                (rx/of
+                                 (dwt/clear-thumbnail file-id (:page-id shape) (:id shape) "frame")
+                                 (when-not (= (:frame-id shape) uuid/zero)
+                                   (dwt/clear-thumbnail file-id (:page-id shape) (:frame-id shape) "frame")))))))
             (when (not= file-id library-id)
               ;; When we have just updated the library file, give some time for the
               ;; update to finish, before marking this file as synced.

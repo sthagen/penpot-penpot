@@ -41,12 +41,18 @@
   (let [new-css-system (mf/use-ctx ctx/new-css-system)
         dir-v [:auto :start :center :end :stretch #_:baseline]
         alignment (or alignment :auto)
-        type (if is-col? "col" "row")]
+        type (if is-col? "col" "row")
+
+        handle-set-alignment
+        (mf/use-callback
+         (mf/deps set-alignment)
+         (fn [value]
+           (set-alignment (-> value keyword))))]
 
     (if new-css-system
       [:div {:class (stl/css :self-align-menu)}
        [:& radio-buttons {:selected (d/name alignment)
-                          :on-change #(set-alignment (keyword %))
+                          :on-change handle-set-alignment
                           :name (dm/str "flex-align-items-" type)}
         [:& radio-button {:value "start"
                           :icon  (if is-col? i/align-self-row-left-refactor i/align-self-column-top-refactor)
@@ -93,7 +99,7 @@
         cell (or cell (attrs/get-attrs-multi cells cell-props))
 
         multiple? (= :multiple (:id cell))
-        cell-ids (if (some? cell) [(:id cell)] (->> cells (map :id)))
+        cell-ids (if multiple? (->> cells (map :id)) [(:id cell)])
         cell-ids (hooks/use-equal-memo cell-ids)
 
         {:keys [position area-name align-self justify-self column column-span row row-span]} cell
@@ -210,19 +216,21 @@
           (when (and (not multiple?) (= :auto cell-mode))
             [:div {:class (stl/css :row)}
              [:div {:class (stl/css :grid-coord-group)}
-              [:span {:class (stl/css :icon)} i/layout-rows]
+              [:span {:class (stl/css :icon)} i/flex-vertical-refactor]
               [:div {:class (stl/css :coord-input)}
                [:> numeric-input*
                 {:placeholder "--"
+                 :title "Column"
                  :on-click #(dom/select-target %)
                  :on-change (partial on-grid-coordinates :all :column)
                  :value column}]]]
 
              [:div {:class (stl/css :grid-coord-group)}
-              [:span {:class (stl/css :icon)} i/layout-columns]
+              [:span {:class (stl/css :icon)} i/flex-horizontal-refactor]
               [:div {:class (stl/css :coord-input)}
                [:> numeric-input*
                 {:placeholder "--"
+                 :title "Row"
                  :on-click #(dom/select-target %)
                  :on-change (partial on-grid-coordinates :all :row)
                  :value row}]]]])
