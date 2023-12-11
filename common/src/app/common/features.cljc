@@ -97,6 +97,24 @@
     :feature-fdata-pointer-map "fdata/pointer-map"
     nil))
 
+(defn migrate-legacy-features
+  "A helper that translates old feature names to new names"
+  [features]
+  (cond-> (or features #{})
+    (contains? features "storage/pointer-map")
+    (-> (conj "fdata/pointer-map")
+        (disj "storage/pointer-map"))
+
+    (contains? features "storage/objects-map")
+    (-> (conj "fdata/objects-map")
+        (disj "storage/objects-map"))
+
+    (or (contains? features "internal/geom-record")
+        (contains? features "internal/shape-record"))
+    (-> (conj "fdata/shape-data-type")
+        (disj "internal/geom-record")
+        (disj "internal/shape-record"))))
+
 (def xf-supported-features
   (filter (partial contains? supported-features)))
 
@@ -159,7 +177,7 @@
   (let [not-supported (set/difference enabled-features supported-features)]
     (when (seq not-supported)
       (ex/raise :type :restriction
-                :code :features-mismatch
+                :code :feature-not-supported
                 :feature (first not-supported)
                 :hint (str/ffmt "features '%' not supported"
                                 (str/join "," not-supported)))))
@@ -202,7 +220,7 @@
 
        (when (seq not-supported)
          (ex/raise :type :restriction
-                   :code :feature-mismatch
+                   :code :file-feature-mismatch
                    :feature (first not-supported)
                    :hint (str/ffmt "file features '%' not enabled"
                                    (str/join "," not-supported))))))
@@ -224,6 +242,7 @@
   (let [not-supported (-> (or source-features #{})
                           (set/difference destination-features)
                           (set/difference no-migration-features)
+                          (set/difference default-enabled-features)
                           (seq))]
     (when not-supported
       (ex/raise :type :restriction
@@ -235,6 +254,7 @@
   (let [not-supported (-> (or destination-features #{})
                           (set/difference source-features)
                           (set/difference no-migration-features)
+                          (set/difference default-enabled-features)
                           (seq))]
     (when not-supported
       (ex/raise :type :restriction
@@ -242,3 +262,46 @@
                 :feature (first not-supported)
                 :hint (str/ffmt "the source team does not have support '%' features"
                                 (str/join "," not-supported))))))
+
+
+(defn check-paste-features!
+  "Function used for check feature compability between currently enabled
+  features set on the application with the provided featured set by
+  the paste data (frontend clipboard)."
+  [enabled-features paste-features]
+  (let [not-supported (-> enabled-features
+                          (set/difference paste-features)
+                          ;; NOTE: we don't want to raise a feature-mismatch
+                          ;; exception for features which don't require an
+                          ;; explicit file migration process or has no real
+                          ;; effect on file data structure
+                          (set/difference no-migration-features))]
+
+    (when (seq not-supported)
+      (ex/raise :type :restriction
+                :code :missing-features-in-paste-content
+                :feature (first not-supported)
+                :hint (str/ffmt "expected features '%' not present in pasted content"
+                                (str/join "," not-supported)))))
+
+  (let [not-supported (set/difference enabled-features supported-features)]
+    (when (seq not-supported)
+      (ex/raise :type :restriction
+                :code :paste-feature-not-supported
+                :feature (first not-supported)
+                :hint (str/ffmt "features '%' not supported in the application"
+                                (str/join "," not-supported)))))
+
+  (let [not-supported (-> paste-features
+                          (set/difference enabled-features)
+                          (set/difference backend-only-features)
+                          (set/difference frontend-only-features))]
+
+    (when (seq not-supported)
+      (ex/raise :type :restriction
+                :code :paste-feature-not-enabled
+                :feature (first not-supported)
+                :hint (str/ffmt "paste features '%' not enabled on the application"
+                                (str/join "," not-supported))))))
+
+

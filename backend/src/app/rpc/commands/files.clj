@@ -11,7 +11,7 @@
    [app.common.exceptions :as ex]
    [app.common.features :as cfeat]
    [app.common.files.helpers :as cfh]
-   [app.common.files.migrations :as pmg]
+   [app.common.files.migrations :as fmg]
    [app.common.schema :as sm]
    [app.common.schema.desc-js-like :as-alias smdj]
    [app.common.spec :as us]
@@ -67,6 +67,22 @@
       features (assoc :features (db/decode-pgarray features #{}))
       changes  (assoc :changes (blob/decode changes))
       data     (assoc :data (blob/decode data)))))
+
+(defn check-version!
+  [{:keys [data] :as file}]
+  (dm/assert!
+   "expect data to be decoded"
+   (map? data))
+
+  (let [version (:version data 0)]
+    (when (> version fmg/version)
+      (ex/raise :type :restriction
+                :code :file-version-not-supported
+                :hint "file version is greated that the maximum"
+                :file-version version
+                :max-version fmg/version))
+
+    file))
 
 ;; --- FILE PERMISSIONS
 
@@ -232,33 +248,38 @@
 ;; --- COMMAND QUERY: get-file (by id)
 
 (def schema:file
-  [:map {:title "File"}
-   [:id ::sm/uuid]
-   [:features ::cfeat/features]
-   [:has-media-trimmed :boolean]
-   [:comment-thread-seqn {:min 0} :int]
-   [:name :string]
-   [:revn {:min 0} :int]
-   [:modified-at ::dt/instant]
-   [:is-shared :boolean]
-   [:project-id ::sm/uuid]
-   [:created-at ::dt/instant]
-   [:data {:optional true} :any]])
+  (sm/define
+    [:map {:title "File"}
+     [:id ::sm/uuid]
+     [:features ::cfeat/features]
+     [:has-media-trimmed :boolean]
+     [:comment-thread-seqn {:min 0} :int]
+     [:name :string]
+     [:revn {:min 0} :int]
+     [:modified-at ::dt/instant]
+     [:is-shared :boolean]
+     [:project-id ::sm/uuid]
+     [:created-at ::dt/instant]
+     [:data {:optional true} :any]]))
 
 (def schema:permissions-mixin
-  [:map {:title "PermissionsMixin"}
-   [:permissions ::perms/permissions]])
+  (sm/define
+    [:map {:title "PermissionsMixin"}
+     [:permissions ::perms/permissions]]))
 
 (def schema:file-with-permissions
-  [:merge {:title "FileWithPermissions"}
-   schema:file
-   schema:permissions-mixin])
+  (sm/define
+    [:merge {:title "FileWithPermissions"}
+     schema:file
+     schema:permissions-mixin]))
 
-(def schema:get-file
-  [:map {:title "get-file"}
-   [:features {:optional true} ::cfeat/features]
-   [:id ::sm/uuid]
-   [:project-id {:optional true} ::sm/uuid]])
+(def ^:private
+  schema:get-file
+  (sm/define
+    [:map {:title "get-file"}
+     [:features {:optional true} ::cfeat/features]
+     [:id ::sm/uuid]
+     [:project-id {:optional true} ::sm/uuid]]))
 
 (defn get-file
   ([conn id] (get-file conn id nil))
@@ -278,20 +299,24 @@
 
            file   (-> (db/get conn :file params)
                       (decode-row)
-                      (pmg/migrate-file))]
+                      (fmg/migrate-file))]
 
        ;; NOTE: when file is migrated, we break the rule of no perform
        ;; mutations on get operations and update the file with all
        ;; migrations applied
-       (if (pmg/migrated? file)
-         (let [features (set/union (deref cfeat/*new*) (:features file))]
+       ;;
+       ;; NOTE: the following code will not work on read-only mode, it
+       ;; is a known issue; we keep is not implemented until we really
+       ;; need this
+       (if (fmg/migrated? file)
+         (let [file     (update file :features cfeat/migrate-legacy-features)
+               features (set/union (deref cfeat/*new*) (:features file))]
            (db/update! conn :file
                        {:data (blob/encode (:data file))
                         :features (db/create-array conn "text" features)}
                        {:id id})
            (persist-pointers! conn id)
            (assoc file :features features))
-
          file)))))
 
 (defn get-minimal-file
@@ -319,7 +344,8 @@
                                                  :file-id id)
 
                             file (-> (get-file conn id project-id)
-                                     (assoc :permissions perms))
+                                     (assoc :permissions perms)
+                                     (check-version!))
 
                             _    (-> (cfeat/get-team-enabled-features cf/flags team)
                                      (cfeat/check-client-features! (:features params))
@@ -815,7 +841,7 @@
   into the file local libraries"
   [conn {:keys [id] :as library}]
   (let [ldata (binding [pmap/*load-fn* (partial load-pointer conn id)]
-                (-> library decode-row (process-pointers deref) pmg/migrate-file :data))
+                (-> library decode-row (process-pointers deref) fmg/migrate-file :data))
         rows  (db/exec! conn [sql:get-referenced-files id])]
     (doseq [file-id (map :id rows)]
       (binding [pmap/*load-fn* (partial load-pointer conn file-id)
@@ -825,7 +851,7 @@
                                      ::db/remove-deleted? false)
                        (decode-row)
                        (load-all-pointers!)
-                       (pmg/migrate-file))
+                       (fmg/migrate-file))
               data (ctf/absorb-assets (:data file) ldata)]
           (db/update! conn :file
                       {:revn (inc (:revn file))
