@@ -29,7 +29,7 @@
 
 (defn- get-view-only-bundle
   [{:keys [::db/conn] :as cfg} {:keys [profile-id file-id ::perms] :as params}]
-  (let [file    (files/get-file conn file-id)
+  (let [file    (files/get-file cfg file-id)
 
         project (db/get conn :project
                         {:id (:project-id file)}
@@ -86,19 +86,20 @@
    ::doc/added "1.17"
    ::sm/params schema:get-view-only-bundle}
   [system {:keys [::rpc/profile-id file-id share-id] :as params}]
-  (db/run! system (fn [{:keys [::db/conn] :as system}]
-                    (let [perms  (files/get-permissions conn profile-id file-id share-id)
-                          params (-> params
-                                     (assoc ::perms perms)
-                                     (assoc :profile-id profile-id))]
+  (db/run! system
+           (fn [{:keys [::db/conn] :as system}]
+             (let [perms  (files/get-permissions conn profile-id file-id share-id)
+                   params (-> params
+                              (assoc ::perms perms)
+                              (assoc :profile-id profile-id))]
 
-                      ;; When we have neither profile nor share, we just return a not
-                      ;; found response to the user.
-                      (when-not perms
-                        (ex/raise :type :not-found
-                                  :code :object-not-found
-                                  :hint "object not found"))
+                  ;; When we have neither profile nor share, we just return a not
+               ;; found response to the user.
+               (when-not perms
+                 (ex/raise :type :not-found
+                           :code :object-not-found
+                           :hint "object not found"))
 
-                      (get-view-only-bundle system params)))))
+               (get-view-only-bundle system params)))))
 
 
