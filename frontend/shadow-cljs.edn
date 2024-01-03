@@ -12,14 +12,46 @@
               :watch-dir "resources/public"
               :reload-strategy :full}
    :build-options {:manifest-name "manifest.json"}
-
+   :module-loader true
    :modules
-   {:shared {:entries []}
+   {:shared
+    {:entries []}
 
     :main
     {:entries [app.main]
      :depends-on #{:shared}
      :init-fn app.main/init}
+
+    :util-highlight
+    {:entries [app.util.code-highlight]
+     :depends-on #{:main}}
+
+    :main-auth
+    {:entries [app.main.ui.auth
+               app.main.ui.auth.verify-token]
+     :depends-on #{:main}}
+
+    :main-viewer
+    {:entries [app.main.ui.viewer]
+     :depends-on #{:main :main-auth}}
+
+    :main-onboarding
+    {:entries [app.main.ui.onboarding
+               app.main.ui.onboarding.questions
+               app.main.ui.releases]
+     :depends-on #{:main}}
+
+    :main-workspace
+    {:entries [app.main.ui.workspace]
+     :depends-on #{:main}}
+
+    :main-dashboard
+    {:entries [app.main.ui.dashboard]
+     :depends-on #{:main}}
+
+    :main-settings
+    {:entries [app.main.ui.settings]
+     :depends-on #{:main}}
 
     :render
     {:entries [app.render]
@@ -47,19 +79,32 @@
     :compiler-options
     {:fn-invoke-direct true
      :optimizations #shadow/env ["PENPOT_BUILD_OPTIMIZATIONS" :as :keyword :default :advanced]
+     :output-wrapper true
+     :rename-prefix-namespace "PENPOT"
      :source-map true
      :elide-asserts true
      :anon-fn-naming-policy :off
      :source-map-detail-level :all}}}
 
+  ;; FIXME: maybe rename to :components ? (there are nothing storybook
+  ;; related, is just an ESM export of components that will be used
+  ;; initially on storybook but not limited to storybook)
   :storybook
   {:target :esm
    :output-dir "target/storybook/"
-   :modules
-   {:design-system {:exports {default app.main.ui.components.design-system/default} }}
+   :js-options {:js-provider :import}
 
-   :js-options
-   {:js-provider :import}
+   :modules
+   {:base
+    {:entries []}
+
+    :icons
+    {:exports {default app.main.ui.icons/default}
+     :depends-on #{:base}}
+
+    :components
+    {:exports {:default app.main.ui.components/default}
+     :depends-on #{:base}}}
 
    :compiler-options
    {:output-feature-set :es2020
@@ -106,7 +151,7 @@
 
   :test
   {:target :node-test
-   :output-to "target/tests.js"
+   :output-to "target/tests.cjs"
    :output-dir "target/test/"
    :ns-regexp "^frontend-tests.*-test$"
    :autorun true

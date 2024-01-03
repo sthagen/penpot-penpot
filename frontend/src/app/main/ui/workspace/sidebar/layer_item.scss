@@ -12,7 +12,7 @@
   align-items: center;
   width: 100%;
   background-color: var(--layer-row-background-color);
-  border: 2px solid transparent;
+  border: $s-2 solid transparent;
 
   &.highlight,
   &:hover {
@@ -20,7 +20,7 @@
     --context-hover-opacity: $op-10;
     background-color: var(--layer-row-background-color-hover);
     color: var(--layer-row-foreground-color-hover);
-    box-shadow: $s-16 0px 0px 0px var(--layer-row-background-color-hover);
+    box-shadow: $s-16 $s-0 $s-0 $s-0 var(--layer-row-background-color-hover);
     &.hidden {
       opacity: $op-10;
     }
@@ -28,7 +28,7 @@
 
   &.selected {
     background-color: var(--layer-row-background-color-selected);
-    box-shadow: $s-16 0px 0px 0px var(--layer-row-background-color-selected);
+    box-shadow: $s-16 $s-0 $s-0 $s-0 var(--layer-row-background-color-selected);
   }
 
   &.selected.highlight,
@@ -38,11 +38,13 @@
 
   .parent-selected & {
     background-color: var(--layer-child-row-background-color);
+    box-shadow: $s-16 $s-0 $s-0 $s-0 var(--layer-child-row-background-color);
   }
 
   .parent-selected &.highlight,
   .parent-selected &:hover {
     background-color: var(--layer-row-background-color-hover);
+    box-shadow: $s-16 $s-0 $s-0 $s-0 var(--layer-row-background-color-hover);
   }
 
   &.dnd-over-bot {
@@ -60,6 +62,7 @@
   .layer-row.highlight &,
   .layer-row:hover & {
     background-color: var(--layer-row-background-color-selected);
+    box-shadow: $s-16 $s-0 $s-0 $s-0 var(--layer-row-background-color-selected);
   }
   .layer-row.type-comp & {
     color: var(--layer-row-component-foreground-color);
@@ -166,7 +169,7 @@
   align-items: center;
   height: 100%;
   width: $s-24;
-  padding: 0 4px 0 8px;
+  padding: 0 $s-4 0 $s-8;
 
   svg {
     @extend .button-icon-small;
@@ -244,8 +247,8 @@
 
 :global(.sticky) {
   position: sticky;
-  top: 0px;
-  z-index: 3;
+  top: $s-0;
+  z-index: $z-index-3;
 }
 
 .tab-indentation {

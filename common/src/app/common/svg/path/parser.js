@@ -1,3 +1,11 @@
+/**
+ * Performance focused pure javascript implementation of the
+ * SVG path parser.
+ *
+ * @author KALEIDOS INC
+ * @license MPL-2.0 <https://www.mozilla.org/en-US/MPL/2.0/>
+ */
+
 import cljs from "goog:cljs.core";
 
 const MOVE_TO = cljs.keyword("move-to");
@@ -674,7 +682,13 @@ export function arcToBeziers(x1, y1, x2, y2, fa, fs, rx, ry, phi) {
   let x1p = (cosPhi * (x1 - x2)) / 2 + (sinPhi * (y1 - y2)) / 2;
   let y1p = (-sinPhi * (x1 - x2)) / 2 + (cosPhi * (y1 - y2)) / 2;
 
-  if (x1p === 0 || y1p === 0 || rx === 0 || ry === 0) {
+  if (x1p === 0 && y1p === 0) {
+    // we're asked to draw line to itself
+    return [];
+  }
+
+  if (rx === 0 || ry === 0) {
+      // one of the radii is zero
     return [];
   }
 
@@ -711,7 +725,7 @@ export function arcToBeziers(x1, y1, x2, y2, fa, fs, rx, ry, phi) {
 // commands.
 function simplifyPathData(pdata) {
   var result = [];
-  var lastType = null;
+  var lastCommand = null;
 
   var lastControlX = null;
   var lastControlY = null;
@@ -724,8 +738,9 @@ function simplifyPathData(pdata) {
 
   for (let i=0; i<pdata.length; i++) {
     const segment = pdata[i];
+    const currentCommand = segment.command;
 
-    switch(segment.command) {
+    switch(currentCommand) {
     case "M":
       var x = segment.params[0];
       var y = segment.params[1];
@@ -787,7 +802,7 @@ function simplifyPathData(pdata) {
 
       var cx1, cy1;
 
-      if (lastType === "C" || lastType === "S") {
+      if (lastCommand === "C" || lastCommand === "S") {
         cx1 = currentX + (currentX - lastControlX);
         cy1 = currentY + (currentY - lastControlY);
       } else {
@@ -813,7 +828,7 @@ function simplifyPathData(pdata) {
 
       var x1, y1;
 
-      if (lastType === "Q" || lastType === "T") {
+      if (lastCommand === "Q" || lastCommand === "T") {
         x1 = currentX + (currentX - lastControlX);
         y1 = currentY + (currentY - lastControlY);
       } else {
@@ -876,6 +891,7 @@ function simplifyPathData(pdata) {
         currentX = x;
         currentY = y;
       } else if (currentX !== x || currentY !== y) {
+
         var segments = arcToBeziers(currentX, currentY, x, y, fa, fs, rx, ry, phi);
         result.push(...segments);
 
@@ -891,7 +907,7 @@ function simplifyPathData(pdata) {
       break;
     }
 
-    lastCommand = segment.command;
+    lastCommand = currentCommand;
   }
 
   return result;

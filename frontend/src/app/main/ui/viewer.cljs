@@ -5,7 +5,6 @@
 ;; Copyright (c) KALEIDOS INC
 
 (ns app.main.ui.viewer
-  (:import goog.events.EventType)
   (:require-macros [app.main.style :as stl])
   (:require
    [app.common.data :as d]
@@ -25,7 +24,6 @@
    [app.main.ui.context :as ctx]
    [app.main.ui.hooks :as hooks]
    [app.main.ui.icons :as i]
-   [app.main.ui.static :as static]
    [app.main.ui.viewer.comments :refer [comments-layer comments-sidebar]]
    [app.main.ui.viewer.header :as header]
    [app.main.ui.viewer.inspect :as inspect]
@@ -38,6 +36,7 @@
    [app.util.globals :as globals]
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.keyboard :as kbd]
+   [app.util.object :as obj]
    [app.util.webapi :as wapi]
    [cuerdas.core :as str]
    [goog.events :as events]
@@ -334,11 +333,10 @@
                               :page page
                               :zoom zoom}])]])))
 
-(mf/defc viewer
-  [{:keys [params data]}]
-
-  (let [{:keys [page-id share-id section index interactions-mode]} params
-        {:keys [file users project permissions]} data
+(mf/defc viewer-content
+  {::mf/wrap-props false}
+  [{:keys [data page-id share-id section index interactions-mode] :as props}]
+  (let [{:keys [file users project permissions]} data
 
         new-css-system (mf/use-ctx ctx/new-css-system)
 
@@ -485,8 +483,8 @@
 
     (mf/with-effect []
       (let [events
-            [(events/listen globals/window EventType.CLICK on-click)
-             (events/listen (mf/ref-val viewer-section-ref) EventType.WHEEL on-wheel #js {"passive" false})]]
+            [(events/listen globals/window "click" on-click)
+             (events/listen (mf/ref-val viewer-section-ref) "wheel" on-wheel #js {"passive" false})]]
 
         (doseq [event dom/fullscreen-events]
           (.addEventListener globals/document event on-exit-fullscreen false))
@@ -747,26 +745,23 @@
                 :section section
                 :index index}]]))]]])))
 
-;; --- Component: Viewer Page
+;; --- Component: Viewer
 
-(mf/defc viewer-page
-  [{:keys [file-id] :as props}]
-
-  (mf/with-effect [file-id]
-    (st/emit! (dv/initialize props))
-    (fn []
-      (st/emit! (dv/finalize props))))
+(mf/defc viewer
+  {::mf/wrap-props false}
+  [{:keys [file-id share-id page-id] :as props}]
+  (mf/with-effect [file-id page-id share-id]
+    (let [params {:file-id file-id
+                  :page-id page-id
+                  :share-id share-id}]
+      (st/emit! (dv/initialize params))
+      (fn []
+        (st/emit! (dv/finalize params)))))
 
   (if-let [data (mf/deref refs/viewer-data)]
-    (let [key (str (get-in data [:file :id]))]
-      [:& viewer {:params props :data data :key key}])
+    (let [props (obj/merge props #js {:data data :key (dm/str file-id)})]
+      [:> viewer-content props])
 
     [:div.loader-content.viewer-loader
      i/loader-pencil]))
 
-(mf/defc breaking-change-notice
-  []
-  [:> static/static-header {}
-   [:div.image i/unchain]
-   [:div.main-message (tr "viewer.breaking-change.message")]
-   [:div.desc-message (tr "viewer.breaking-change.description")]])

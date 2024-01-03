@@ -13,7 +13,10 @@
 
   --scrollbar-background-color: var(--color-foreground-secondary);
   --panel-background-color: var(--color-background-primary);
+  --app-background: var(--color-background-primary);
+  --loader-background: var(--color-background-primary);
   --panel-title-background-color: var(--color-background-secondary);
+  --presence-color: var(--default-presence-color);
 
   // BUTTONS
   --button-foreground-hover: var(--color-accent-primary);
@@ -161,10 +164,11 @@
   --input-checkbox-background-color-intermediate: var(--color-foreground-secondary);
 
   // Checkbox color
-  --input-checkbox-inactive-background-color: var(--off-white);
+  --input-checkbox-inactive-background-color: var(--color-foreground-secondary);
   --input-checkbox-inactive-foreground-color: var(--color-background-primary);
   --input-checkbox-active-background-color: var(--color-accent-primary);
   --input-checkbox-active-foreground-color: var(--color-background-primary);
+  --input-checkbox-text-foreground-color: var(--color-foreground-secondary);
 
   --menu-background-color: var(--color-background-tertiary);
   --menu-foreground-color: var(--color-foreground-primary);
@@ -297,6 +301,9 @@
   --tag-background-color: var(--color-accent-primary);
 
   --link-foreground-color: var(--color-accent-primary);
+
+  --resize-area-background-color: var(--color-background-primary);
+  --resize-area-border-color: var(--color-background-quaternary);
 
   // VIEWER
   --viewer-background-color: var(--color-background-secondary);
