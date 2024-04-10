@@ -682,12 +682,12 @@
 
 (defn end-rename-shape
   "End the ongoing shape rename process"
-  ([] (end-rename-shape nil))
-  ([name]
+  ([] (end-rename-shape nil nil))
+  ([shape-id name]
    (ptk/reify ::end-rename-shape
      ptk/WatchEvent
      (watch [_ state _]
-       (when-let [shape-id (dm/get-in state [:workspace-local :shape-for-rename])]
+       (when-let [shape-id (d/nilv shape-id (dm/get-in state [:workspace-local :shape-for-rename]))]
          (let [shape (wsh/lookup-shape state shape-id)
                name        (str/trim name)
                clean-name  (cfh/clean-path name)
@@ -2013,6 +2013,7 @@
                                 (d/index-by :prev-id))
 
               selected     (:selected pdata)
+
               objects      (:objects pdata)
 
               position     (deref ms/mouse-position)
@@ -2035,6 +2036,10 @@
               index        (if (= candidate-parent-id parent-id)
                              index
                              0)
+
+              selected     (if (and (ctl/flex-layout? page-objects parent-id) (not (ctl/reverse? page-objects parent-id)))
+                             (into (d/ordered-set) (reverse selected))
+                             selected)
 
               objects      (update-vals objects (partial process-shape file-id frame-id parent-id))
 
