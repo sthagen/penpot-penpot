@@ -6,8 +6,6 @@ cd ~;
 
 source ~/.bashrc
 
-set -e;
-
 echo "[start-tmux.sh] Installing node dependencies"
 pushd ~/penpot/frontend/
 yarn install
