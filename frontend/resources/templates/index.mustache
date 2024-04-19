@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="x-ua-compatible" content="ie=edge" />
@@ -23,19 +23,19 @@
     {{/isDebug}}
 
     <link rel="icon" href="images/favicon.png" />
+    {{# manifest}}
+    <script>window.penpotWorkerURI="{{& worker}}"</script>
+    <script defer src="{{& config}}"></script>
+    <script defer src="{{& polyfills}}"></script>
+    {{/manifest}}
+
+    <script type="module" src="{{pluginRuntimeUri}}/index.mjs"></script>
 
     <script>
       window.penpotTranslations = JSON.parse({{& translations}});
       window.penpotVersion = "%version%";
       window.penpotBuildDate = "%buildDate%";
     </script>
-
-    {{# manifest}}
-    <script>window.penpotWorkerURI="{{& worker}}"</script>
-    <script src="{{& config}}"></script>
-    <script src="{{& polyfills}}"></script>
-    {{/manifest}}
-
     <!--cookie-consent-->
   </head>
   <body>
@@ -43,9 +43,10 @@
     {{> ../public/images/sprites/symbol/cursors.svg }}
     <div id="app"></div>
     <section id="modal"></section>
+
     {{# manifest}}
-    <script src="{{& shared}}"></script>
-    <script src="{{& main}}"></script>
+    <script defer src="{{& shared}}"></script>
+    <script defer src="{{& main}}"></script>
     {{/manifest}}
   </body>
 </html>
