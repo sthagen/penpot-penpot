@@ -23,6 +23,7 @@
    [app.common.types.shape.layout :as ctl]
    [app.common.types.typography :as ctt]
    [app.common.uuid :as uuid]
+   [app.main.data.comments :as dc]
    [app.main.data.events :as ev]
    [app.main.data.messages :as msg]
    [app.main.data.modal :as modal]
@@ -31,7 +32,6 @@
    [app.main.data.workspace.groups :as dwg]
    [app.main.data.workspace.notifications :as-alias dwn]
    [app.main.data.workspace.selection :as dws]
-   [app.main.data.workspace.shapes :as dwsh]
    [app.main.data.workspace.specialized-panel :as dwsp]
    [app.main.data.workspace.state-helpers :as wsh]
    [app.main.data.workspace.thumbnails :as dwt]
@@ -351,7 +351,7 @@
             parents  (into #{} (map :parent-id) shapes)]
         (when-not (empty? shapes)
           (let [[root _ changes]
-                (cflh/generate-add-component it shapes objects page-id file-id components-v2
+                (cflh/generate-add-component (pcb/empty-changes it) shapes objects page-id file-id components-v2
                                              dwg/prepare-create-group
                                              cfsh/prepare-create-artboard-from-selection)]
             (when-not (empty? (:redo-changes changes))
@@ -414,25 +414,10 @@
       (let [new-name (str/trim new-name)]
         (if (str/empty? new-name)
           (rx/empty)
-          (let [data          (get state :workspace-data)
-                [path name]   (cfh/parse-path-name new-name)
+          (let [library-data  (get state :workspace-data)
                 components-v2 (features/active-feature? state "components/v2")
-
-                update-fn
-                (fn [component]
-                  (cond-> component
-                    :always
-                    (assoc :path path
-                           :name name)
-
-                    (not components-v2)
-                    (update :objects
-                            ;; Give the same name to the root shape
-                            #(assoc-in % [id :name] name))))
-
-                changes (-> (pcb/empty-changes it)
-                            (pcb/with-library-data data)
-                            (pcb/update-component id update-fn))]
+                changes       (-> (pcb/empty-changes it)
+                                  (cflh/generate-rename-component id new-name library-data components-v2))]
 
             (rx/of (dch/commit-changes changes))))))))
 
@@ -465,35 +450,9 @@
     (watch [it state _]
       (let [libraries          (wsh/get-libraries state)
             library            (get libraries library-id)
-            component          (ctkl/get-component (:data library) component-id)
-            new-name           (:name component)
-
             components-v2      (features/active-feature? state "components/v2")
-
-            main-instance-page (when components-v2
-                                 (ctf/get-component-page (:data library) component))
-
-            new-component-id   (when components-v2
-                                 (uuid/next))
-
-            [new-component-shape new-component-shapes  ; <- null in components-v2
-             new-main-instance-shape new-main-instance-shapes]
-            (cflh/duplicate-component component new-component-id (:data library))
-
             changes (-> (pcb/empty-changes it nil)
-                        (pcb/with-page main-instance-page)
-                        (pcb/with-objects (:objects main-instance-page))
-                        (pcb/add-objects new-main-instance-shapes {:ignore-touched true})
-                        (pcb/add-component (if components-v2
-                                             new-component-id
-                                             (:id new-component-shape))
-                                           (:path component)
-                                           new-name
-                                           new-component-shapes
-                                           []
-                                           (:id new-main-instance-shape)
-                                           (:id main-instance-page)
-                                           (:annotation component)))]
+                        (cflh/generate-duplicate-component library component-id components-v2))]
 
         (rx/of (dch/commit-changes changes))))))
 
@@ -506,12 +465,29 @@
     (watch [it state _]
       (let [data (get state :workspace-data)]
         (if (features/active-feature? state "components/v2")
-          (let [component (ctkl/get-component data id)
-                page-id   (:main-instance-page component)
-                root-id   (:main-instance-id component)]
+          (let [component     (ctkl/get-component data id)
+                page-id       (:main-instance-page component)
+                root-id       (:main-instance-id component)
+                file-id       (:current-file-id state)
+                file          (wsh/get-file state file-id)
+                page          (wsh/lookup-page state page-id)
+                objects       (wsh/lookup-page-objects state page-id)
+                components-v2 (features/active-feature? state "components/v2")
+                undo-group    (uuid/next)
+                undo-id       (js/Symbol)
+                [all-parents changes]
+                (-> (pcb/empty-changes it page-id)
+                    ;; Deleting main root triggers component delete
+                    (cflh/generate-delete-shapes file page objects #{root-id} {:components-v2 components-v2
+                                                                               :undo-group undo-group
+                                                                               :undo-id undo-id}))]
             (rx/of
+             (dwu/start-undo-transaction undo-id)
              (dwt/clear-thumbnail (:current-file-id state) page-id root-id "component")
-             (dwsh/delete-shapes page-id #{root-id}))) ;; Deleting main root triggers component delete
+             (dc/detach-comment-thread #{root-id})
+             (dch/commit-changes changes)
+             (ptk/data-event :layout/update {:ids all-parents :undo-group undo-group})
+             (dwu/commit-undo-transaction undo-id)))
           (let [page-id (:current-page-id state)
                 changes (-> (pcb/empty-changes it)
                             (pcb/with-library-data data)
@@ -529,22 +505,11 @@
     (watch [it state _]
       (let [page-id      (:current-page-id state)
             current-page (dm/get-in state [:workspace-data :pages-index page-id])
-            objects      (wsh/lookup-page-objects state page-id)
             library-data (wsh/get-file state library-id)
-            {:keys [changes shape]} (cflh/prepare-restore-component library-data component-id current-page it)
-            parent-id (:parent-id shape)
-            objects (cond-> (assoc objects (:id shape) shape)
-                      (not (nil? parent-id))
-                      (update-in [parent-id :shapes]
-                                 #(conj % (:id shape))))
-
-            ;; Adds a resize-parents operation so the groups are updated. We add all the new objects
-            new-objects-ids (->> changes :redo-changes (filter #(= (:type %) :add-obj)) (mapv :id))
-            changes (-> changes
-                        (pcb/with-objects objects)
-                        (pcb/resize-parents new-objects-ids))]
-
-        (rx/of (dch/commit-changes (assoc changes :file-id library-id)))))))
+            objects      (wsh/lookup-page-objects state page-id)
+            changes      (-> (pcb/empty-changes it)
+                             (cflh/generate-restore-component library-data component-id library-id current-page objects))]
+        (rx/of (dch/commit-changes changes))))))
 
 
 (defn restore-components
@@ -606,13 +571,10 @@
     (watch [it state _]
       (let [file      (wsh/get-local-file state)
             page-id   (get state :current-page-id)
-            container (cfh/get-container file :page page-id)
             libraries (wsh/get-libraries state)
 
             changes   (-> (pcb/empty-changes it)
-                          (pcb/with-container container)
-                          (pcb/with-objects (:objects container))
-                          (cflh/generate-detach-instance container libraries id))]
+                          (cflh/generate-detach-component id file page-id libraries))]
 
         (rx/of (dch/commit-changes changes))))))
 
@@ -649,9 +611,7 @@
                       (reduce
                        (fn [changes id]
                          (cflh/generate-detach-instance changes container libraries id))
-                       (-> (pcb/empty-changes it)
-                           (pcb/with-container container)
-                           (pcb/with-objects objects))
+                       (pcb/empty-changes it)
                        selected))]
 
         (rx/of (when can-detach?
@@ -712,38 +672,6 @@
 
          (rx/take-until stopper-s))))))
 
-(defn sync-head
-  [id]
-  (ptk/reify ::sync-head
-    ptk/WatchEvent
-    (watch [it state _]
-      (log/info :msg "SYNC-head of shape" :id (str id))
-      (let [file       (wsh/get-local-file state)
-            file-full  (wsh/get-local-file-full state)
-            libraries  (wsh/get-libraries state)
-
-            page-id    (:current-page-id state)
-            container  (cfh/get-container file :page page-id)
-            objects    (:objects container)
-
-            shape-inst (ctn/get-shape container id)
-            parent     (get objects (:parent-id shape-inst))
-            head       (ctn/get-component-shape container parent)
-
-            components-v2
-            (features/active-feature? state "components/v2")
-
-            changes
-            (-> (pcb/empty-changes it)
-                (pcb/with-container container)
-                (pcb/with-objects (:objects container))
-                (cflh/generate-sync-shape-direct file-full libraries container (:id head) false components-v2))]
-
-        (log/debug :msg "SYNC-head finished" :js/rchanges (log-changes
-                                                           (:redo-changes changes)
-                                                           file))
-        (rx/of (dch/commit-changes changes))))))
-
 (defn reset-component
   "Cancels all modifications in the shape with the given id, and all its children, in
   the current page. Set all attributes equal to the ones in the linked component,
@@ -754,35 +682,29 @@
     ptk/WatchEvent
     (watch [it state _]
       (log/info :msg "RESET-COMPONENT of shape" :id (str id))
-      (let [file      (wsh/get-local-file state)
-            file-full (wsh/get-local-file-full state)
-            libraries (wsh/get-libraries state)
+      (let [file       (wsh/get-local-file state)
+            file-full  (wsh/get-local-file-full state)
+            libraries  (wsh/get-libraries state)
 
-            page-id   (:current-page-id state)
-            container (cfh/get-container file :page page-id)
+            page-id    (:current-page-id state)
+            container  (cfh/get-container file :page page-id)
 
             components-v2
             (features/active-feature? state "components/v2")
 
-            swap-slot (-> (ctn/get-shape container id)
-                          (ctk/get-swap-slot))
-
-            undo-id (js/Symbol)
+            undo-id    (js/Symbol)
 
             changes
             (-> (pcb/empty-changes it)
-                (pcb/with-container container)
-                (pcb/with-objects (:objects container))
-                (cflh/generate-sync-shape-direct file-full libraries container id true components-v2))]
+                (cflh/generate-reset-component file-full libraries container id components-v2))]
 
         (log/debug :msg "RESET-COMPONENT finished" :js/rchanges (log-changes
                                                                  (:redo-changes changes)
                                                                  file))
+
         (rx/of
          (dwu/start-undo-transaction undo-id)
          (dch/commit-changes changes)
-         (when (some? swap-slot)
-           (sync-head id))
          (dwu/commit-undo-transaction undo-id))))))
 
 (defn reset-components
@@ -937,62 +859,6 @@
                  second)
             0)))))
 
-(defn- add-component-for-swap
-  [shape file page libraries id-new-component index target-cell keep-props-values {:keys [undo-group]}]
-  (dm/assert! (uuid? id-new-component))
-  (ptk/reify ::add-component-for-swap
-    ptk/WatchEvent
-    (watch [it _ _]
-      (let [objects      (:objects page)
-            position     (gpt/point (:x shape) (:y shape))
-            changes      (-> (pcb/empty-changes it (:id page))
-                             (pcb/set-undo-group undo-group)
-                             (pcb/with-objects objects))
-            position     (-> position (with-meta {:cell target-cell}))
-            parent       (get objects (:parent-id shape))
-            inside-comp? (ctn/in-any-component? objects parent)
-
-            [new-shape changes]
-            (cflh/generate-instantiate-component changes
-                                                 objects
-                                                 (:id file)
-                                                 id-new-component
-                                                 position
-                                                 page
-                                                 libraries
-                                                 nil
-                                                 (:parent-id shape)
-                                                 (:frame-id shape)
-                                                 {:force-frame? true})
-
-            new-shape (cond-> new-shape
-                        ; if the shape isn't inside a main component, it shouldn't have a swap slot
-                        (and (nil? (ctk/get-swap-slot new-shape))
-                             inside-comp?)
-                        (update :touched cfh/set-touched-group (-> (ctf/find-swap-slot shape
-                                                                                       page
-                                                                                       {:id (:id file)
-                                                                                        :data file}
-                                                                                       libraries)
-                                                                   (ctk/build-swap-slot-group))))
-
-            changes
-            (-> changes
-                ;; Restore the properties
-                (pcb/update-shapes [(:id new-shape)] #(d/patch-object % keep-props-values))
-
-                ;; We need to set the same index as the original shape
-                (pcb/change-parent (:parent-id shape) [new-shape] index {:component-swap true
-                                                                         :ignore-touched true})
-                (cflh/change-touched new-shape
-                                     shape
-                                     (ctn/make-container page :page)
-                                     {}))]
-
-        ;; First delete so we don't break the grid layout cells
-        (rx/of (dch/commit-changes changes)
-               (dws/select-shape (:id new-shape) true))))))
-
 (defn- component-swap
   "Swaps a component with another one"
   [shape file-id id-new-component]
@@ -1000,7 +866,7 @@
   (dm/assert! (uuid? file-id))
   (ptk/reify ::component-swap
     ptk/WatchEvent
-    (watch [_ state _]
+    (watch [it state _]
       ;; First delete shapes so we have space in the layout otherwise we can have problems
       ;; in the grid creating new rows/columns to make space
       (let [file      (wsh/get-file state file-id)
@@ -1019,15 +885,18 @@
             keep-props-values (select-keys shape ctk/swap-keep-attrs)
 
             undo-id (js/Symbol)
-            undo-group (uuid/next)]
+            undo-group (uuid/next)
+
+            [new-shape all-parents changes]
+            (-> (pcb/empty-changes it (:id page))
+                (pcb/set-undo-group undo-group)
+                (cflh/generate-component-swap objects shape file page libraries id-new-component index target-cell keep-props-values))]
+
         (rx/of
          (dwu/start-undo-transaction undo-id)
-         (dwsh/delete-shapes nil (d/ordered-set (:id shape)) {:component-swap true
-                                                              :undo-id undo-id
-                                                              :undo-group undo-group})
-         (add-component-for-swap shape file page libraries id-new-component index target-cell keep-props-values
-                                 {:undo-group undo-group})
-         (ptk/data-event :layout/update {:ids [(:parent-id shape)] :undo-group undo-group})
+         (dch/commit-changes changes)
+         (dws/select-shape (:id new-shape) true)
+         (ptk/data-event :layout/update {:ids all-parents :undo-group undo-group})
          (dwu/commit-undo-transaction undo-id))))))
 
 (defn component-multi-swap
@@ -1107,34 +976,15 @@
                libraries       (wsh/get-libraries state)
                current-file-id (:current-file-id state)
 
-
-               sync-components?   (or (nil? asset-type) (= asset-type :components))
-               sync-colors?       (or (nil? asset-type) (= asset-type :colors))
-               sync-typographies? (or (nil? asset-type) (= asset-type :typographies))
-
-               library-changes (reduce
-                                pcb/concat-changes
-                                (-> (pcb/empty-changes it)
-                                    (pcb/set-undo-group undo-group))
-                                [(when sync-components?
-                                   (cflh/generate-sync-library it file-id :components asset-id library-id libraries current-file-id))
-                                 (when sync-colors?
-                                   (cflh/generate-sync-library it file-id :colors asset-id library-id libraries current-file-id))
-                                 (when sync-typographies?
-                                   (cflh/generate-sync-library it file-id :typographies asset-id library-id libraries current-file-id))])
-
-               file-changes    (reduce
-                                pcb/concat-changes
-                                (-> (pcb/empty-changes it)
-                                    (pcb/set-undo-group undo-group))
-                                [(when sync-components?
-                                   (cflh/generate-sync-file it file-id :components asset-id library-id libraries current-file-id))
-                                 (when sync-colors?
-                                   (cflh/generate-sync-file it file-id :colors asset-id library-id libraries current-file-id))
-                                 (when sync-typographies?
-                                   (cflh/generate-sync-file it file-id :typographies asset-id library-id libraries current-file-id))])
-
-               changes         (pcb/concat-changes library-changes file-changes)
+               changes         (cflh/generate-sync-file-changes
+                                (pcb/empty-changes it)
+                                undo-group
+                                asset-type
+                                file-id
+                                asset-id
+                                library-id
+                                libraries
+                                current-file-id)
 
                find-frames     (fn [change]
                                  (->> (ch/frames-changed file change)
@@ -1152,8 +1002,7 @@
             (rx/of (set-updating-library false)
                    (msg/hide-tag :sync-dialog))
             (when (seq (:redo-changes changes))
-              (rx/of (dch/commit-changes (assoc changes ;; TODO a ver qué pasa con esto
-                                                :file-id file-id))))
+              (rx/of (dch/commit-changes changes)))
             (when-not (empty? updated-frames)
               (rx/merge
                (rx/of (ptk/data-event :layout/update {:ids (map :id updated-frames) :undo-group undo-group}))

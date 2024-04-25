@@ -422,7 +422,7 @@
          (prepare-duplicate-guides shapes page ids-map delta)))))
 
 (defn- prepare-duplicate-component-change
-  [changes objects page component-root parent-id frame-id delta libraries library-data it]
+  [changes objects page component-root parent-id frame-id delta libraries library-data]
   (let [component-id (:component-id component-root)
         file-id (:component-file component-root)
         main-component    (ctf/get-component libraries file-id component-id)
@@ -447,7 +447,7 @@
                                               {})
 
         restore-component
-        #(let [restore (cflh/prepare-restore-component changes library-data (:component-id component-root) it page delta (:id component-root) parent-id frame-id)]
+        #(let [restore (cflh/prepare-restore-component changes library-data (:component-id component-root) page delta (:id component-root) parent-id frame-id)]
            [(:shape restore) (:changes restore)])
 
         [_shape changes]
@@ -467,7 +467,7 @@
      changes
 
      (ctf/is-main-of-known-component? obj libraries)
-     (prepare-duplicate-component-change changes objects page obj parent-id frame-id delta libraries library-data it)
+     (prepare-duplicate-component-change changes objects page obj parent-id frame-id delta libraries library-data)
 
      :else
      (let [frame?      (cfh/frame-shape? obj)
@@ -485,6 +485,7 @@
            duplicating-component? (or duplicating-component? (ctk/instance-head? obj))
            is-component-main?     (ctk/main-instance? obj)
            subinstance-head?      (ctk/subinstance-head? obj)
+           instance-root?         (ctk/instance-root? obj)
 
            into-component?        (and duplicating-component?
                                        (ctn/in-any-component? objects parent))
@@ -507,7 +508,9 @@
                       :parent-id parent-id
                       :frame-id frame-id)
 
-               (cond-> (and subinstance-head? remove-swap-slot?)
+               (cond-> (and (not instance-root?)
+                            subinstance-head?
+                            remove-swap-slot?)
                  (ctk/remove-swap-slot))
 
                (dissoc :shapes
@@ -580,8 +583,9 @@
                                                  true
                                                  (and remove-swap-slot?
                                                       ;; only remove swap slot of children when the current shape
-                                                      ;; is not a subinstance head
-                                                      (not subinstance-head?))))
+                                                      ;; is not a subinstance head nor a instance root
+                                                      (not subinstance-head?)
+                                                      (not instance-root?))))
                changes
                (map (d/getf objects) (:shapes obj)))))))
 
