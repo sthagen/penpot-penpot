@@ -159,6 +159,8 @@ RUN set -eux; \
     tar -xf /tmp/nodejs.tar.gz --strip-components=1; \
     chown -R root /usr/local/nodejs; \
     corepack enable; \
+    corepack install -g yarn@4.2.2; \
+    npx playwright install --with-deps chromium; \
     rm -rf /tmp/nodejs.tar.gz;
 
 RUN set -ex; \
