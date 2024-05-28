@@ -13,6 +13,7 @@
    [app.main.ui.components.search-bar :refer [search-bar]]
    [app.main.ui.components.title-bar :refer [title-bar]]
    [app.main.ui.icons :as i]
+   [app.util.avatars :as avatars]
    [app.util.http :as http]
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.object :as obj]
@@ -42,7 +43,9 @@
              (on-remove-plugin index))))]
     [:div {:class (stl/css :plugins-list-element)}
      [:div {:class (stl/css :plugin-icon)}
-      (when (some? icon) [:img {:src (dm/str host icon)}])]
+      [:img {:src (if (some? icon)
+                    (dm/str host icon)
+                    (avatars/generate {:name name}))}]]
      [:div {:class (stl/css :plugin-description)}
       [:div {:class (stl/css :plugin-title)} name]
       [:div {:class (stl/css :plugin-summary)} (d/nilv description "")]]
@@ -182,19 +185,22 @@
 
        [:hr]
 
-       [:& title-bar {:collapsable false
-                      :title (tr "workspace.plugins.installed-plugins")}]
-
        (if (empty? plugins-state)
          [:div {:class (stl/css :plugins-empty)}
-          [:div {:class (stl/css :plugins-empty-logo)} i/logo-icon]
-          [:div {:class (stl/css :plugins-empty-text)} (tr "workspace.plugins.empty-plugins")]]
+          [:div {:class (stl/css :plugins-empty-logo)} i/rocket]
+          [:div {:class (stl/css :plugins-empty-text)} (tr "workspace.plugins.empty-plugins")]
+          [:a {:class (stl/css :plugins-link) :href "#"}
+           (tr "workspace.plugins.plugin-list-link") i/external-link]]
 
-         [:div {:class (stl/css :plugins-list)}
+         [:*
+          [:& title-bar {:collapsable false
+                         :title (tr "workspace.plugins.installed-plugins")}]
 
-          (for [[idx manifest] (d/enumerate plugins-state)]
-            [:& plugin-entry {:key (dm/str "plugin-" idx)
-                              :index idx
-                              :manifest manifest
-                              :on-open-plugin handle-open-plugin
-                              :on-remove-plugin handle-remove-plugin}])])]]]))
+          [:div {:class (stl/css :plugins-list)}
+
+           (for [[idx manifest] (d/enumerate plugins-state)]
+             [:& plugin-entry {:key (dm/str "plugin-" idx)
+                               :index idx
+                               :manifest manifest
+                               :on-open-plugin handle-open-plugin
+                               :on-remove-plugin handle-remove-plugin}])]])]]]))
