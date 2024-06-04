@@ -100,7 +100,6 @@
                    (= :ldap-not-initialized (:code cause)))
               (st/emit! (msg/error (tr "errors.ldap-disabled")))
 
-
               (and (= :restriction (:type cause))
                    (= :admin-only-profile (:code cause)))
               (reset! error (tr "errors.profile-blocked"))
@@ -300,13 +299,4 @@
          [:& lk/link {:action go-register
                       :class (stl/css :register-link)
                       :data-test "register-submit"}
-          (tr "auth.register-submit")]])
-
-      (when (contains? cf/flags :demo-users)
-        [:div {:class (stl/css :demo-account)}
-         [:span  {:class (stl/css :demo-account-text)}
-          (tr "auth.create-demo-profile") " "]
-         [:& lk/link {:action create-demo-profile
-                      :class (stl/css :demo-account-link)
-                      :data-test "demo-account-link"}
-          (tr "auth.create-demo-account")]])]]))
+          (tr "auth.register-submit")]])]]))
