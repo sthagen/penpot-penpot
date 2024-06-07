@@ -38,8 +38,9 @@
   (l/derived :workspace-annotations st/state))
 
 (mf/defc component-annotation
-  {::mf/props :obj}
-  [{:keys [id shape component]}]
+  {::mf/props :obj
+   ::mf/private true}
+  [{:keys [id shape component rerender-fn]}]
   (let [main-instance? (:main-instance shape)
         component-id   (:component-id shape)
         annotation     (:annotation component)
@@ -57,6 +58,7 @@
         textarea-ref   (mf/use-ref)
 
         state          (mf/deref ref:annotations-state)
+
         expanded?      (:expanded state)
         create-id      (:id-for-create state)
         creating?      (= id create-id)
@@ -89,7 +91,8 @@
              (reset! editing* false)
              (when creating?
                (st/emit! (dw/set-annotations-id-for-create nil)))
-             (adjust-textarea-size))))
+             (adjust-textarea-size)
+             (rerender-fn))))
 
         on-edit
         (mf/use-fn
@@ -98,7 +101,8 @@
            (when ^boolean main-instance?
              (when-let [textarea (mf/ref-val textarea-ref)]
                (reset! editing* true)
-               (dom/focus! textarea)))))
+               (dom/focus! textarea)
+               (rerender-fn)))))
 
         on-save
         (mf/use-fn
@@ -111,8 +115,8 @@
                  (reset! editing* false)
                  (st/emit! (dw/update-component-annotation component-id text))
                  (when ^boolean creating?
-                   (st/emit! (dw/set-annotations-id-for-create nil))))))))
-
+                   (st/emit! (dw/set-annotations-id-for-create nil)))
+                 (rerender-fn))))))
 
         on-delete-annotation
         (mf/use-fn
@@ -124,7 +128,8 @@
                               ;; (ptk/data-event {::ev/name "delete-component-annotation"})
                               (when creating?
                                 (dw/set-annotations-id-for-create nil))
-                              (dw/update-component-annotation component-id nil)))]
+                              (dw/update-component-annotation component-id nil)
+                              (rerender-fn)))]
              (st/emit! (modal/show
                         {:type :confirm
                          :title (tr "modals.delete-component-annotation.title")
@@ -566,6 +571,17 @@
              (when can-swap? (st/emit! (dwsp/open-specialized-panel :component-swap)))
              (tm/schedule-on-idle #(dom/focus! (dom/get-element search-id))))))
 
+        ;; NOTE: function needed for force rerender from the bottom
+        ;; components. This is because `component-annotation`
+        ;; component changes the component but that has no direct
+        ;; reflection on shape which is passed on params. So for avoid
+        ;; the need to modify the shape artificially we just pass a
+        ;; rerender helper to it via react context mechanism
+        rerender-fn
+        (mf/use-fn
+         (fn []
+           (swap! state* update :render inc)))
+
         menu-entries         (cmm/generate-components-menu-entries shapes components-v2)
         show-menu?           (seq menu-entries)
         path (->> component (:path) (cfh/split-path) (cfh/join-path-with-dot))]
@@ -631,6 +647,6 @@
             [:& component-swap {:shapes copies}])
 
           (when (and (not swap-opened?) (not multi) components-v2)
-            [:& component-annotation {:id id :shape shape :component component}])
+            [:& component-annotation {:id id :shape shape :component component :rerender-fn rerender-fn}])
           (when (dbg/enabled? :display-touched)
             [:div ":touched " (str (:touched shape))])])])))
