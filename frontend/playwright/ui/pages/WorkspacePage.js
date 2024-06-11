@@ -102,6 +102,13 @@ export class WorkspacePage extends BaseWebSocketPage {
     await this.page.mouse.up();
   }
 
+  async moveSelectionToShape(name) {
+    await this.page.locator('rect.viewport-selrect').hover();
+    await this.page.mouse.down();
+    await this.viewport.getByTestId(name).first().hover({ force: true });
+    await this.page.mouse.up();
+  }
+
   async clickLeafLayer(name, clickOptions = {}) {
     const layer = this.layers.getByText(name);
     await layer.click(clickOptions);
@@ -111,7 +118,11 @@ export class WorkspacePage extends BaseWebSocketPage {
     const layer = this.layers.getByTestId("layer-item").filter({ has: this.page.getByText(name) });
     await layer.getByRole("button").click(clickOptions);
   }
-      
+
+  async expectSelectedLayer(name) {
+    await expect(this.layers.getByTestId("layer-row").filter({ has: this.page.getByText(name) })).toHaveClass(/selected/);
+  }
+
   async clickAssets(clickOptions = {}) {
     await this.assets.click(clickOptions);
   }
