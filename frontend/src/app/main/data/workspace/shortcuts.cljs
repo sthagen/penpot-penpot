@@ -119,12 +119,12 @@
    :group                {:tooltip (ds/meta "G")
                           :command (ds/c-mod "g")
                           :subsections [:modify-layers]
-                          :fn #(emit-when-no-readonly dw/group-selected)}
+                          :fn #(emit-when-no-readonly (dw/group-selected))}
 
    :ungroup              {:tooltip (ds/shift "G")
                           :command "shift+g"
                           :subsections [:modify-layers]
-                          :fn #(emit-when-no-readonly dw/ungroup-selected)}
+                          :fn #(emit-when-no-readonly (dw/ungroup-selected))}
 
    :mask                 {:tooltip (ds/meta "M")
                           :command (ds/c-mod "m")
@@ -436,14 +436,16 @@
                           :command (ds/a-mod "p")
                           :subsections [:panels]
                           :fn #(do (r/set-resize-type! :bottom)
-                                   (emit-when-no-readonly (dw/remove-layout-flag :textpalette)
+                                   (emit-when-no-readonly (dw/remove-layout-flag :hide-palettes)
+                                                          (dw/remove-layout-flag :textpalette)
                                                           (toggle-layout-flag :colorpalette)))}
 
    :toggle-textpalette   {:tooltip (ds/alt "T")
                           :command (ds/a-mod "t")
                           :subsections [:panels]
                           :fn #(do (r/set-resize-type! :bottom)
-                                   (emit-when-no-readonly (dw/remove-layout-flag :colorpalette)
+                                   (emit-when-no-readonly (dw/remove-layout-flag :hide-palettes)
+                                                          (dw/remove-layout-flag :colorpalette)
                                                           (toggle-layout-flag :textpalette)))}
 
    :hide-ui              {:tooltip "\\"
