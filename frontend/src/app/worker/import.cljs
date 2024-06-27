@@ -50,7 +50,9 @@
          path (case type
                 :manifest           (str "manifest.json")
                 :page               (str file-id "/" id ".svg")
-                :colors             (str file-id "/colors.json")
+                :colors-list        (str file-id "/colors.json")
+                :colors             (let [ext (cm/mtype->extension (:mtype media))]
+                                      (str/concat file-id "/colors/" id ext))
                 :typographies       (str file-id "/typographies.json")
                 :media-list         (str file-id "/media.json")
                 :media              (let [ext (cm/mtype->extension (:mtype media))]
@@ -223,6 +225,32 @@
               (uuid? (get item :typography-ref-file))
               (d/update-when :typography-ref-file resolve)))))))
 
+(defn resolve-fills-content
+  [fills context]
+  (let [resolve (:resolve context)]
+    (->> fills
+         (mapv
+          (fn [fill]
+            (cond-> fill
+              (uuid? (get fill :fill-color-ref-id))
+              (d/update-when :fill-color-ref-id resolve)
+
+              (uuid? (get fill :fill-color-ref-file))
+              (d/update-when :fill-color-ref-file resolve)))))))
+
+(defn resolve-strokes-content
+  [fills context]
+  (let [resolve (:resolve context)]
+    (->> fills
+         (mapv
+          (fn [fill]
+            (cond-> fill
+              (uuid? (get fill :stroke-color-ref-id))
+              (d/update-when :stroke-color-ref-id resolve)
+
+              (uuid? (get fill :stroke-color-ref-file))
+              (d/update-when :stroke-color-ref-file resolve)))))))
+
 (defn resolve-data-ids
   [data type context]
   (let [resolve (:resolve context)]
@@ -237,6 +265,12 @@
 
         (cond-> (= type :text)
           (d/update-when :content resolve-text-content context))
+
+        (cond-> (:fills data)
+          (d/update-when :fills resolve-fills-content context))
+
+        (cond-> (:strokes data)
+          (d/update-when :strokes resolve-strokes-content context))
 
         (cond-> (and (= type :frame) (= :grid (:layout data)))
           (update
@@ -528,15 +562,36 @@
   (if (:has-colors context)
     (let [resolve (:resolve context)
           add-color
-          (fn [file [id color]]
+          (fn [file color]
             (let [color (-> color
                             (d/update-in-when [:gradient :type] keyword)
-                            (assoc :id (resolve id)))]
+                            (d/update-in-when [:image :id] resolve)
+                            (update :id resolve))]
               (fb/add-library-color file color)))]
-      (->> (get-file context :colors)
+      (->> (get-file context :colors-list)
            (rx/merge-map (comp d/kebab-keys parser/string->uuid))
+           (rx/mapcat
+            (fn [[id color]]
+              (let [color (assoc color :id id)
+                    color-image (:image color)
+                    upload-image? (some? color-image)
+                    color-image-id (:id color-image)]
+                (if upload-image?
+                  (->> (get-file context :colors color-image-id color-image)
+                       (rx/map (fn [blob]
+                                 (let [content (.slice blob 0 (.-size blob) (:mtype color-image))]
+                                   {:name (:name color-image)
+                                    :id (resolve color-image-id)
+                                    :file-id (:id file)
+                                    :content content
+                                    :is-local false})))
+                       (rx/tap #(progress! context :upload-media (:name %)))
+                       (rx/merge-map #(rp/cmd! :upload-file-media-object %))
+                       (rx/map (constantly color))
+                       (rx/catch #(do (.error js/console (str "Error uploading color-image: " (:name color-image)))
+                                      (rx/empty))))
+                  (rx/of color)))))
            (rx/reduce add-color file)))
-
     (rx/of file)))
 
 (defn process-library-typographies
