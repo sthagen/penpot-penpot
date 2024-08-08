@@ -12,7 +12,18 @@
 
 ### :bug: Bugs fixed
 
+- Fix wrong props on padding input [Taiga #8254](https://tree.taiga.io/project/penpot/issue/8254)
+- Fix fill collapsed options [Taiga #8351](https://tree.taiga.io/project/penpot/issue/8351)
+- Fix scroll on color picker modal [Taiga #8353](https://tree.taiga.io/project/penpot/issue/8353)
 - Fix components are not dragged from the group to the assets tab [Taiga #8273](https://tree.taiga.io/project/penpot/issue/8273)
+
+## 2.1.2
+
+### :bug: Bugs fixed
+
+- User switch language to "zh_hant" will get 400 [Github #4884](https://github.com/penpot/penpot/issues/4884)
+- Smtp config ignoring port if ssl is set [Github #4872](https://github.com/penpot/penpot/issues/4872)
+- Ability to let users to authenticate with a private oidc provider only [Github #4963](https://github.com/penpot/penpot/issues/4963)
 
 ## 2.1.1
 
