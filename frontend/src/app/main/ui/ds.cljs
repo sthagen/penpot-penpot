@@ -14,8 +14,10 @@
    [app.main.ui.ds.foundations.typography :refer [typography-list]]
    [app.main.ui.ds.foundations.typography.heading :refer [heading*]]
    [app.main.ui.ds.foundations.typography.text :refer [text*]]
+   [app.main.ui.ds.notifications.toast :refer [toast*]]
    [app.main.ui.ds.product.loader :refer [loader*]]
-   [app.main.ui.ds.storybook :as sb]))
+   [app.main.ui.ds.storybook :as sb]
+   [app.main.ui.ds.tab-switcher :refer [tab-switcher*]]))
 
 (def default
   "A export used for storybook"
@@ -27,6 +29,8 @@
        :Loader loader*
        :RawSvg raw-svg*
        :Text text*
+       :TabSwitcher tab-switcher*
+       :Toast toast*
        ;; meta / misc
        :meta #js {:icons (clj->js (sort icon-list))
                   :svgs (clj->js (sort raw-svg-list))
