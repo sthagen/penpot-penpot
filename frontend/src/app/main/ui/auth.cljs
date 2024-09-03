@@ -8,7 +8,6 @@
   (:require-macros [app.main.style :as stl])
   (:require
    [app.common.data.macros :as dm]
-   [app.config :as cf]
    [app.main.data.users :as du]
    [app.main.store :as st]
    [app.main.ui.auth.login :refer [login-page]]
@@ -29,15 +28,10 @@
                          (not= section :auth-register-validate)
                          (not= section :auth-register-success))
         params  (:query-params route)
-        error   (:error params)
-        default-light?   (cf/external-feature-flag "onboarding-02" "test")]
+        error   (:error params)]
 
     (mf/with-effect []
       (dom/set-html-title (tr "title.default")))
-
-    (mf/with-effect [default-light?]
-      (when default-light?
-        (dom/set-html-theme-color "light")))
 
     (mf/with-effect [error]
       (when error
