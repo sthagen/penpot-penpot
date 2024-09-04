@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 2.3.0
+
+### :rocket: Epics and highlights
+
+### :boom: Breaking changes & Deprecations
+
+### :heart: Community contributions (Thank you!)
+
+### :sparkles: New features
+
+### :bug: Bugs fixed
+
 ## 2.2.0
 
 ### :rocket: Epics and highlights
@@ -76,16 +88,17 @@
 - Fix scroll on color picker modal [Taiga #8353](https://tree.taiga.io/project/penpot/issue/8353)
 - Fix components are not dragged from the group to the assets tab [Taiga #8273](https://tree.taiga.io/project/penpot/issue/8273)
 
+## 2.1.4
+
+### :bug: Bugs fixed
+
+- Fix json encoding on zip encoding decoding.
+- Add schema validation for color changes.
+- Fix render of some texts without position data.
 
 ## 2.1.3
 
 - Don't allow registration when registration is disabled and invitation token is used [Github #4975](https://github.com/penpot/penpot/issues/4975)
-
-## 2.1.2
-
-### :bug: Bugs fixed
-
-- Don't allow registry with email and password, if password login is disabled (invitation workflow) [Github #4975](https://github.com/penpot/penpot/issues/4975)
 
 ## 2.1.2
 
