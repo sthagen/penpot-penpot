@@ -79,7 +79,7 @@
    [app.util.http :as http]
    [app.util.i18n :as i18n :refer [tr]]
    [app.util.router :as rt]
-   [app.util.storage :refer [storage]]
+   [app.util.storage :as storage]
    [app.util.timers :as tm]
    [app.util.webapi :as wapi]
    [beicon.v2.core :as rx]
@@ -336,7 +336,7 @@
     ptk/UpdateEvent
     (update [_ state]
       (assoc state
-             :recent-colors (:recent-colors @storage)
+             :recent-colors (:recent-colors storage/user)
              :workspace-ready? false
              :current-file-id file-id
              :current-project-id project-id
@@ -1676,17 +1676,19 @@
 
 (def ^:private
   schema:paste-data
-  (sm/define
-    [:map {:title "paste-data"}
-     [:type [:= :copied-shapes]]
-     [:features ::sm/set-of-strings]
-     [:version :int]
-     [:file-id ::sm/uuid]
-     [:selected ::sm/set-of-uuid]
-     [:objects
-      [:map-of ::sm/uuid :map]]
-     [:images [:set :map]]
-     [:position {:optional true} ::gpt/point]]))
+  [:map {:title "paste-data"}
+   [:type [:= :copied-shapes]]
+   [:features ::sm/set-of-strings]
+   [:version :int]
+   [:file-id ::sm/uuid]
+   [:selected ::sm/set-of-uuid]
+   [:objects
+    [:map-of ::sm/uuid :map]]
+   [:images [:set :map]]
+   [:position {:optional true} ::gpt/point]])
+
+(def validate-paste-data!
+  (sm/validate-fn schema:paste-data))
 
 (defn- paste-transit
   [{:keys [images] :as pdata}]
@@ -1711,9 +1713,8 @@
         (let [file-id (:current-file-id state)
               features (features/get-team-enabled-features state)]
 
-          (sm/validate! schema:paste-data pdata
-                        {:hint "invalid paste data"
-                         :code :invalid-paste-data})
+          (validate-paste-data! pdata {:hint "invalid paste data"
+                                       :code :invalid-paste-data})
 
           (cfeat/check-paste-features! features (:features pdata))
           (if (= file-id (:file-id pdata))
