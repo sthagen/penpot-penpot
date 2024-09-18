@@ -5,45 +5,20 @@
 ;; Copyright (c) KALEIDOS INC
 
 (ns app.common.schema.generators
-  (:refer-clojure :exclude [set subseq uuid for filter map let boolean])
+  (:refer-clojure :exclude [set subseq uuid filter map let boolean])
   #?(:cljs (:require-macros [app.common.schema.generators]))
   (:require
    [app.common.schema.registry :as sr]
    [app.common.uri :as u]
    [app.common.uuid :as uuid]
    [clojure.core :as c]
-   [clojure.test.check :as tc]
    [clojure.test.check.generators :as tg]
-   [clojure.test.check.properties :as tp]
    [cuerdas.core :as str]
    [malli.generator :as mg]))
-
-(defn default-reporter-fn
-  [{:keys [type result] :as args}]
-  (case type
-    :complete
-    (prn (select-keys args [:result :num-tests :seed "time-elapsed-ms"]))
-
-    :failure
-    (do
-      (prn (select-keys args [:num-tests :seed :failed-after-ms]))
-      (when #?(:clj (instance? Throwable result)
-               :cljs (instance? js/Error result))
-        (throw result)))
-
-    nil))
-
-(defmacro for
-  [& params]
-  `(tp/for-all ~@params))
 
 (defmacro let
   [& params]
   `(tg/let ~@params))
-
-(defn check!
-  [p & {:keys [num] :or {num 20} :as options}]
-  (tc/quick-check num p (assoc options :reporter-fn default-reporter-fn :max-size 50)))
 
 (defn sample
   ([g]
@@ -83,6 +58,11 @@
     (tg/such-that (fn [v] (>= (count v) 4)) $$ 100)
     (tg/fmap str/lower $$)))
 
+(defn word-keyword
+  []
+  (->> (word-string)
+       (tg/fmap keyword)))
+
 (defn email
   []
   (->> (word-string)
@@ -90,7 +70,6 @@
        (tg/fmap str/lower)
        (tg/fmap (fn [v]
                   (str v "@example.net")))))
-
 
 (defn uri
   []
@@ -103,8 +82,7 @@
 
 (defn uuid
   []
-  (->> tg/small-integer
-       (tg/fmap (fn [_] (uuid/next)))))
+  (tg/fmap (fn [_] (uuid/next)) (small-int)))
 
 (defn subseq
   "Given a collection, generates \"subsequences\" which are sequences

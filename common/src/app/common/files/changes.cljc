@@ -10,21 +10,25 @@
    [app.common.data.macros :as dm]
    [app.common.exceptions :as ex]
    [app.common.files.helpers :as cfh]
+   [app.common.geom.point :as gpt]
    [app.common.geom.shapes :as gsh]
    [app.common.schema :as sm]
    [app.common.schema.desc-native :as smd]
+   [app.common.schema.generators :as sg]
    [app.common.types.color :as ctc]
    [app.common.types.colors-list :as ctcl]
    [app.common.types.component :as ctk]
    [app.common.types.components-list :as ctkl]
    [app.common.types.container :as ctn]
    [app.common.types.file :as ctf]
+   [app.common.types.grid :as ctg]
    [app.common.types.page :as ctp]
    [app.common.types.pages-list :as ctpl]
    [app.common.types.shape :as cts]
    [app.common.types.shape-tree :as ctst]
    [app.common.types.typographies-list :as ctyl]
    [app.common.types.typography :as ctt]
+   [app.common.uuid :as uuid]
    [clojure.set :as set]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -60,6 +64,111 @@
      [:type [:= :set-remote-synced]]
      [:remote-synced {:optional true} [:maybe :boolean]]]]])
 
+(def schema:set-default-grid-change
+  (let [gen (->> (sg/elements #{:square :column :row})
+                 (sg/mcat (fn [grid-type]
+                            (sg/fmap (fn [params]
+                                       {:page-id (uuid/next)
+                                        :type :set-default-grid
+                                        :grid-type grid-type
+                                        :params params})
+
+                                     (case grid-type
+                                       :square (sg/generator ctg/schema:square-params)
+                                       :column (sg/generator ctg/schema:column-params)
+                                       :row    (sg/generator ctg/schema:column-params))))))]
+
+    [:multi {:decode/json #(update % :grid-type keyword)
+             :gen/gen gen
+             :dispatch :grid-type
+             ::smd/simplified true}
+     [:square
+      [:map
+       [:type [:= :set-default-grid]]
+       [:page-id ::sm/uuid]
+       [:grid-type [:= :square]]
+       [:params [:maybe ctg/schema:square-params]]]]
+
+     [:column
+      [:map
+       [:type [:= :set-default-grid]]
+       [:page-id ::sm/uuid]
+       [:grid-type [:= :column]]
+       [:params [:maybe ctg/schema:column-params]]]]
+
+     [:row
+      [:map
+       [:type [:= :set-default-grid]]
+       [:page-id ::sm/uuid]
+       [:grid-type [:= :row]]
+       [:params [:maybe ctg/schema:column-params]]]]]))
+
+(def schema:set-guide-change
+  (let [schema [:map {:title "SetGuideChange"}
+                [:type [:= :set-guide]]
+                [:page-id ::sm/uuid]
+                [:id ::sm/uuid]
+                [:params [:maybe ::ctp/guide]]]
+        gen    (->> (sg/generator schema)
+                    (sg/fmap (fn [change]
+                               (if (some? (:params change))
+                                 (update change :params assoc :id (:id change))
+                                 change))))]
+    [:schema {:gen/gen gen} schema]))
+
+(def schema:set-flow-change
+  (let [schema [:map {:title "SetFlowChange"}
+                [:type [:= :set-flow]]
+                [:page-id ::sm/uuid]
+                [:id ::sm/uuid]
+                [:params [:maybe ::ctp/flow]]]
+
+        gen    (->> (sg/generator schema)
+                    (sg/fmap (fn [change]
+                               (if (some? (:params change))
+                                 (update change :params assoc :id (:id change))
+                                 change))))]
+
+    [:schema {:gen/gen gen} schema]))
+
+(def schema:set-plugin-data-change
+  (let [types  #{:file :page :shape :color :typography :component}
+
+        schema [:map {:title "SetPagePluginData"}
+                [:type [:= :set-plugin-data]]
+                [:object-type [::sm/one-of types]]
+                ;; It's optional because files don't need the id for type :file
+                [:object-id {:optional true} ::sm/uuid]
+                [:page-id {:optional true} ::sm/uuid]
+                [:namespace {:gen/gen (sg/word-keyword)} :keyword]
+                [:key {:gen/gen (sg/word-string)} :string]
+                [:value [:maybe [:string {:gen/gen (sg/word-string)}]]]]
+
+        check1 [:fn {:error/path [:page-id]
+                     :error/message "missing page-id"}
+                (fn [{:keys [object-type] :as change}]
+                  (if (= :shape object-type)
+                    (uuid? (:page-id change))
+                    true))]
+
+        gen    (->> (sg/generator schema)
+                    (sg/filter :object-id)
+                    (sg/filter :page-id)
+                    (sg/fmap (fn [{:keys [object-type] :as change}]
+                               (cond
+                                 (= :file object-type)
+                                 (-> change
+                                     (dissoc :object-id)
+                                     (dissoc :page-id))
+
+                                 (= :shape object-type)
+                                 change
+
+                                 :else
+                                 (dissoc change :page-id)))))]
+
+    [:and {:gen/gen gen} schema check1]))
+
 (def schema:change
   [:schema
    [:multi {:dispatch :type
@@ -67,13 +176,18 @@
             :decode/json #(update % :type keyword)
             ::smd/simplified true}
     [:set-option
-     [:map {:title "SetOptionChange"}
-      [:type [:= :set-option]]
+
+     ;; DEPRECATED: remove before 2.3 release
+     ;;
+     ;; Is still there for not cause error when event is received
+     [:map {:title "SetOptionChange"}]]
+
+    [:set-comment-thread-position
+     [:map
+      [:comment-thread-id ::sm/uuid]
       [:page-id ::sm/uuid]
-      [:option [:union
-                [:keyword]
-                [:vector {:gen/max 10} :keyword]]]
-      [:value :any]]]
+      [:frame-id [:maybe ::sm/uuid]]
+      [:position [:maybe ::gpt/point]]]]
 
     [:add-obj
      [:map {:title "AddObjChange"}
@@ -102,6 +216,10 @@
       [:page-id {:optional true} ::sm/uuid]
       [:component-id {:optional true} ::sm/uuid]
       [:ignore-touched {:optional true} :boolean]]]
+
+    [:set-guide schema:set-guide-change]
+    [:set-flow schema:set-flow-change]
+    [:set-default-grid schema:set-default-grid-change]
 
     [:fix-obj
      [:map {:title "FixObjChange"}
@@ -143,19 +261,12 @@
      [:map {:title "ModPageChange"}
       [:type [:= :mod-page]]
       [:id ::sm/uuid]
-      [:name :string]]]
+      ;; All props are optional, background can be nil because is the
+      ;; way to remove already set background
+      [:background {:optional true} [:maybe ::ctc/rgb-color]]
+      [:name {:optional true} :string]]]
 
-    [:mod-plugin-data
-     [:map {:title "ModPagePluginData"}
-      [:type [:= :mod-plugin-data]]
-      [:object-type [::sm/one-of #{:file :page :shape :color :typography :component}]]
-      ;; It's optional because files don't need the id for type :file
-      [:object-id {:optional true} [:maybe ::sm/uuid]]
-      ;; Only needed in type shape
-      [:page-id {:optional true} [:maybe ::sm/uuid]]
-      [:namespace :keyword]
-      [:key :string]
-      [:value [:maybe :string]]]]
+    [:set-plugin-data schema:set-plugin-data-change]
 
     [:del-page
      [:map {:title "DelPageChange"}
@@ -263,11 +374,11 @@
 (sm/register! ::change schema:change)
 (sm/register! ::changes schema:changes)
 
-(def check-change!
-  (sm/check-fn ::change))
+(def valid-change?
+  (sm/lazy-validator schema:change))
 
 (def check-changes!
-  (sm/check-fn ::changes))
+  (sm/check-fn schema:changes))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Specific helpers
@@ -305,7 +416,7 @@
                          (not= shape-old shape-new))
                 (dm/verify!
                  "expected valid shape"
-                 (and (cts/check-shape! shape-new)
+                 (and (cts/valid-shape? shape-new)
                       (cts/shape? shape-new))))))]
 
     (->> (into #{} (map :page-id) items)
@@ -339,12 +450,10 @@
    (process-changes data items true))
 
   ([data items verify?]
-   ;; When verify? false we spec the schema validation. Currently used to make just
-   ;; 1 validation even if the changes are applied twice
+   ;; When verify? false we spec the schema validation. Currently used
+   ;; to make just 1 validation even if the changes are applied twice
    (when verify?
-     (dm/verify!
-      "expected valid changes"
-      (check-changes! items)))
+     (check-changes! items))
 
    (binding [*touched-changes* (volatile! #{})]
      (let [result (reduce #(or (process-change %1 %2) %1) data items)
@@ -356,14 +465,71 @@
        #?(:clj (validate-shapes! data result items))
        result))))
 
+;; DEPRECATED: remove before 2.3 release
 (defmethod process-change :set-option
-  [data {:keys [page-id option value]}]
+  [data _]
+  data)
+
+;; --- Comment Threads
+
+(defmethod process-change :set-comment-thread-position
+  [data {:keys [page-id comment-thread-id position frame-id]}]
   (d/update-in-when data [:pages-index page-id]
-                    (fn [data]
-                      (let [path (if (seqable? option) option [option])]
-                        (if value
-                          (assoc-in data (into [:options] path) value)
-                          (assoc data :options (d/dissoc-in (:options data) path)))))))
+                    (fn [page]
+                      (if (and position frame-id)
+                        (update page :comment-thread-positions assoc
+                                comment-thread-id {:frame-id frame-id
+                                                   :position position})
+                        (update page :comment-thread-positions dissoc
+                                comment-thread-id)))))
+
+;; --- Guides
+
+(defmethod process-change :set-guide
+  [data {:keys [page-id id params]}]
+  (if (nil? params)
+    (d/update-in-when data [:pages-index page-id]
+                      (fn [page]
+                        (let [guides (get page :guides)
+                              guides (dissoc guides id)]
+                          (if (empty? guides)
+                            (dissoc page :guides)
+                            (assoc page :guides guides)))))
+
+    (let [params (assoc params :id id)]
+      (d/update-in-when data [:pages-index page-id] update :guides assoc id params))))
+
+;; --- Flows
+
+(defmethod process-change :set-flow
+  [data {:keys [page-id id params]}]
+  (if (nil? params)
+    (d/update-in-when data [:pages-index page-id]
+                      (fn [page]
+                        (let [flows (get page :flows)
+                              flows (dissoc flows id)]
+                          (if (empty? flows)
+                            (dissoc page :flows)
+                            (assoc page :flows flows)))))
+
+    (let [params (assoc params :id id)]
+      (d/update-in-when data [:pages-index page-id] update :flows assoc id params))))
+
+;; --- Grids
+
+(defmethod process-change :set-default-grid
+  [data {:keys [page-id grid-type params]}]
+  (if (nil? params)
+    (d/update-in-when data [:pages-index page-id]
+                      (fn [page]
+                        (let [default-grids (get page :default-grids)
+                              default-grids (dissoc default-grids grid-type)]
+                          (if (empty? default-grids)
+                            (dissoc page :default-grids)
+                            (assoc page :default-grids default-grids)))))
+    (d/update-in-when data [:pages-index page-id] update :default-grids assoc grid-type params)))
+
+;; --- Shape / Obj
 
 (defmethod process-change :add-obj
   [data {:keys [id obj page-id component-id frame-id parent-id index ignore-touched]}]
@@ -603,25 +769,34 @@
     (ctpl/add-page data page)))
 
 (defmethod process-change :mod-page
-  [data {:keys [id name]}]
-  (d/update-in-when data [:pages-index id] assoc :name name))
+  [data {:keys [id] :as params}]
+  (d/update-in-when data [:pages-index id]
+                    (fn [page]
+                      (let [name (get params :name)
+                            bg   (get params :background :not-found)]
+                        (cond-> page
+                          (string? name)
+                          (assoc :name name)
 
-(defmethod process-change :mod-plugin-data
+                          (string? bg)
+                          (assoc :background bg)
+
+                          (nil? bg)
+                          (dissoc :background))))))
+
+(defmethod process-change :set-plugin-data
   [data {:keys [object-type object-id page-id namespace key value]}]
-
-  (when (and (= object-type :shape) (nil? page-id))
-    (ex/raise :type :internal :hint "update for shapes needs a page-id"))
-
   (letfn [(update-fn [data]
             (if (some? value)
               (assoc-in data [:plugin-data namespace key] value)
-              (update-in data [:plugin-data namespace] (fnil dissoc {}) key)))]
+              (update-in data [:plugin-data namespace] dissoc key)))]
+
     (case object-type
       :file
       (update-fn data)
 
       :page
-      (d/update-in-when data [:pages-index object-id :options] update-fn)
+      (d/update-in-when data [:pages-index object-id] update-fn)
 
       :shape
       (d/update-in-when data [:pages-index page-id :objects object-id] update-fn)
@@ -659,6 +834,7 @@
 (defmethod process-change :add-recent-color
   [data _]
   data)
+
 
 ;; -- Media
 

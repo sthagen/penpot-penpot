@@ -568,7 +568,7 @@
     (watch [it state _]
       (let [page    (get-in state [:workspace-data :pages-index id])
             changes (-> (pcb/empty-changes it)
-                        (pcb/mod-page page name))]
+                        (pcb/mod-page page {:name name}))]
 
         (rx/of (dch/commit-changes changes))))))
 
@@ -598,7 +598,7 @@
              (-> (pcb/empty-changes it)
                  (pcb/with-file-data file-data)
                  (assoc :file-id file-id)
-                 (pcb/mod-plugin-data type id page-id namespace key value))]
+                 (pcb/set-plugin-data type id page-id namespace key value))]
          (rx/of (dch/commit-changes changes)))))))
 
 (declare purge-page)
@@ -2071,7 +2071,7 @@
              page    (wsh/lookup-page state page-id)
              changes (-> (pcb/empty-changes it)
                          (pcb/with-page page)
-                         (pcb/set-page-option :background (:color color)))]
+                         (pcb/mod-page {:background (:color color)}))]
          (rx/of (dch/commit-changes changes)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

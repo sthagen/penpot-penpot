@@ -221,6 +221,8 @@
           (v/-block "Schema" (v/-visit schema printer) printer)]})
 
 (defn pretty-explain
+  "A helper that allows print a console-friendly output for the
+  explain; should not be used for other purposes"
   [explain & {:keys [variant message]
               :or {variant ::explain
                    message "Validation Error"}}]

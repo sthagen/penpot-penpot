@@ -120,7 +120,7 @@
         flow-id (obj/get proxy "$id")
         page (locate-page file-id page-id)]
     (when (some? page)
-      (d/seek #(= (:id %) flow-id) (-> page :options :flows)))))
+      (d/seek #(= (:id %) flow-id) (:flows page)))))
 
 (defn proxy->ruler-guide
   [proxy]
@@ -129,7 +129,7 @@
         ruler-id (obj/get proxy "$id")
         page (locate-page file-id page-id)]
     (when (some? page)
-      (d/seek #(= (:id %) ruler-id) (-> page :options :guides vals)))))
+      (d/seek #(= (:id %) ruler-id) (-> page :guides vals)))))
 
 (defn proxy->interaction
   [proxy]
