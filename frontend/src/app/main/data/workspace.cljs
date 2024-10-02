@@ -42,6 +42,7 @@
    [app.main.data.modal :as modal]
    [app.main.data.notifications :as ntf]
    [app.main.data.persistence :as dps]
+   [app.main.data.plugins :as dp]
    [app.main.data.users :as du]
    [app.main.data.workspace.bool :as dwb]
    [app.main.data.workspace.collapse :as dwco]
@@ -85,6 +86,7 @@
    [app.util.webapi :as wapi]
    [beicon.v2.core :as rx]
    [cljs.spec.alpha :as s]
+   [clojure.set :as set]
    [cuerdas.core :as str]
    [potok.v2.core :as ptk]
    [promesa.core :as p]))
@@ -131,6 +133,7 @@
        (when (and (not (boolean (-> state :profile :props :v2-info-shown)))
                   (features/active-feature? state "components/v2"))
          (modal/show :v2-info {}))
+       (dp/check-open-plugin)
        (fdf/fix-deleted-fonts)
        (fbs/fix-broken-shapes)))))
 
@@ -1543,7 +1546,8 @@
             (let [objects  (wsh/lookup-page-objects state)
                   selected (->> (wsh/lookup-selected state)
                                 (cfh/clean-loops objects))
-                  features (features/get-team-enabled-features state)
+                  features (-> (features/get-team-enabled-features state)
+                               (set/difference cfeat/frontend-only-features))
 
                   file-id  (:current-file-id state)
                   frame-id (cfh/common-parent-frame objects selected)
