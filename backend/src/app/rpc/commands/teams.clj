@@ -82,19 +82,17 @@
   (cond-> row
     (some? features) (assoc :features (db/decode-pgarray features #{}))))
 
-
-
-(defn- check-valid-email-muted
-  "Check if the member's email is part of the global bounce report."
+(defn- check-profile-muted
+  "Check if the member's email is part of the global bounce report"
   [conn member]
-  (let [email  (profile/clean-email (:email member))]
+  (let [email (profile/clean-email (:email member))]
     (when (and member (not (eml/allow-send-emails? conn member)))
       (ex/raise :type :validation
                 :code :member-is-muted
                 :email email
                 :hint "the profile has reported repeatedly as spam or has bounces"))))
 
-(defn- check-valid-email-bounce
+(defn- check-email-bounce
   "Check if the email is part of the global complain report"
   [conn email show?]
   (when (eml/has-bounce-reports? conn email)
@@ -103,7 +101,7 @@
               :email (if show? email "private")
               :hint "this email has been repeatedly reported as bounce")))
 
-(defn- check-valid-email-spam
+(defn- check-email-spam
   "Check if the member email is part of the global complain report"
   [conn email show?]
   (when (eml/has-complaint-reports? conn email)
@@ -227,16 +225,16 @@
 ;; --- Query: Team Members
 
 (def sql:team-members
-  "select tp.*,
+  "SELECT tp.*,
           p.id,
           p.email,
-          p.fullname as name,
-          p.fullname as fullname,
+          p.fullname AS name,
+          p.fullname AS fullname,
           p.photo_id,
           p.is_active
-     from team_profile_rel as tp
-     join profile as p on (p.id = tp.profile_id)
-    where tp.team_id = ?")
+     FROM team_profile_rel AS tp
+     JOIN profile AS p ON (p.id = tp.profile_id)
+    WHERE tp.team_id = ?")
 
 (defn get-team-members
   [conn team-id]
@@ -403,17 +401,19 @@
   {::doc/added "1.17"
    ::sm/params schema:create-team}
   [cfg {:keys [::rpc/profile-id] :as params}]
-  (db/tx-run! cfg (fn [{:keys [::db/conn] :as cfg}]
-                    (quotes/check-quote! conn {::quotes/id ::quotes/teams-per-profile
-                                               ::quotes/profile-id profile-id})
 
-                    (let [features (-> (cfeat/get-enabled-features cf/flags)
-                                       (cfeat/check-client-features! (:features params)))
-                          team (create-team cfg (assoc params
-                                                       :profile-id profile-id
-                                                       :features features))]
-                      (with-meta team
-                        {::audit/props {:id (:id team)}})))))
+  (quotes/check! cfg {::quotes/id ::quotes/teams-per-profile
+                      ::quotes/profile-id profile-id})
+
+  (let [features (-> (cfeat/get-enabled-features cf/flags)
+                     (cfeat/check-client-features! (:features params)))
+        params   (-> params
+                     (assoc :profile-id profile-id)
+                     (assoc :features features))
+        team     (db/tx-run! cfg create-team params)]
+
+    (with-meta team
+      {::audit/props {:id (:id team)}})))
 
 (defn create-team
   "This is a complete team creation process, it creates the team
@@ -767,21 +767,50 @@
                     :member-id member-id}))
 
 (defn- create-profile-identity-token
-  [cfg profile]
+  [cfg profile-id]
+
+  (dm/assert!
+   "expected valid uuid for profile-id"
+   (uuid? profile-id))
+
   (tokens/generate (::setup/props cfg)
                    {:iss :profile-identity
-                    :profile-id (:id profile)
+                    :profile-id profile-id
                     :exp (dt/in-future {:days 30})}))
+
+(def ^:private schema:create-invitation
+  [:map {:title "params:create-invitation"}
+   [:team
+    [:map
+     [:id ::sm/uuid]
+     [:name :string]]]
+   [:profile
+    [:map
+     [:id ::sm/uuid]
+     [:fullname :string]]]
+   [:role [::sm/one-of valid-roles]]
+   [:email ::sm/email]])
+
+(def ^:private check-create-invitation-params!
+  (sm/check-fn schema:create-invitation))
 
 (defn- create-invitation
   [{:keys [::db/conn] :as cfg} {:keys [team profile role email] :as params}]
+
+  (dm/assert!
+   "expected valid connection on cfg parameter"
+   (db/connection? conn))
+
+  (dm/assert!
+   "expected valid params for `create-invitation` fn"
+   (check-create-invitation-params! params))
+
   (let [email  (profile/clean-email email)
         member (profile/get-profile-by-email conn email)]
 
-    (check-valid-email-muted conn member)
-    (check-valid-email-bounce conn email true)
-    (check-valid-email-spam conn email true)
-
+    (check-profile-muted conn member)
+    (check-email-bounce conn email true)
+    (check-email-spam conn email true)
 
     ;; When we have email verification disabled and invitation user is
     ;; already present in the database, we proceed to add it to the
@@ -815,7 +844,8 @@
                                            (name role) expire
                                            (name role) expire])
             updated?   (not= id (:id invitation))
-            tprops     {:profile-id (:id profile)
+            profile-id (:id profile)
+            tprops     {:profile-id profile-id
                         :invitation-id (:id invitation)
                         :valid-until expire
                         :team-id (:id team)
@@ -823,11 +853,10 @@
                         :member-id (:id member)
                         :role role}
             itoken     (create-invitation-token cfg tprops)
-            ptoken     (create-profile-identity-token cfg profile)]
+            ptoken     (create-profile-identity-token cfg profile-id)]
 
         (when (contains? cf/flags :log-invitation-tokens)
           (l/info :hint "invitation token" :token itoken))
-
 
         (let [props  (-> (dissoc tprops :profile-id)
                          (audit/clean-props))
@@ -851,26 +880,27 @@
         itoken))))
 
 (defn- add-user-to-team
-  [conn profile team email role]
+  [conn profile team role email]
 
   (let [team-id (:id team)
-        member (db/get* conn :profile
-                        {:email (str/lower email)}
-                        {::sql/columns [:id :email]})
-        params (merge
-                {:team-id team-id
-                 :profile-id (:id member)}
-                (role->params role))]
+        member  (db/get* conn :profile
+                         {:email (str/lower email)}
+                         {::sql/columns [:id :email]})
+        params  (merge
+                 {:team-id team-id
+                  :profile-id (:id member)}
+                 (role->params role))]
 
       ;; Do not allow blocked users to join teams.
     (when (:is-blocked member)
       (ex/raise :type :restriction
                 :code :profile-blocked))
 
-    (quotes/check-quote! conn
-                         {::quotes/id ::quotes/profiles-per-team
-                          ::quotes/profile-id (:id member)
-                          ::quotes/team-id team-id})
+    (quotes/check!
+     {::db/conn conn
+      ::quotes/id ::quotes/profiles-per-team
+      ::quotes/profile-id (:id member)
+      ::quotes/team-id team-id})
 
     ;; Insert the member to the team
     (db/insert! conn :team-profile-rel params {::db/on-conflict-do-nothing? true})
@@ -902,6 +932,39 @@
   [conn team-id]
   (db/exec! conn [sql:valid-requests-email team-id]))
 
+(def ^:private xf:map-email
+  (map :email))
+
+(defn- create-team-invitations
+  [{:keys [::db/conn] :as cfg} profile team role emails]
+  (let [join-requests    (into #{} xf:map-email
+                               (get-valid-requests-email conn (:id team)))
+        team-members     (into #{} xf:map-email
+                               (get-team-members conn (:id team)))
+
+        invitations      (into #{}
+                               (comp
+                                ;;  We don't re-send inviation to
+                                ;;  already existing members
+                                (remove team-members)
+                                ;; We don't send invitations to
+                                ;; join-requested members
+                                (remove join-requests)
+                                (map (fn [email]
+                                       {:email email
+                                        :team team
+                                        :profile profile
+                                        :role role}))
+                                (keep (partial create-invitation cfg)))
+                               emails)]
+
+    ;; For requested invitations, do not send invitation emails, add
+    ;; the user directly to the team
+    (->> (filter join-requests emails)
+         (run! (partial add-user-to-team conn profile team role)))
+
+    invitations))
+
 (def ^:private schema:create-team-invitations
   [:map {:title "create-team-invitations"}
    [:team-id ::sm/uuid]
@@ -917,63 +980,36 @@
   join the team."
   {::doc/added "1.17"
    ::sm/params schema:create-team-invitations}
-  [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id team-id emails role] :as params}]
-  (db/with-atomic [conn pool]
-    (let [perms    (get-permissions conn profile-id team-id)
-          profile  (db/get-by-id conn :profile profile-id)
-          team     (db/get-by-id conn :team team-id)
-          emails   (into #{} (map profile/clean-email) emails)]
+  [cfg {:keys [::rpc/profile-id team-id emails role] :as params}]
+  (let [perms    (get-permissions cfg profile-id team-id)
+        profile  (db/get-by-id cfg :profile profile-id)
+        emails   (into #{} (map profile/clean-email) emails)]
 
-      (when (> (count emails) max-invitations-by-request-threshold)
-        (ex/raise :type :validation
-                  :code :max-invitations-by-request
-                  :hint "the maximum of invitation on single request is reached"
-                  :threshold max-invitations-by-request-threshold))
+    (when-not (:is-admin perms)
+      (ex/raise :type :validation
+                :code :insufficient-permissions))
 
-      (run! (partial quotes/check-quote! conn)
-            (list {::quotes/id ::quotes/invitations-per-team
-                   ::quotes/profile-id profile-id
-                   ::quotes/team-id (:id team)
-                   ::quotes/incr (count emails)}
-                  {::quotes/id ::quotes/profiles-per-team
-                   ::quotes/profile-id profile-id
-                   ::quotes/team-id (:id team)
-                   ::quotes/incr (count emails)}))
+    (when (> (count emails) max-invitations-by-request-threshold)
+      (ex/raise :type :validation
+                :code :max-invitations-by-request
+                :hint "the maximum of invitation on single request is reached"
+                :threshold max-invitations-by-request-threshold))
 
-      (when-not (:is-admin perms)
-        (ex/raise :type :validation
-                  :code :insufficient-permissions))
+    (-> cfg
+        (assoc ::quotes/profile-id profile-id)
+        (assoc ::quotes/team-id team-id)
+        (assoc ::quotes/incr (count emails))
+        (quotes/check! {::quotes/id ::quotes/invitations-per-team}
+                       {::quotes/id ::quotes/profiles-per-team}))
 
-      ;; Check if the current profile is allowed to send emails.
-      (check-valid-email-muted conn profile)
+    ;; Check if the current profile is allowed to send emails
+    (check-profile-muted cfg profile)
 
-
-      (let [requested     (into #{} (map :email) (get-valid-requests-email conn team-id))
-            emails-to-add (filter #(contains? requested %) emails)
-            emails        (remove #(contains? requested %) emails)
-            cfg           (assoc cfg ::db/conn conn)
-            members     (->> (db/exec! conn [sql:team-members team-id])
-                             (into #{} (map :email)))
-
-            invitations (into #{}
-                              (comp
-                               ;;  We don't re-send inviation to already existing members
-                               (remove (partial contains? members))
-                               (map (fn [email]
-                                      (-> params
-                                          (assoc :email email)
-                                          (assoc :team team)
-                                          (assoc :profile profile)
-                                          (assoc :role role))))
-                               (keep (partial create-invitation cfg)))
-                              emails)]
-          ;; For requested invitations, do not send invitation emails, add the user directly to the team
-        (doseq [email emails-to-add]
-          (add-user-to-team conn profile team email role))
-
-        (with-meta {:total (count invitations)
-                    :invitations invitations}
-          {::audit/props {:invitations (count invitations)}})))))
+    (let [team        (db/get-by-id cfg :team team-id)
+          invitations (db/tx-run! cfg create-team-invitations profile team role emails)]
+      (with-meta {:total (count invitations)
+                  :invitations invitations}
+        {::audit/props {:invitations (count invitations)}}))))
 
 ;; --- Mutation: Create Team & Invite Members
 
@@ -987,58 +1023,51 @@
 
 (sv/defmethod ::create-team-with-invitations
   {::doc/added "1.17"
-   ::sm/params schema:create-team-with-invitations}
-  [cfg {:keys [::rpc/profile-id emails role name] :as params}]
+   ::sm/params schema:create-team-with-invitations
+   ::db/transaction true}
+  [{:keys [::db/conn] :as cfg} {:keys [::rpc/profile-id emails role name] :as params}]
+  (let [features (-> (cfeat/get-enabled-features cf/flags)
+                     (cfeat/check-client-features! (:features params)))
 
-  (db/tx-run! cfg
-              (fn [{:keys [::db/conn] :as cfg}]
-                (let [features (-> (cfeat/get-enabled-features cf/flags)
-                                   (cfeat/check-client-features! (:features params)))
+        params   (-> params
+                     (assoc :profile-id profile-id)
+                     (assoc :features features))
 
-                      params   (-> params
-                                   (assoc :profile-id profile-id)
-                                   (assoc :features features))
+        team     (create-team cfg params)
+        emails   (into #{} (map profile/clean-email) emails)]
 
-                      cfg      (assoc cfg ::db/conn conn)
-                      team     (create-team cfg params)
-                      profile  (db/get-by-id conn :profile profile-id)
-                      emails   (into #{} (map profile/clean-email) emails)]
+    (-> cfg
+        (assoc ::quotes/profile-id profile-id)
+        (assoc ::quotes/team-id (:id team))
+        (assoc ::quotes/incr (count emails))
+        (quotes/check! {::quotes/id ::quotes/teams-per-profile}
+                       {::quotes/id ::quotes/invitations-per-team}
+                       {::quotes/id ::quotes/profiles-per-team}))
 
-                  (when (> (count emails) max-invitations-by-request-threshold)
-                    (ex/raise :type :validation
-                              :code :max-invitations-by-request
-                              :hint "the maximum of invitation on single request is reached"
-                              :threshold max-invitations-by-request-threshold))
+    (when (> (count emails) max-invitations-by-request-threshold)
+      (ex/raise :type :validation
+                :code :max-invitations-by-request
+                :hint "the maximum of invitation on single request is reached"
+                :threshold max-invitations-by-request-threshold))
 
-                  (let [props {:name name :features features}
-                        event (-> (audit/event-from-rpc-params params)
-                                  (assoc ::audit/name "create-team")
-                                  (assoc ::audit/props props))]
-                    (audit/submit! cfg event))
+    (let [props {:name name :features features}
+          event (-> (audit/event-from-rpc-params params)
+                    (assoc ::audit/name "create-team")
+                    (assoc ::audit/props props))]
+      (audit/submit! cfg event))
 
-                  ;; Create invitations for all provided emails.
-                  (->> emails
-                       (map (fn [email]
-                              (-> params
-                                  (assoc :team team)
-                                  (assoc :profile profile)
-                                  (assoc :email email)
-                                  (assoc :role role))))
-                       (run! (partial create-invitation cfg)))
+    ;; Create invitations for all provided emails.
+    (let [profile (db/get-by-id conn :profile profile-id)]
+      (->> emails
+           (map (fn [email]
+                  (-> params
+                      (assoc :team team)
+                      (assoc :profile profile)
+                      (assoc :email email)
+                      (assoc :role role))))
+           (run! (partial create-invitation cfg))))
 
-                  (run! (partial quotes/check-quote! conn)
-                        (list {::quotes/id ::quotes/teams-per-profile
-                               ::quotes/profile-id profile-id}
-                              {::quotes/id ::quotes/invitations-per-team
-                               ::quotes/profile-id profile-id
-                               ::quotes/team-id (:id team)
-                               ::quotes/incr (count emails)}
-                              {::quotes/id ::quotes/profiles-per-team
-                               ::quotes/profile-id profile-id
-                               ::quotes/team-id (:id team)
-                               ::quotes/incr (count emails)}))
-
-                  (vary-meta team assoc ::audit/props {:invitations (count emails)})))))
+    (vary-meta team assoc ::audit/props {:invitations (count emails)})))
 
 ;; --- Query: get-team-invitation-token
 
@@ -1231,11 +1260,11 @@
                               :code :invalid-parameters))
 
                   ;; Check that the requester is not muted
-                  (check-valid-email-muted conn requester)
+                  (check-profile-muted conn requester)
 
                   ;; Check that the owner is not marked as bounce nor spam
-                  (check-valid-email-bounce conn (:email team-owner) false)
-                  (check-valid-email-spam conn (:email team-owner) true)
+                  (check-email-bounce conn (:email team-owner) false)
+                  (check-email-spam conn (:email team-owner) true)
 
                   (let [request (create-team-access-request
                                  cfg {:team team :requester requester :team-owner team-owner :file file :is-viewer is-viewer})]
