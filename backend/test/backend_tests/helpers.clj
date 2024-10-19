@@ -332,6 +332,7 @@
     (t/is (nil? (:error out)))
     (:result out)))
 
+
 (defn create-webhook*
   ([params] (create-webhook* *system* params))
   ([system {:keys [team-id id uri mtype is-active]
@@ -556,6 +557,7 @@
       (into []
             (map (fn [event]
                    (let [[item1 item2] (re-seq #"(.*): (.*)\n?" event)]
+
                      [(keyword (nth item1 2))
                       (tr/decode-str (nth item2 2))])))
             (-> (slurp' input)

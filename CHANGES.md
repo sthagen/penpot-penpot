@@ -12,6 +12,8 @@
 
 ### :sparkles: New features
 
+- Viewer role for team members  [Taiga #1056 & #6590](https://tree.taiga.io/project/penpot/us/1056 & https://tree.taiga.io/project/penpot/us/6590)
+
 ### :bug: Bugs fixed
 
 ## 2.3.0
@@ -60,6 +62,7 @@
 - Fix percent calculation on grid layout tracks [Github #4688](https://github.com/penpot/penpot/issues/4688)
 - Fix problem with caps and inner shadows [Github #4517](https://github.com/penpot/penpot/issues/4517)
 - Fix problem with horizontal/vertical lines and shadows [Github #4516](https://github.com/penpot/penpot/issues/4516)
+- Fix problem with layers overflowing panel [Taiga #9021](https://tree.taiga.io/project/penpot/issue/9021)
 
 ## 2.2.1
 
