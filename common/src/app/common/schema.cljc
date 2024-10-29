@@ -29,8 +29,7 @@
 
 (defprotocol ILazySchema
   (-validate [_ o])
-  (-explain [_ o])
-  (-decode [_ o]))
+  (-explain [_ o]))
 
 (def default-options
   {:registry sr/default-registry})
@@ -337,9 +336,7 @@
       (-validate [_ o]
         (@validator o))
       (-explain [_ o]
-        (@explainer o))
-      (-decode [_ o]
-        (@decoder o)))))
+        (@explainer o)))))
 
 ;; --- BUILTIN SCHEMAS
 
@@ -697,8 +694,8 @@
                   pred)
            pred (if (some? max)
                   (fn [v]
-                    (and (>= max v)
-                         (pred v)))
+                    (and (pred v)
+                         (>= max v)))
                   pred)]
 
        {:pred pred
@@ -735,8 +732,8 @@
                   pred)
            pred (if (some? max)
                   (fn [v]
-                    (and (>= max v)
-                         (pred v)))
+                    (and (pred v)
+                         (>= max v)))
                   pred)]
 
        {:pred pred
@@ -765,8 +762,8 @@
                   pred)
            pred (if (some? max)
                   (fn [v]
-                    (and (>= max v)
-                         (pred v)))
+                    (and (pred v)
+                         (>= max v)))
                   pred)
 
            gen  (sg/one-of
