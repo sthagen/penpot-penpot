@@ -181,10 +181,12 @@
   [state name]
   (let [page-id (get state :current-page-id)
         objects (get-in state [:workspace-data :pages-index page-id :objects])
-        result  (or (d/seek (fn [[_ shape]] (= name (:name shape))) objects)
+        result  (or (d/seek (fn [shape] (= name (:name shape))) (vals objects))
                     (get objects (uuid/uuid name)))]
-    (logjs name result)
-    nil))
+    #_(logjs name result)
+    result
+
+    #_nil))
 
 (defn ^:export dump-object
   [name]
@@ -427,11 +429,11 @@
 
              params    {:id (:id file)
                         :revn (:revn file)
+                        :vern (:vern file)
                         :session-id sid
                         :changes changes
                         :features features
                         :skip-validate true}]
-
 
          (->> (rp/cmd! :update-file params)
               (rx/subs! (fn [_]
