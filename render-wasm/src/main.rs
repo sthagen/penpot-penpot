@@ -32,15 +32,6 @@ pub unsafe extern "C" fn resize_surface(width: i32, height: i32) {
     state.set_surface(surface);
 }
 
-/// Draws a rect at the specified coordinates with the give ncolor
-/// # Safety
-#[no_mangle]
-pub unsafe extern "C" fn draw_rect(x1: f32, y1: f32, x2: f32, y2: f32) {
-    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
-    let r = skia::Rect::new(x1, y1, x2, y2);
-    render::render_rect(&mut state.render_state.surface, r, skia::Color::RED);
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn draw_all_shapes(zoom: f32, pan_x: f32, pan_y: f32) {
     let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
@@ -49,7 +40,7 @@ pub unsafe extern "C" fn draw_all_shapes(zoom: f32, pan_x: f32, pan_y: f32) {
     scale(zoom, zoom);
     translate(pan_x, pan_y);
 
-    render::render_all(state);
+    render::render_shape_tree(state, Uuid::nil());
 
     flush();
 }
@@ -126,26 +117,6 @@ pub unsafe extern "C" fn set_shape_rotation(rotation: f32) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn set_shape_x(x: f32) {
-    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
-    if let Some(shape) = state.current_shape.as_deref_mut() {
-        let width = shape.selrect.x2 - shape.selrect.x1;
-        shape.selrect.x1 = x;
-        shape.selrect.x2 = x + width;
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn set_shape_y(y: f32) {
-    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
-    if let Some(shape) = state.current_shape.as_deref_mut() {
-        let height = shape.selrect.y2 - shape.selrect.y1;
-        shape.selrect.y1 = y;
-        shape.selrect.y2 = y + height;
-    }
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn set_shape_transform(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) {
     let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
     if let Some(shape) = state.current_shape.as_deref_mut() {
@@ -155,6 +126,41 @@ pub unsafe extern "C" fn set_shape_transform(a: f32, b: f32, c: f32, d: f32, e: 
         shape.transform.d = d;
         shape.transform.e = e;
         shape.transform.f = f;
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn add_shape_child(a: u32, b: u32, c: u32, d: u32) {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+    let id = uuid_from_u32_quartet(a, b, c, d);
+    if let Some(shape) = state.current_shape.as_deref_mut() {
+        shape.children.push(id);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn clear_shape_children() {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+    if let Some(shape) = state.current_shape.as_deref_mut() {
+        shape.children.clear();
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn add_shape_solid_fill(r: u8, g: u8, b: u8, a: f32) {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+    if let Some(shape) = state.current_shape.as_deref_mut() {
+        let alpha: u8 = (a * 0xff as f32).floor() as u8;
+        let color = skia::Color::from_argb(alpha, r, g, b);
+        shape.add_fill(shapes::Fill::from(color));
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn clear_shape_fills() {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+    if let Some(shape) = state.current_shape.as_deref_mut() {
+        shape.clear_fills();
     }
 }
 

@@ -1,3 +1,4 @@
+use skia_safe as skia;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy)]
@@ -27,6 +28,8 @@ pub struct Rect {
     pub y2: f32,
 }
 
+type Color = skia::Color;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Matrix {
     pub a: f32,
@@ -50,23 +53,54 @@ impl Matrix {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum Fill {
+    Solid(Color), // TODO: add more fills here
+}
+
+impl From<Color> for Fill {
+    fn from(value: Color) -> Self {
+        Self::Solid(value)
+    }
+}
+
+impl Fill {
+    pub fn to_paint(&self) -> skia::Paint {
+        match self {
+            Self::Solid(color) => {
+                let mut p = skia::Paint::default();
+                p.set_color(*color);
+                p.set_style(skia::PaintStyle::Fill);
+                p.set_anti_alias(true);
+                // TODO: get proper blend mode. See https://tree.taiga.io/project/penpot/task/9275
+                p.set_blend_mode(skia::BlendMode::SrcOver);
+                p
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Shape {
     pub id: Uuid,
+    pub children: Vec::<Uuid>,
     pub kind: Kind,
     pub selrect: Rect,
     pub transform: Matrix,
     pub rotation: f32,
+    fills: Vec<Fill>,
 }
 
 impl Shape {
     pub fn new(id: Uuid) -> Self {
         Self {
             id,
+            children: Vec::<Uuid>::new(),
             kind: Kind::Rect,
             selrect: Rect::default(),
             transform: Matrix::identity(),
             rotation: 0.,
+            fills: vec![],
         }
     }
 
@@ -80,5 +114,17 @@ impl Shape {
 
     pub fn skew(&self) -> (f32, f32) {
         (self.transform.c, self.transform.b)
+    }
+
+    pub fn fills(&self) -> std::slice::Iter<Fill> {
+        self.fills.iter()
+    }
+
+    pub fn add_fill(&mut self, f: Fill) {
+        self.fills.push(f)
+    }
+
+    pub fn clear_fills(&mut self) {
+        self.fills.clear();
     }
 }
