@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 2.5.0
+
+### :rocket: Epics and highlights
+
+### :boom: Breaking changes & Deprecations
+
+### :heart: Community contributions (Thank you!)
+
+### :sparkles: New features
+
+### :bug: Bugs fixed
+
+
 ## 2.4.0
 
 ### :rocket: Epics and highlights
@@ -35,6 +48,8 @@
 ### :bug: Bugs fixed
 
 - Fix problem creating manual overlay interactions [Taiga #9146](https://tree.taiga.io/project/penpot/issue/9146)
+- Fix plugins list default URL
+- Activate plugins feature by default
 
 ## 2.3.2
 
