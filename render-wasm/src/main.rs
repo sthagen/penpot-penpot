@@ -1,6 +1,7 @@
 mod debug;
 mod images;
 mod math;
+pub mod mem;
 mod render;
 mod shapes;
 mod state;
@@ -150,12 +151,60 @@ pub extern "C" fn clear_shape_children() {
 }
 
 #[no_mangle]
-pub extern "C" fn add_shape_solid_fill(r: u8, g: u8, b: u8, a: f32) {
+pub extern "C" fn add_shape_solid_fill(raw_color: u32) {
     let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
     if let Some(shape) = state.current_shape() {
-        let alpha: u8 = (a * 0xff as f32).floor() as u8;
-        let color = skia::Color::from_argb(alpha, r, g, b);
-        shape.add_fill(shapes::Fill::from(color));
+        let color = skia::Color::new(raw_color);
+        shape.add_fill(shapes::Fill::Solid(color));
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn add_shape_linear_fill(
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
+    opacity: f32,
+) {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+    if let Some(shape) = state.current_shape() {
+        shape.add_fill(shapes::Fill::new_linear_gradient(
+            (start_x, start_y),
+            (end_x, end_y),
+            opacity,
+        ))
+    }
+}
+
+#[derive(Debug)]
+pub struct RawStopData {
+    color: [u8; 4],
+    offset: u8,
+}
+
+#[no_mangle]
+pub extern "C" fn add_shape_fill_stops(ptr: *mut RawStopData, n_stops: i32) {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+    if let Some(shape) = state.current_shape() {
+        unsafe {
+            let buf = Vec::<RawStopData>::from_raw_parts(ptr, n_stops as usize, n_stops as usize);
+            for raw_stop in buf.iter() {
+                let color = skia::Color::from_argb(
+                    raw_stop.color[3],
+                    raw_stop.color[0],
+                    raw_stop.color[1],
+                    raw_stop.color[2],
+                );
+                shape
+                    .add_gradient_stop(color, (raw_stop.offset as f32) / 100.)
+                    .expect("got no fill or an invalid one");
+            }
+            mem::free(
+                ptr as *mut u8,
+                n_stops as usize * std::mem::size_of::<RawStopData>(),
+            );
+        }
     }
 }
 
