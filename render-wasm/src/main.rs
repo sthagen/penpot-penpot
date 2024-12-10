@@ -7,6 +7,8 @@ mod state;
 mod utils;
 mod view;
 
+use crate::shapes::Kind;
+use crate::shapes::Path;
 use skia_safe as skia;
 
 use crate::state::State;
@@ -103,6 +105,33 @@ pub extern "C" fn use_shape(a: u32, b: u32, c: u32, d: u32) {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn set_shape_kind_circle() {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+
+    if let Some(shape) = state.current_shape() {
+        shape.kind = Kind::Circle(math::Rect::new_empty());
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_shape_kind_rect() {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+
+    if let Some(shape) = state.current_shape() {
+        shape.kind = Kind::Rect(math::Rect::new_empty());
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_shape_kind_path() {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+    if let Some(shape) = state.current_shape() {
+        let p = Path::try_from(Vec::new()).unwrap();
+        shape.kind = Kind::Path(p);
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn set_shape_selrect(left: f32, top: f32, right: f32, bottom: f32) {
     let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
     if let Some(shape) = state.current_shape() {
@@ -111,7 +140,15 @@ pub extern "C" fn set_shape_selrect(left: f32, top: f32, right: f32, bottom: f32
 }
 
 #[no_mangle]
-pub extern "C" fn set_shape_rotation(rotation: f32) {
+pub unsafe extern "C" fn set_shape_clip_content(clip_content: bool) {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+    if let Some(shape) = state.current_shape() {
+        shape.clip_content = clip_content;
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_shape_rotation(rotation: f32) {
     let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
     if let Some(shape) = state.current_shape() {
         shape.rotation = rotation;
@@ -171,6 +208,26 @@ pub extern "C" fn add_shape_linear_fill(
             (start_x, start_y),
             (end_x, end_y),
             opacity,
+        ))
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn add_shape_radial_fill(
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
+    opacity: f32,
+    width: f32,
+) {
+    let state = unsafe { STATE.as_mut() }.expect("got an invalid state pointer");
+    if let Some(shape) = state.current_shape() {
+        shape.add_fill(shapes::Fill::new_radial_gradient(
+            (start_x, start_y),
+            (end_x, end_y),
+            opacity,
+            width,
         ))
     }
 }
