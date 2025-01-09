@@ -16,9 +16,11 @@
   {::mf/props :obj
    ::mf/private true}
   [{:keys [id label icon aria-label on-click selected set-ref focused] :rest props}]
+
   [:> :li {:value id
            :class (stl/css-case :option true
                                 :option-with-icon (some? icon)
+                                :option-selected selected
                                 :option-current focused)
            :aria-selected selected
            :ref (fn [node]
@@ -31,7 +33,7 @@
 
    (when (some? icon)
      [:> icon*
-      {:id icon
+      {:icon-id icon
        :size "s"
        :class (stl/css :option-icon)
        :aria-hidden (when label true)
@@ -40,7 +42,7 @@
    [:span {:class (stl/css :option-text)} label]
    (when selected
      [:> icon*
-      {:id i/tick
+      {:icon-id i/tick
        :size "s"
        :class (stl/css :option-check)
        :aria-hidden (when label true)}])])
