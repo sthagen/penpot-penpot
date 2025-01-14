@@ -61,15 +61,16 @@
     [r g b a]))
 
 (defn cancel-render
-  []
+  [_]
   (when internal-frame-id
     (js/cancelAnimationFrame internal-frame-id)
     (set! internal-frame-id nil)))
 
 (defn request-render
-  []
-  (when internal-frame-id (cancel-render))
-  (set! internal-frame-id (js/requestAnimationFrame render)))
+  [requester]
+  (when internal-frame-id (cancel-render requester))
+  (let [frame-id (js/requestAnimationFrame render)]
+    (set! internal-frame-id frame-id)))
 
 (defn use-shape
   [id]
@@ -376,12 +377,25 @@
         value  (:value blur)]
     (h/call internal-module "_set_shape_blur" type hidden value)))
 
+(defn set-shape-corners
+  [corners]
+  (let [r1 (or (get corners 0) 0)
+        r2 (or (get corners 1) 0)
+        r3 (or (get corners 2) 0)
+        r4 (or (get corners 3) 0)]
+    (h/call internal-module "_set_shape_corners" r1 r2 r3 r4)))
+
 (def debounce-render-without-cache (fns/debounce render-without-cache 100))
 
-(defn set-view
+(defn set-view-box
   [zoom vbox]
   (h/call internal-module "_set_view" zoom (- (:x vbox)) (- (:y vbox)))
-  (h/call internal-module "_navigate")
+  (h/call internal-module "_pan"))
+
+(defn set-view-zoom
+  [zoom vbox]
+  (h/call internal-module "_set_view" zoom (- (:x vbox)) (- (:y vbox)))
+  (h/call internal-module "_zoom")
   (debounce-render-without-cache))
 
 (defn set-objects
@@ -407,8 +421,13 @@
                   opacity      (dm/get-prop shape :opacity)
                   hidden       (dm/get-prop shape :hidden)
                   content      (dm/get-prop shape :content)
-                  bool-content (dm/get-prop shape :bool-content)
-                  blur         (dm/get-prop shape :blur)]
+                  blur         (dm/get-prop shape :blur)
+                  corners      (when (some? (dm/get-prop shape :r1))
+                                 [(dm/get-prop shape :r1)
+                                  (dm/get-prop shape :r2)
+                                  (dm/get-prop shape :r3)
+                                  (dm/get-prop shape :r4)])
+                  bool-content (dm/get-prop shape :bool-content)]
 
               (use-shape id)
               (set-shape-type type)
@@ -424,10 +443,11 @@
                 (set-shape-blur blur))
               (when (and (some? content) (= type :path)) (set-shape-path-content content))
               (when (some? bool-content) (set-shape-bool-content bool-content))
+              (when (some? corners) (set-shape-corners corners))
               (let [pending' (concat (set-shape-fills fills) (set-shape-strokes strokes))]
                 (recur (inc index) (into pending pending'))))
             pending))]
-    (request-render)
+    (request-render "set-objects")
     (when-let [pending (seq pending)]
       (->> (rx/from pending)
            (rx/mapcat identity)

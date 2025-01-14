@@ -5991,8 +5991,23 @@ msgid "workspace.shape.menu.copy"
 msgstr "Copy"
 
 #: src/app/main/ui/workspace/context_menu.cljs:146
-msgid "workspace.shape.menu.copy_link"
+msgid "workspace.shape.menu.copy-link"
 msgstr "Copy link to clipboard"
+
+msgid "workspace.shape.menu.copy-paste-as"
+msgstr "Copy/Paste as ..."
+
+msgid "workspace.shape.menu.copy-css"
+msgstr "Copy as CSS"
+
+msgid "workspace.shape.menu.copy-css-nested"
+msgstr "Copy as CSS (nested layers)"
+
+msgid "workspace.shape.menu.copy-props"
+msgstr "Copy properties"
+
+msgid "workspace.shape.menu.paste-props"
+msgstr "Paste properties"
 
 #: src/app/main/ui/workspace/sidebar/assets/common.cljs:431
 msgid "workspace.shape.menu.create-annotation"
@@ -6951,8 +6966,27 @@ msgstr "None"
 msgid "dashboard.settings.notifications.submit"
 msgstr "Update settings"
 
+msgid "dashboard.import.error"
+msgstr "Import failed. Please try again"
+
+msgid "dashboard.import.bad-url"
+msgstr "Import failed. The template URL is incorrect"
+
+msgid "dashboard.import.no-perms"
+msgstr "You don’t have permission to import to this team"
+
+msgid "dashboard.plugins.try-plugin"
+msgstr "Try plugin: "
+
+msgid "dashboard.plugins.parse-error"
+msgstr "Cannot parser the plugin manifest"
+
+msgid "dashboard.plugins.bad-url"
+msgstr "The plugin URL is incorrect"
+
 msgid "labels.notifications"
 msgstr "Notifications"
 
 msgid "comments.mentions.not-found"
 msgstr "No people found for @%s"
+

@@ -12,6 +12,8 @@
 
 - New gradients UI with multi-stop support.
 - Shareable link pointing to an specific board.
+- Copy styles in CSS
+- Copy/paste shape styles (fills, strokes, shadows, etc..)
 
 ### :bug: Bugs fixed
 
@@ -20,6 +22,7 @@
 ### :bug: Bugs fixed
 
 - Fix error when importing files with touched components [Taiga #9625](https://tree.taiga.io/project/penpot/issue/9625)
+- Fix problem when changing color libraries [Plugins #184](https://github.com/penpot/penpot-plugins/issues/184)
 
 ## 2.4.0
 

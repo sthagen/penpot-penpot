@@ -5990,8 +5990,23 @@ msgstr "Enviar atrás"
 msgid "workspace.shape.menu.copy"
 msgstr "Copiar"
 
-msgid "workspace.shape.menu.copy_link"
+msgid "workspace.shape.menu.copy-link"
 msgstr "Copiar enlace al portapapeles"
+
+msgid "workspace.shape.menu.copy-paste-as"
+msgstr "Copiar/Pegar como ..."
+
+msgid "workspace.shape.menu.copy-css"
+msgstr "Copiar como CSS"
+
+msgid "workspace.shape.menu.copy-css-nested"
+msgstr "Copiar como CSS (capas anidadas)"
+
+msgid "workspace.shape.menu.copy-props"
+msgstr "Copiar propiedades"
+
+msgid "workspace.shape.menu.paste-props"
+msgstr "Pegar propiedades"
 
 #: src/app/main/ui/workspace/sidebar/assets/common.cljs:427
 msgid "workspace.shape.menu.create-annotation"
@@ -6672,7 +6687,7 @@ msgstr "Nombre"
 
 #: src/app/main/ui/workspace/tokens/form.cljs
 msgid "workspace.token.enter-token-name"
-msgstr "Introduce un nombre para el token %s" 
+msgstr "Introduce un nombre para el token %s"
 
 #: src/app/main/ui/workspace/tokens/form.cljs
 msgid "workspace.token.token-value"
@@ -6907,6 +6922,24 @@ msgstr "Ninguna"
 
 msgid "dashboard.settings.notifications.submit"
 msgstr "Actualizar configuración"
+
+msgid "dashboard.import.error"
+msgstr "La importación ha fallado. Intentalo de nuevo, por favor"
+
+msgid "dashboard.import.bad-url"
+msgstr "La importación ha fallado. La URL de la plantilla es incorrecta"
+
+msgid "dashboard.import.no-perms"
+msgstr "No tienes permisos para importar en este equipo"
+
+msgid "dashboard.plugins.try-plugin"
+msgstr "Prueba la extensión: "
+
+msgid "dashboard.plugins.parse-error"
+msgstr "No se puede analizar el manifiest de la extensión"
+
+msgid "dashboard.plugins.bad-url"
+msgstr "La URL de la extensión es incorrecta"
 
 msgid "labels.notifications"
 msgstr "Notificaciones"
