@@ -6318,6 +6318,12 @@ msgstr "You currently have no themes."
 msgid "workspace.token.num-sets"
 msgstr "%s sets"
 
+
+#: src/app/main/ui/workspace/tokens/form.cljs:55
+msgid "workspace.token.token-name-validation-error"
+msgstr " is not a valid token name.
+Token names should only contain letters and digits separated by . characters and must not start with a $ sign."
+
 #: src/app/main/ui/workspace/tokens/sidebar.cljs:66
 msgid "workspace.token.original-value"
 msgstr "Original value: "
@@ -6717,6 +6723,10 @@ msgstr "Add set"
 msgid "workspace.token.tools"
 msgstr "Tools"
 
+#: src/app/main/ui/workspace/tokens/sidebar.cljs
+msgid "workspace.token.no-permission-themes"
+msgstr "You need to be an editor to use themes"
+
 #: src/app/main/ui/workspace/tokens/modals/themes.cljs
 msgid "workspace.token.save-theme"
 msgstr "Save theme"
@@ -6792,6 +6802,10 @@ msgstr "Define what token sets should be used as part of this theme option:"
 #: src/app/main/ui/workspace/tokens/sets.cljs
 msgid "workspace.token.no-sets-yet"
 msgstr "There are no sets yet."
+
+#: src/app/main/ui/workspace/tokens/sets.cljs
+msgid "workspace.token.no-permisions-set"
+msgstr "You need to be an editor to activate / deactivate sets"
 
 #: src/app/main/ui/workspace/tokens/sets.cljs
 msgid "workspace.token.no-sets-create"
@@ -6932,3 +6946,6 @@ msgstr "Notifications"
 msgid "comments.mentions.not-found"
 msgstr "No people found for @%s"
 
+#: src/app/main/ui/dashboard/placeholder.cljs:48
+msgid "dashboard.add-file"
+msgstr "Add file"
