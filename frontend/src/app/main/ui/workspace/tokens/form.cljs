@@ -18,8 +18,9 @@
    [app.main.ui.ds.foundations.assets.icon :as i]
    [app.main.ui.ds.foundations.typography.heading :refer [heading*]]
    [app.main.ui.ds.foundations.typography.text :refer [text*]]
+   [app.main.ui.notifications.context-notification :refer [context-notification]]
    [app.main.ui.workspace.colorpicker :as colorpicker]
-   [app.main.ui.workspace.colorpicker.ramp :refer [ramp-selector]]
+   [app.main.ui.workspace.colorpicker.ramp :refer [ramp-selector*]]
    [app.main.ui.workspace.tokens.components.controls.input-token-color-bullet :refer [input-token-color-bullet*]]
    [app.main.ui.workspace.tokens.components.controls.input-tokens :refer [input-tokens*]]
    [app.main.ui.workspace.tokens.errors :as wte]
@@ -156,31 +157,43 @@
 
 (defonce form-token-cache-atom (atom nil))
 
-(mf/defc ramp
+(defn hex->value
+  [hex]
+  (when-let [tc (tinycolor/valid-color hex)]
+    (let [hex (str "#" (tinycolor/->hex tc))
+          [r g b] (c/hex->rgb hex)
+          [h s v] (c/hex->hsv hex)]
+      {:hex hex
+       :r r :g g :b b
+       :h h :s s :v v
+       :alpha 1})))
+
+(mf/defc ramp*
   [{:keys [color on-change]}]
   (let [wrapper-node-ref (mf/use-ref nil)
-        dragging? (mf/use-state)
-        hex->value (fn [hex]
-                     (when-let [tc (tinycolor/valid-color hex)]
-                       (let [hex (str "#" (tinycolor/->hex tc))
-                             [r g b] (c/hex->rgb hex)
-                             [h s v] (c/hex->hsv hex)]
-                         {:hex hex
-                          :r r :g g :b b
-                          :h h :s s :v v
-                          :alpha 1})))
-        value (mf/use-state (hex->value color))
-        on-change' (fn [{:keys [hex]}]
-                     (reset! value (hex->value hex))
-                     (when-not (and @dragging? hex)
-                       (on-change hex)))]
-    (colorpicker/use-color-picker-css-variables! wrapper-node-ref @value)
+        dragging-ref     (mf/use-ref false)
+
+        on-start-drag
+        (mf/use-fn #(mf/set-ref-val! dragging-ref true))
+
+        on-finish-drag
+        (mf/use-fn #(mf/set-ref-val! dragging-ref false))
+
+        on-change'
+        (mf/use-fn
+         (mf/deps on-change)
+         (fn [{:keys [hex]}]
+           (let [dragging? (mf/ref-val dragging-ref)]
+             (when-not (and dragging? hex)
+               (on-change hex)))))]
+
+    (colorpicker/use-color-picker-css-variables! wrapper-node-ref (hex->value color))
     [:div {:ref wrapper-node-ref}
-     [:& ramp-selector
-      {:color @value
+     [:> ramp-selector*
+      {:color (hex->value color)
        :disable-opacity true
-       :on-start-drag #(reset! dragging? true)
-       :on-finish-drag #(reset! dragging? false)
+       :on-start-drag on-start-drag
+       :on-finish-drag on-finish-drag
        :on-change on-change'}]]))
 
 (mf/defc token-value-or-errors
@@ -202,7 +215,7 @@
 
 (mf/defc form
   {::mf/wrap-props false}
-  [{:keys [token token-type action selected-token-set-path]}]
+  [{:keys [token token-type action selected-token-set-name]}]
   (let [token (or token {:type token-type})
         token-properties (wtty/get-token-properties token)
         color? (wtt/color-token? token)
@@ -227,7 +240,10 @@
            (mf/set-ref-val! cancel-ref node)))
 
         ;; Name
-        touched-name? (mf/use-state false)
+        touched-name* (mf/use-state false)
+        touched-name? (deref touched-name*)
+        warning-name-change* (mf/use-state false)
+        warning-name-change? (deref warning-name-change*)
         name-ref (mf/use-var (:name token))
         name-errors (mf/use-state nil)
         validate-name
@@ -240,13 +256,15 @@
 
         on-blur-name
         (mf/use-fn
-         (mf/deps cancel-ref)
+         (mf/deps cancel-ref touched-name? warning-name-change?)
          (fn [e]
            (let [node (dom/get-related-target e)
                  on-cancel-btn (= node (mf/ref-val cancel-ref))]
              (when-not on-cancel-btn
                (let [value (dom/get-target-val e)
                      errors (validate-name value)]
+                 (when touched-name?
+                   (reset! warning-name-change* true))
                  (reset! name-errors errors))))))
 
         on-update-name-debounced
@@ -261,7 +279,7 @@
         (mf/use-fn
          (mf/deps on-update-name-debounced)
          (fn [e]
-           (reset! touched-name? true)
+           (reset! touched-name* true)
            (reset! name-ref (dom/get-target-val e))
            (on-update-name-debounced e)))
 
@@ -364,11 +382,11 @@
                                 (modal/hide!))))))))
         on-delete-token
         (mf/use-fn
-         (mf/deps selected-token-set-path)
+         (mf/deps selected-token-set-name)
          (fn [e]
            (dom/prevent-default e)
            (modal/hide!)
-           (st/emit! (dt/delete-token (ctob/prefixed-set-path-string->set-name-string selected-token-set-path) (:name token)))))
+           (st/emit! (dt/delete-token (ctob/prefixed-set-path-string->set-name-string selected-token-set-name) (:name token)))))
 
         on-cancel
         (mf/use-fn
@@ -404,7 +422,13 @@
                     :key error
                     :typography "body-small"
                     :class (stl/css :error)}
-          error])]
+          error])
+
+       (when (and warning-name-change? (= action "edit"))
+         [:div {:class (stl/css :warning-name-change-notification-wrapper)}
+          [:> context-notification
+           {:level :warning
+            :content (tr "workspace.token.warning-name-change")}]])]
 
       [:div {:class (stl/css :input-row)}
        [:> input-tokens*
@@ -419,9 +443,9 @@
           [:> input-token-color-bullet*
            {:color @color :on-click on-display-colorpicker}])]
        (when @color-ramp-open?
-         [:& ramp {:color (some-> (or @token-resolve-result (:value token))
-                                  (tinycolor/valid-color))
-                   :on-change on-update-color}])
+         [:> ramp* {:color (some-> (or @token-resolve-result (:value token))
+                                   (tinycolor/valid-color))
+                    :on-change on-update-color}])
        [:& token-value-or-errors {:result-or-errors @token-resolve-result}]]
 
       [:div {:class (stl/css :input-row)}
