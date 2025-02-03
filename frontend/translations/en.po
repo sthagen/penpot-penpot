@@ -1143,6 +1143,10 @@ msgstr "Cannot drop a parent set to an own child path."
 msgid "errors.drag-drop.set-exists"
 msgstr "Cannot complete drop, a set with same name already exists at path %s."
 
+#: src/app/main/data/tokens.cljs:294
+msgid "workspace.token.duplicate-suffix"
+msgstr "copy"
+
 #: src/app/main/ui/auth/verify_token.cljs:84, src/app/main/ui/settings/change_email.cljs:29
 msgid "errors.email-already-exists"
 msgstr "Email already used"
@@ -4640,6 +4644,30 @@ msgstr "Exit"
 #: src/app/main/ui/workspace/sidebar/options/menus/layout_container.cljs:478
 msgid "workspace.layout_grid.editor.padding.expand"
 msgstr "Show 4 sided padding options"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/layout_container.cljs:337
+msgid "workspace.layout_grid.editor.padding.vertical"
+msgstr "Vertical padding"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/layout_container.cljs:351
+msgid "workspace.layout_grid.editor.padding.horizontal"
+msgstr "Horizontal padding"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/layout_container.cljs:396
+msgid "workspace.layout_grid.editor.padding.top"
+msgstr "Top padding"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/layout_container.cljs:411
+msgid "workspace.layout_grid.editor.padding.right"
+msgstr "Right padding"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/layout_container.cljs:425
+msgid "workspace.layout_grid.editor.padding.bottom"
+msgstr "Bottom padding"
+
+#: src/app/main/ui/workspace/sidebar/options/menus/layout_container.cljs:439
+msgid "workspace.layout_grid.editor.padding.left"
+msgstr "Left padding"
 
 #: src/app/main/ui/workspace/viewport/grid_layout_editor.cljs:59
 msgid "workspace.layout_grid.editor.title"
