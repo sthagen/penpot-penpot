@@ -670,19 +670,83 @@ used for managing active sets without a user created theme.")
 
 ;; === Import / Export from DTCG format
 
+(def ^:private legacy-node?
+  (sm/validator
+   [:or
+    [:map
+     ["value" :string]
+     ["type" :string]]
+    [:map
+     ["value" [:sequential [:map ["type" :string]]]]
+     ["type" :string]]
+    [:map
+     ["value" :map]
+     ["type" :string]]]))
+
+(def ^:private dtcg-node?
+  (sm/validator
+   [:or
+    [:map
+     ["$value" :string]
+     ["$type" :string]]
+    [:map
+     ["$value" [:sequential [:map ["$type" :string]]]]
+     ["$type" :string]]
+    [:map
+     ["$value" :map]
+     ["$type" :string]]]))
+
+(defn has-legacy-format?
+  "Searches through parsed token file and returns:
+   - true when first node satisfies `legacy-node?` predicate
+   - false when first node satisfies `dtcg-node?` predicate
+   - nil if neither combination is found"
+  ([data]
+   (has-legacy-format? data legacy-node? dtcg-node?))
+  ([data legacy-node? dtcg-node?]
+   (let [branch? map?
+         children (fn [node] (vals node))
+         check-node (fn [node]
+                      (cond
+                        (legacy-node? node) true
+                        (dtcg-node? node) false
+                        :else nil))
+         walk (fn walk [node]
+                (lazy-seq
+                 (cons
+                  (check-node node)
+                  (when (branch? node)
+                    (mapcat walk (children node))))))]
+     (->> (walk data)
+          (filter some?)
+          first))))
+
 (defn walk-sets-tree-seq
-  [nodes & {:keys [walk-children?]
-            :or {walk-children? (constantly true)}}]
+  "Walk sets tree as a flat list.
+
+  Options:
+    `:skip-children-pred`: predicate to skip iterating over a set groups children by checking the path of the set group
+    `:new-editing-set-path`: append a an item with `:new?` at the given path"
+  [nodes & {:keys [skip-children-pred new-editing-set-path]
+            :or {skip-children-pred (constantly false)}}]
   (let [walk (fn walk [node {:keys [parent depth]
                              :or {parent []
                                   depth 0}
                              :as opts}]
                (lazy-seq
                 (if (d/ordered-map? node)
-                  (mapcat #(walk % opts) node)
+                  (let [root (cond-> node
+                               (= [] new-editing-set-path) (assoc :new? true))]
+                    (mapcat #(walk % opts) root))
                   (let [[k v] node]
                     (cond
-                      ;;; Set
+                      ;; New set
+                      (= :new? k) [{:new? true
+                                    :group? false
+                                    :parent-path parent
+                                    :depth depth}]
+
+                      ;; Set
                       (and v (instance? TokenSet v))
                       [{:group? false
                         :path (split-token-set-path (:name v))
@@ -698,12 +762,12 @@ used for managing active sets without a user created theme.")
                                   :path path
                                   :parent-path parent
                                   :depth depth}]
-                        (if (walk-children? path)
+                        (if (skip-children-pred path)
                           [item]
-                          (cons
-                           item
-                           (mapcat #(walk % (assoc opts :parent path :depth (inc depth))) v)))))))))]
-    (walk nodes nil)))
+                          (let [v' (cond-> v
+                                     (= path new-editing-set-path) (assoc :new? true))]
+                            (cons item (mapcat #(walk % (assoc opts :parent path :depth (inc depth))) v'))))))))))]
+    (walk (or nodes (d/ordered-map)) nil)))
 
 (defn flatten-nested-tokens-json
   "Recursively flatten the dtcg token structure, joining keys with '.'."
@@ -749,6 +813,7 @@ Will return a value that matches this schema:
   (get-active-themes-set-tokens [_] "set of set names that are active in the the active themes")
   (encode-dtcg [_] "Encodes library to a dtcg compatible json string")
   (decode-dtcg-json [_ parsed-json] "Decodes parsed json containing tokens and converts to library")
+  (decode-legacy-json [_ parsed-json] "Decodes parsed legacy json containing tokens and converts to library")
   (get-all-tokens [_] "all tokens in the lib")
   (validate [_]))
 
@@ -1174,6 +1239,27 @@ Will return a value that matches this schema:
          lib' themes-data)
         lib')))
 
+  (decode-legacy-json [this parsed-legacy-json]
+    (let [other-data (select-keys parsed-legacy-json ["$themes" "$metadata"])
+          sets-data (dissoc parsed-legacy-json "$themes" "$metadata")
+          dtcg-sets-data (walk/postwalk
+                          (fn [node]
+                            (cond-> node
+                              (and (map? node)
+                                   (contains? node "value")
+                                   (sequential? (get node "value")))
+                              (update "value"
+                                      (fn [seq-value]
+                                        (map #(set/rename-keys % {"type" "$type"}) seq-value)))
+
+                              (and (map? node)
+                                   (and (contains? node "type")
+                                        (contains? node "value")))
+                              (set/rename-keys  {"value" "$value"
+                                                 "type" "$type"})))
+                          sets-data)]
+      (decode-dtcg-json this (merge other-data
+                                    dtcg-sets-data))))
   (get-all-tokens [this]
     (reduce
      (fn [tokens' set]

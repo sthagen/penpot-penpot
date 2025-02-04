@@ -759,6 +759,27 @@ msgstr "+ New project"
 msgid "dashboard.new-project-prefix"
 msgstr "New Project"
 
+msgid "dashboard.empty-project.create"
+msgstr "Create new file"
+
+msgid "dashboard.empty-project.start"
+msgstr "Start building amazing stuff"
+
+msgid "dashboard.empty-project.import"
+msgstr "Import a file"
+
+msgid "dashboard.empty-project.import-penpot"
+msgstr "Import a .penpot file"
+
+msgid "dashboard.empty-project.add-library"
+msgstr "Add a Library or a Template"
+
+msgid "dashboard.empty-project.explore"
+msgstr "Explore some to add"
+
+msgid "dashboard.empty-project.go-to-libraries"
+msgstr "Go to Libraries and Templates"
+
 #: src/app/main/ui/dashboard/search.cljs:77
 msgid "dashboard.no-matches-for"
 msgstr "No matches found for “%s“"
@@ -1864,6 +1885,10 @@ msgstr "Expired"
 #: src/app/main/ui/exports/assets.cljs:170, src/app/main/ui/workspace/tokens/sidebar.cljs:359
 msgid "labels.export"
 msgstr "Export"
+
+#: src/app/main/ui/exports/assets.cljs:177
+msgid "labels.import"
+msgstr "Import"
 
 #: src/app/main/ui/settings/feedback.cljs:48
 msgid "labels.feedback-disabled"
@@ -6517,6 +6542,10 @@ msgstr "Enter token value or alias"
 #, unused
 msgid "workspace.token.grouping-set-alert"
 msgstr "Token Set grouping is not supported yet."
+
+#: src/app/main/ui/workspace/tokens/sets_context_menu.cljs
+msgid "workspace.token.add-set-to-group"
+msgstr "Add set to this group"
 
 #: src/app/main/ui/workspace/tokens/modals/themes.cljs:179
 msgid "workspace.token.label.group"
