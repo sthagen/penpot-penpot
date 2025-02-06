@@ -211,7 +211,7 @@
                   (u/display-not-valid :name value)
 
                   :else
-                  (st/emit! (dwsh/update-shapes [id] #(assoc % :name value))))))}
+                  (st/emit! (dw/end-rename-shape id value)))))}
 
            :blocked
            {:this true
@@ -515,9 +515,10 @@
             ;; not enumerable so there are no infinite loops
             :enumerable false
             :get (fn [self]
-                   (let [shape (u/proxy->shape self)
-                         parent-id (:parent-id shape)]
-                     (shape-proxy plugin-id (obj/get self "$file") (obj/get self "$page") parent-id)))}
+                   (let [shape (u/proxy->shape self)]
+                     (when-not (cfh/root? shape)
+                       (let [parent-id (:parent-id shape)]
+                         (shape-proxy plugin-id (obj/get self "$file") (obj/get self "$page") parent-id)))))}
 
            :parentX
            {:this true
@@ -953,7 +954,7 @@
 
                  :else
                  (do (st/emit! (dwsl/create-layout-from-id id :flex :from-frame? true :calculate-params? false))
-                     (grid/grid-layout-proxy plugin-id file-id page-id id)))))
+                     (flex/flex-layout-proxy plugin-id file-id page-id id)))))
 
            :addGridLayout
            (fn []
