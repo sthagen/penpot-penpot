@@ -29,9 +29,11 @@
    [app.main.ui.workspace.tokens.token :as wtt]
    [app.main.ui.workspace.tokens.token-types :as wtty]
    [app.main.ui.workspace.tokens.update :as wtu]
+   [app.main.ui.workspace.tokens.warnings :as wtw]
    [app.util.dom :as dom]
    [app.util.functions :as uf]
    [app.util.i18n :refer [tr]]
+   [app.util.keyboard :as k]
    [cuerdas.core :as str]
    [malli.core :as m]
    [malli.error :as me]
@@ -198,18 +200,21 @@
 
 (mf/defc token-value-or-errors
   [{:keys [result-or-errors]}]
-  (let [{:keys [errors]} result-or-errors
+  (let [{:keys [errors warnings resolved-value]} result-or-errors
         empty-message? (or (nil? result-or-errors)
                            (wte/has-error-code? :error/empty-input errors))
+
         message (cond
                   empty-message? (tr "workspace.token.resolved-value" "-")
+                  warnings (wtw/humanize-warnings warnings)
                   errors (->> (wte/humanize-errors errors)
                               (str/join "\n"))
-                  :else (tr "workspace.token.resolved-value" result-or-errors))]
+                  :else (tr "workspace.token.resolved-value" (or resolved-value result-or-errors)))]
     [:> text* {:as "p"
                :typography "body-small"
                :class (stl/css-case :resolved-value true
                                     :resolved-value-placeholder empty-message?
+                                    :resolved-value-warning (seq warnings)
                                     :resolved-value-error (seq errors))}
      message]))
 
@@ -227,6 +232,7 @@
         token-path (mf/use-memo
                     (mf/deps (:name token))
                     #(wtt/token-name->path (:name token)))
+
         selected-set-tokens-tree (mf/use-memo
                                   (mf/deps token-path selected-set-tokens)
                                   (fn []
@@ -294,14 +300,20 @@
         color-ramp-open? (deref color-ramp-open*)
         value-input-ref (mf/use-ref nil)
         value-ref (mf/use-var (:value token))
-        token-resolve-result* (mf/use-state (get-in resolved-tokens [(wtt/token-identifier token) :resolved-value]))
+
+        token-resolve-result* (mf/use-state (get resolved-tokens (wtt/token-identifier token)))
         token-resolve-result (deref token-resolve-result*)
         set-resolve-value
         (mf/use-fn
          (fn [token-or-err]
            (let [error? (:errors token-or-err)
-                 v (if error?
+                 warnings? (:warnings token-or-err)
+                 v (cond
+                     error?
                      token-or-err
+                     warnings?
+                     (:warnings {:warnings token-or-err})
+                     :else
                      (:resolved-value token-or-err))]
              (when color? (reset! color (if error? nil v)))
              (reset! token-resolve-result* v))))
@@ -333,6 +345,7 @@
              (on-display-colorpicker open?))))
 
         value-error? (seq (:errors token-resolve-result))
+
         valid-value-field? (and
                             (not value-error?)
                             (valid-value? token-resolve-result))
@@ -404,7 +417,25 @@
          (fn [e]
            (mf/set-ref-val! cancel-ref nil)
            (dom/prevent-default e)
-           (modal/hide!)))]
+           (modal/hide!)))
+        handle-key-down-delete
+        (mf/use-fn
+         (mf/deps on-delete-token)
+         (fn [e]
+           (when (k/enter? e)
+             (on-delete-token e))))
+        handle-key-down-cancel
+        (mf/use-fn
+         (mf/deps on-cancel)
+         (fn [e]
+           (when (k/enter? e)
+             (on-cancel e))))
+        handle-key-down-save
+        (mf/use-fn
+         (fn [e]
+           (mf/deps on-submit)
+           (when (k/enter? e)
+             (on-submit e))))]
 
     ;; Clear form token cache on mount
     (mf/use-effect
@@ -493,18 +524,21 @@
                                   :with-delete (= action "edit"))}
        (when (= action "edit")
          [:> button* {:on-click on-delete-token
+                      :on-key-down handle-key-down-delete
                       :class (stl/css :delete-btn)
                       :type "button"
                       :icon i/delete
                       :variant "secondary"}
           (tr "labels.delete")])
        [:> button* {:on-click on-cancel
+                    :on-key-down handle-key-down-cancel
                     :type "button"
                     :on-ref  on-cancel-ref
                     :id "token-modal-cancel"
                     :variant "secondary"}
         (tr "labels.cancel")]
        [:> button* {:type "submit"
+                    :on-key-down handle-key-down-save
                     :variant "primary"
                     :disabled disabled?}
         (tr "labels.save")]]]]))
