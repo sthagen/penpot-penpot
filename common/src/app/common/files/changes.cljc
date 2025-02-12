@@ -458,24 +458,12 @@
       [:type [:= :set-tokens-lib]]
       [:tokens-lib :any]]]
 
-    [:add-token
-     [:map {:title "AddTokenChange"}
-      [:type [:= :add-token]]
+    [:set-token
+     [:map {:title "SetTokenChange"}
+      [:type [:= :set-token]]
       [:set-name :string]
-      [:token ::cto/token]]]
-
-    [:mod-token
-     [:map {:title "ModTokenChange"}
-      [:type [:= :mod-token]]
-      [:set-name :string]
-      [:name :string]
-      [:token ::cto/token]]]
-
-    [:del-token
-     [:map {:title "DelTokenChange"}
-      [:type [:= :del-token]]
-      [:set-name :string]
-      [:name :string]]]]])
+      [:token-name :string]
+      [:token [:maybe ::cto/token]]]]]])
 
 (def schema:changes
   [:sequential {:gen/max 5 :gen/min 1} schema:change])
@@ -685,7 +673,7 @@
       (d/update-in-when data [:components component-id] update-container))))
 
 (defn- process-operations
-  [objects {:keys [id operations] :as change}]
+  [objects {:keys [page-id id operations] :as change}]
   (if-let [shape (get objects id)]
     (let [shape    (reduce process-operation shape operations)
           touched? (-> shape meta ::ctn/touched)]
@@ -694,6 +682,10 @@
       ;; need to report them for to be used in the second
       ;; phase of changes procesing
       (when touched? (some-> *touched-changes* (vswap! conj change)))
+
+      (when (and *state* page-id)
+        (swap! *state* collect-shape-media-refs shape page-id))
+
       (assoc objects id shape))
 
     objects))
@@ -1036,29 +1028,21 @@
   [data {:keys [tokens-lib]}]
   (assoc data :tokens-lib tokens-lib))
 
-(defmethod process-change :add-token
-  [data {:keys [set-name token]}]
-  (update data :tokens-lib #(-> %
-                                (ctob/ensure-tokens-lib)
-                                (ctob/add-token-in-set set-name (ctob/make-token token)))))
+(defmethod process-change :set-token
+  [data {:keys [set-name token-name token]}]
+  (update data :tokens-lib
+          (fn [lib]
+            (let [lib' (ctob/ensure-tokens-lib lib)]
+              (cond
+                (not token)
+                (ctob/delete-token-from-set lib' set-name token-name)
 
-(defmethod process-change :mod-token
-  [data {:keys [set-name name token]}]
-  (update data :tokens-lib #(-> %
-                                (ctob/ensure-tokens-lib)
-                                (ctob/update-token-in-set
-                                 set-name
-                                 name
-                                 (fn [old-token]
-                                   (ctob/make-token (merge old-token token)))))))
+                (not (ctob/get-token-in-set lib' set-name token-name))
+                (ctob/add-token-in-set lib' set-name (ctob/make-token token))
 
-(defmethod process-change :del-token
-  [data {:keys [set-name name]}]
-  (update data :tokens-lib #(-> %
-                                (ctob/ensure-tokens-lib)
-                                (ctob/delete-token-from-set
-                                 set-name
-                                 name))))
+                :else
+                (ctob/update-token-in-set lib' set-name token-name (fn [prev-token]
+                                                                     (ctob/make-token (merge prev-token token)))))))))
 
 (defmethod process-change :add-temporary-token-theme
   [data {:keys [token-theme]}]
