@@ -6557,7 +6557,11 @@ msgstr "Nuevo tema"
 msgid "workspace.token.no-active-theme"
 msgstr "No hay temas activos"
 
-#: src/app/main/ui/workspace/tokens/sets.cljs:89
+#: src/app/main/ui/workspace/tokens/sets.cljs:91
+msgid "workspace.token.set-edit-placeholder"
+msgstr "Añade un nombre - usa '/' para grupos"
+
+#: src/app/main/ui/workspace/tokens/sets.cljs:103
 msgid "workspace.token.no-permisions-set"
 msgstr "Debes ser editor para activar / desactivar sets"
 
@@ -6955,3 +6959,9 @@ msgstr "Los autoguardados duran %s días."
 #, unused
 msgid "workspace.viewport.click-to-close-path"
 msgstr "Pulsar para cerrar la ruta"
+
+msgid "dashboard.mark-all-as-read.success"
+msgstr "Se han marcado todas las noficaciones como leídas"
+
+msgid "label.mark-all-as-read"
+msgstr "Marcar todo como leído"

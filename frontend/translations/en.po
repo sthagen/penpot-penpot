@@ -6547,7 +6547,11 @@ msgstr "New theme"
 msgid "workspace.token.no-active-theme"
 msgstr "No theme active"
 
-#: src/app/main/ui/workspace/tokens/sets.cljs:89
+#: src/app/main/ui/workspace/tokens/sets.cljs:91
+msgid "workspace.token.set-edit-placeholder"
+msgstr "Enter name (use '/' for groups)"
+
+#: src/app/main/ui/workspace/tokens/sets.cljs:103
 msgid "workspace.token.no-permisions-set"
 msgstr "You need to be an editor to activate / deactivate sets"
 
@@ -6962,3 +6966,9 @@ msgstr "Autosaved versions will be kept for %s days."
 #, unused
 msgid "workspace.viewport.click-to-close-path"
 msgstr "Click to close the path"
+
+msgid "dashboard.mark-all-as-read.success"
+msgstr "Marked all notifications as read"
+
+msgid "label.mark-all-as-read"
+msgstr "Mark all as read"

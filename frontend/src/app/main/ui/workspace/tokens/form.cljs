@@ -9,6 +9,7 @@
   (:require
    [app.common.colors :as c]
    [app.common.data :as d]
+   [app.common.data.macros :as dm]
    [app.common.types.tokens-lib :as ctob]
    [app.main.data.modal :as modal]
    [app.main.data.tokens :as dt]
@@ -321,9 +322,15 @@
         on-update-value (mf/use-fn
                          (mf/deps on-update-value-debounced)
                          (fn [e]
-                           (let [value (dom/get-target-val e)]
-                             (reset! value-ref value)
-                             (on-update-value-debounced value))))
+                           (let [value (dom/get-target-val e)
+                                 ;; Automatically add # for hex values
+                                 value' (if (and color? (tinycolor/hex-without-hash-prefix? value))
+                                          (let [hex (dm/str "#" value)]
+                                            (dom/set-value! (mf/ref-val value-input-ref) hex)
+                                            hex)
+                                          value)]
+                             (reset! value-ref value')
+                             (on-update-value-debounced value'))))
         on-update-color (mf/use-fn
                          (mf/deps on-update-value-debounced)
                          (fn [hex-value alpha]
@@ -397,13 +404,20 @@
                               ;; The result should be a vector of all resolved validations
                               ;; We do not handle the error case as it will be handled by the components validations
                               (when (and (seq result) (not err))
-                                (st/emit! (dt/update-create-token {:token (ctob/make-token :name final-name
-                                                                                           :type (or (:type token) token-type)
-                                                                                           :value final-value
-                                                                                           :description final-description)
-                                                                   :prev-token-name (:name token)}))
-                                (st/emit! (wtu/update-workspace-tokens))
-                                (modal/hide!))))))))
+                                (st/emit!
+                                 (if (ctob/token? token)
+                                   (dt/update-token (:name token)
+                                                    {:name final-name
+                                                     :value final-value
+                                                     :description final-description})
+
+                                   (dt/create-token {:name final-name
+                                                     :type token-type
+                                                     :value final-value
+                                                     :description final-description}))
+                                 (wtu/update-workspace-tokens)
+                                 (modal/hide)))))))))
+
         on-delete-token
         (mf/use-fn
          (mf/deps selected-token-set-name)
