@@ -18,7 +18,6 @@
    [app.main.render :as render]
    [app.render-wasm.helpers :as h]
    [app.util.debug :as dbg]
-   [app.util.functions :as fns]
    [app.util.http :as http]
    [app.util.webapi :as wapi]
    [beicon.v2.core :as rx]
@@ -108,7 +107,7 @@
   (h/call internal-module "_set_shape_clip_content" clip-content))
 
 (defn set-shape-type
-  [type]
+  [type {:keys [masked]}]
   (cond
     (= type :circle)
     (h/call internal-module "_set_shape_kind_circle")
@@ -118,6 +117,9 @@
 
     (= type :bool)
     (h/call internal-module "_set_shape_kind_bool")
+
+    (= type :group)
+    (h/call internal-module "_set_shape_kind_group" masked)
 
     :else
     (h/call internal-module "_set_shape_kind_rect")))
@@ -519,13 +521,13 @@
           (h/call internal-module "_add_shape_shadow" rgba blur spread x y (translate-shadow-style style) hidden)
           (recur (inc index)))))))
 
-(def debounce-render (fns/debounce render 100))
-
 (defn set-view-box
   [zoom vbox]
   (h/call internal-module "_set_view" zoom (- (:x vbox)) (- (:y vbox)))
-  (h/call internal-module "_render_from_cache")
-  (debounce-render))
+  (render nil))
+
+(defn clear-cache []
+  (h/call internal-module "_clear_cache"))
 
 (defn set-objects
   [objects]
@@ -537,6 +539,7 @@
             (let [shape        (nth shapes index)
                   id           (dm/get-prop shape :id)
                   type         (dm/get-prop shape :type)
+                  masked       (dm/get-prop shape :masked-group)
                   selrect      (dm/get-prop shape :selrect)
                   clip-content (if (= type :frame)
                                  (not (dm/get-prop shape :show-content))
@@ -563,7 +566,7 @@
                   shadows      (dm/get-prop shape :shadow)]
 
               (use-shape id)
-              (set-shape-type type)
+              (set-shape-type type {:masked masked})
               (set-shape-clip-content clip-content)
               (set-shape-selrect selrect)
               (set-shape-rotation rotation)
@@ -585,6 +588,7 @@
               (let [pending' (concat (set-shape-fills fills) (set-shape-strokes strokes))]
                 (recur (inc index) (into pending pending'))))
             pending))]
+    (clear-cache)
     (request-render "set-objects")
     (when-let [pending (seq pending)]
       (->> (rx/from pending)
