@@ -60,6 +60,7 @@
    [:id {:optional true} :string]
    [:options [:vector schema:combobox-option]]
    [:class {:optional true} :string]
+   [:placeholder {:optional true} :string]
    [:disabled {:optional true} :boolean]
    [:default-selected {:optional true} :string]
    [:on-change {:optional true} fn?]
@@ -68,7 +69,7 @@
 (mf/defc combobox*
   {::mf/props :obj
    ::mf/schema schema:combobox}
-  [{:keys [id options class disabled has-error default-selected on-change] :rest props}]
+  [{:keys [id options class placeholder disabled has-error default-selected on-change] :rest props}]
   (let [open* (mf/use-state false)
         open  (deref open*)
 
@@ -183,7 +184,8 @@
                    (when (deref open*)
                      (dom/prevent-default event)
                      (handle-selection focused* selected* open*)
-                     (when (fn? on-change)
+                     (when (and (fn? on-change)
+                                (some? focused))
                        (on-change focused)))
 
                    (kbd/esc? event)
@@ -241,6 +243,7 @@
                 :disabled disabled
                 :value selected
                 :on-change on-input-change
+                :placeholder placeholder
                 :on-key-down on-key-down}]]
 
       (when (d/not-empty? options)
