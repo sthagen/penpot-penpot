@@ -12,6 +12,8 @@
 
 ### :bug: Bugs fixed
 
+- Fix opacity in frame containers [Github #5858](https://github.com/penpot/penpot/pull/5858)
+
 
 ## 2.5.0 (Unreleased)
 
@@ -81,6 +83,8 @@ is a number of cores)
 - Fix problem with onboarding to a team [Taiga #10143](https://tree.taiga.io/project/penpot/issue/10143)
 - Fix problem with grid layout crashing [Taiga #10127](https://tree.taiga.io/project/penpot/issue/10127)
 - Fix rename locked boards [Taiga #10174](https://tree.taiga.io/project/penpot/issue/10174)
+- Fix update-libraries dialog disappear when clicking outside [Taiga #10238](https://tree.taiga.io/project/penpot/issue/10238)
+- Fix incorrect handling of team access requests with deleted/recreated users
 
 ## 2.4.3
 
