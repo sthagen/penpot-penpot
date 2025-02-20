@@ -168,11 +168,13 @@
                            (assoc file :data (d/removem (comp t/pointer? val) data))))))))))
 
 (defn- libraries-fetched
-  [libraries]
+  [file-id libraries]
   (ptk/reify ::libraries-fetched
     ptk/UpdateEvent
     (update [_ state]
-      (let [libraries (d/index-by :id libraries)]
+      (let [libraries (->> libraries
+                           (map (fn [l] (assoc l :library-of file-id)))
+                           (d/index-by :id))]
         (update state :files merge libraries)))
 
     ptk/WatchEvent
@@ -208,7 +210,7 @@
                               (rx/map #(assoc % :synced-at synced-at)))))
                       (rx/merge-map resolve-file)
                       (rx/reduce conj [])
-                      (rx/map libraries-fetched))
+                      (rx/map (partial libraries-fetched file-id)))
                  (->> (rx/from libraries)
                       (rx/map :id)
                       (rx/mapcat (fn [file-id]
@@ -888,6 +890,7 @@
     (watch [it state _]
       (let [page-id  (:current-page-id state)
             objects  (dsh/lookup-page-objects state page-id)
+            data     (dsh/lookup-file-data state)
 
             ;; Ignore any shape whose parent is also intended to be moved
             ids      (cfh/clean-loops objects ids)
@@ -897,13 +900,15 @@
 
             all-parents (into #{parent-id} (map #(cfh/get-parent-id objects %)) ids)
 
-            changes (cls/generate-relocate (pcb/empty-changes it)
-                                           objects
-                                           parent-id
-                                           page-id
-                                           to-index
-                                           ids
-                                           :ignore-parents? ignore-parents?)
+            changes (-> (pcb/empty-changes it)
+                        (pcb/with-page-id page-id)
+                        (pcb/with-objects objects)
+                        (pcb/with-library-data data)
+                        (cls/generate-relocate
+                         parent-id
+                         to-index
+                         ids
+                         :ignore-parents? ignore-parents?))
             undo-id (js/Symbol)]
 
         (rx/of (dwu/start-undo-transaction undo-id)
