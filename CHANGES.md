@@ -15,6 +15,11 @@
 ### :bug: Bugs fixed
 
 - Fix opacity in frame containers [Github #5858](https://github.com/penpot/penpot/pull/5858)
+- Avoid resizing on click [Taiga #10213](https://tree.taiga.io/project/penpot/issue/10213)
+- Hide horizontal scroll from dashboard sidebar [Taiga #10422](https://tree.taiga.io/project/penpot/issue/10422)
+- Fix cut and paste a copy a cmponent inside its parent [Taiga #10365](https://tree.taiga.io/project/penpot/us/10365)
+- Fix duplicate page with component over frame [Taiga #8151](https://tree.taiga.io/project/penpot/issue/8151) and [Taiga #9698](https://tree.taiga.io/project/penpot/issue/9698)
+- The plugin list in the navigation menu lacks scrolling, some plugins are not visible when a large number are installed [Taiga #9360](https://tree.taiga.io/project/penpot/us/9360)
 
 ## 2.5.2
 
@@ -29,6 +34,7 @@
 ### :bug: Bugs fixed
 
 - Navigate tracking event firing multiple times [Taiga #10415](https://tree.taiga.io/project/penpot/issue/10415)
+- Fix problem with selection colors [Taiga #](https://tree.taiga.io/project/penpot/issue/10376)
 
 ## 2.5.1
 
