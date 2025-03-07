@@ -20,6 +20,7 @@
 - Fix cut and paste a copy a cmponent inside its parent [Taiga #10365](https://tree.taiga.io/project/penpot/us/10365)
 - Fix duplicate page with component over frame [Taiga #8151](https://tree.taiga.io/project/penpot/issue/8151) and [Taiga #9698](https://tree.taiga.io/project/penpot/issue/9698)
 - The plugin list in the navigation menu lacks scrolling, some plugins are not visible when a large number are installed [Taiga #9360](https://tree.taiga.io/project/penpot/us/9360)
+- Fix hidden toolbar click event still available [Taiga #10437](https://tree.taiga.io/project/penpot/us/10437)
 
 ## 2.5.2
 
@@ -30,11 +31,13 @@
 ### :heart: Community contributions (Thank you!)
 
 ### :sparkles: New features
+- When the workspace is empty, set default the board creation tool [Taiga #9425](https://tree.taiga.io/project/penpot/us/9425)
 
 ### :bug: Bugs fixed
 
+- Fix scroll on storybook docs [taiga #9962](https://tree.taiga.io/project/penpot/issue/9962)
 - Navigate tracking event firing multiple times [Taiga #10415](https://tree.taiga.io/project/penpot/issue/10415)
-- Fix problem with selection colors [Taiga #](https://tree.taiga.io/project/penpot/issue/10376)
+- Fix problem with selection colors [Taiga #10376](https://tree.taiga.io/project/penpot/issue/10376)
 
 ## 2.5.1
 
