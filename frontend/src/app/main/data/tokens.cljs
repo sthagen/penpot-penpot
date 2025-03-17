@@ -66,19 +66,26 @@
 ;; TOKENS Actions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn create-token-theme [token-theme]
+(defn create-token-theme
+  [token-theme]
   (let [new-token-theme token-theme]
     (ptk/reify ::create-token-theme
       ptk/WatchEvent
       (watch [it state _]
-        (let [data    (dsh/lookup-file-data state)
-              changes (-> (pcb/empty-changes it)
-                          (pcb/with-library-data data)
-                          (pcb/set-token-theme (:group new-token-theme)
-                                               (:name new-token-theme)
-                                               new-token-theme))]
-          (rx/of
-           (dch/commit-changes changes)))))))
+        (let [data       (dsh/lookup-file-data state)
+              tokens-lib (get data :tokens-lib)]
+
+          (if (and tokens-lib (ctob/get-theme tokens-lib (:group token-theme) (:name token-theme)))
+            (rx/of (ntf/show {:content (tr "errors.token-theme-already-exists")
+                              :type :toast
+                              :level :error
+                              :timeout 9000}))
+            (let [changes (-> (pcb/empty-changes it)
+                              (pcb/with-library-data data)
+                              (pcb/set-token-theme (:group new-token-theme)
+                                                   (:name new-token-theme)
+                                                   new-token-theme))]
+              (rx/of (dch/commit-changes changes)))))))))
 
 (defn update-token-theme [[group name] token-theme]
   (ptk/reify ::update-token-theme
@@ -127,7 +134,7 @@
          (wtu/update-workspace-tokens))))))
 
 (defn create-token-set
-  [set-name token-set]
+  [set-name]
   (ptk/reify ::create-token-set
     ptk/UpdateEvent
     (update [_ state]
@@ -136,17 +143,20 @@
 
     ptk/WatchEvent
     (watch [it state _]
-      (let [token-set' (-> token-set
-                           (update :name #(if (empty? %)
-                                            set-name
-                                            (ctob/join-set-path [% set-name]))))
-            data (dsh/lookup-file-data state)
-            token-set-name (:name token-set')
-            changes   (-> (pcb/empty-changes it)
-                          (pcb/with-library-data data)
-                          (pcb/set-token-set token-set-name false token-set'))]
-        (rx/of (set-selected-token-set-name token-set-name)
-               (dch/commit-changes changes))))))
+      (let [data       (dsh/lookup-file-data state)
+            tokens-lib (get data :tokens-lib)
+            set-name   (ctob/normalize-set-name set-name)]
+        (if (and tokens-lib (ctob/get-set tokens-lib set-name))
+          (rx/of (ntf/show {:content (tr "errors.token-set-already-exists")
+                            :type :toast
+                            :level :error
+                            :timeout 9000}))
+          (let [token-set (ctob/make-token-set :name set-name)
+                changes   (-> (pcb/empty-changes it)
+                              (pcb/with-library-data data)
+                              (pcb/set-token-set set-name false token-set))]
+            (rx/of (set-selected-token-set-name set-name)
+                   (dch/commit-changes changes))))))))
 
 (defn rename-token-set-group [set-group-path set-group-fname]
   (ptk/reify ::rename-token-set-group
@@ -157,17 +167,25 @@
         (rx/of
          (dch/commit-changes changes))))))
 
-(defn update-token-set [set-name token-set]
+(defn update-token-set
+  [token-set name]
   (ptk/reify ::update-token-set
     ptk/WatchEvent
     (watch [it state _]
-      (let [data (dsh/lookup-file-data state)
-            changes (-> (pcb/empty-changes it)
-                        (pcb/with-library-data data)
-                        (pcb/set-token-set set-name false token-set))]
-        (rx/of
-         (set-selected-token-set-name (:name token-set))
-         (dch/commit-changes changes))))))
+      (let [data       (dsh/lookup-file-data state)
+            name       (ctob/normalize-set-name name (:name token-set))
+            tokens-lib (get data :tokens-lib)]
+
+        (if (ctob/get-set tokens-lib name)
+          (rx/of (ntf/show {:content (tr "errors.token-set-already-exists")
+                            :type :toast
+                            :level :error
+                            :timeout 9000}))
+          (let [changes (-> (pcb/empty-changes it)
+                            (pcb/with-library-data data)
+                            (pcb/rename-token-set (:name token-set) name))]
+            (rx/of (set-selected-token-set-name (:name token-set))
+                   (dch/commit-changes changes))))))))
 
 (defn toggle-token-set
   [name]
@@ -224,8 +242,8 @@
     ptk/WatchEvent
     (watch [_ _ _]
       (let [content (case error
-                      :path-exists (tr "errors.drag-drop.set-exists" to-path)
-                      :parent-to-child (tr "errors.drag-drop.parent-to-child")
+                      :path-exists (tr "errors.token-set-exists-on-drop" to-path)
+                      :parent-to-child (tr "errors.drop-token-set-parent-to-child")
                       nil)]
         (when content
           (rx/of
@@ -243,7 +261,7 @@
           (rx/of
            (dch/commit-changes changes)
            (wtu/update-workspace-tokens)))
-        (catch js/Error e
+        (catch :default e
           (rx/of
            (drop-error (ex-data e))))))))
 
@@ -255,7 +273,7 @@
         (when-let [changes (clt/generate-move-token-set (pcb/empty-changes it) (get-tokens-lib state) drop-opts)]
           (rx/of (dch/commit-changes changes)
                  (wtu/update-workspace-tokens)))
-        (catch js/Error e
+        (catch :default e
           (rx/of
            (drop-error (ex-data e))))))))
 
