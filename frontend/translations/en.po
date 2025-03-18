@@ -1171,7 +1171,7 @@ msgstr "Theme Option with the same name exists"
 
 #: src/app/main/data/tokens.cljs:198
 msgid "errors.token-set-exists-on-drop"
-msgstr "Cannot complete drop, a set with same name already exists at path %s."
+msgstr "Cannot complete drop, a set with same name already exists at path."
 
 #: src/app/main/data/tokens.cljs:294
 msgid "workspace.token.duplicate-suffix"
@@ -1529,6 +1529,16 @@ msgstr "Shadow"
 #: src/app/main/ui/viewer/inspect/attributes/geometry.cljs:40
 msgid "inspect.attributes.size"
 msgstr "Size and position"
+
+#: src/app/main/ui/viewer/inspect/attributes/variant.cljs:40
+msgid "inspect.attributes.variant.variant"
+msgstr "Variant properties"
+
+msgid "inspect.attributes.variant.component"
+msgstr "Component properties"
+
+msgid "inspect.attributes.variant.copy"
+msgstr "Copy properties"
 
 #: src/app/main/ui/viewer/inspect/attributes/stroke.cljs:52
 msgid "inspect.attributes.stroke"

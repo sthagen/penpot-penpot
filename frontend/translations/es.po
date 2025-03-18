@@ -1532,6 +1532,16 @@ msgstr "Sombra"
 msgid "inspect.attributes.size"
 msgstr "Tamaño y posición"
 
+#: src/app/main/ui/viewer/inspect/attributes/variant.cljs:40
+msgid "inspect.attributes.variant.variant"
+msgstr "Propiedades de la variante"
+
+msgid "inspect.attributes.variant.component"
+msgstr "Propiedades del componente"
+
+msgid "inspect.attributes.variant.copy"
+msgstr "Propiedades de la copia"
+
 #: src/app/main/ui/viewer/inspect/attributes/stroke.cljs:52
 msgid "inspect.attributes.stroke"
 msgstr "Borde"
@@ -7188,3 +7198,7 @@ msgstr "Ya existe un set con el mismo nombre"
 
 msgid "errors.token-theme-already-exists"
 msgstr "Ya existe un theme con este nombre"
+
+#: src/app/main/data/tokens.cljs:198
+msgid "errors.token-set-exists-on-drop"
+msgstr "No se ha podido mover el set, un set con el mismo nombre ya existe en la esa ruta."
