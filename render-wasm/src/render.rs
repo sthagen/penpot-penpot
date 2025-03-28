@@ -28,6 +28,8 @@ pub use blend::BlendMode;
 pub use fonts::*;
 pub use images::*;
 
+// This is the extra are used for tile rendering.
+const VIEWPORT_INTEREST_AREA_THRESHOLD: i32 = 1;
 const MAX_BLOCKING_TIME_MS: i32 = 32;
 const NODE_BATCH_THRESHOLD: i32 = 10;
 
@@ -94,7 +96,7 @@ pub(crate) struct RenderState {
     pub sampling_options: skia::SamplingOptions,
     pub render_area: Rect,
     pub tiles: tiles::TileHashMap,
-    pub pending_tiles: Vec<tiles::Tile>,
+    pub pending_tiles: Vec<tiles::TileWithDistance>,
 }
 
 impl RenderState {
@@ -211,13 +213,7 @@ impl RenderState {
 
     pub fn apply_drawing_to_render_canvas(&mut self, shape: Option<&Shape>) {
         self.surfaces
-            .flush_and_submit(&mut self.gpu_state, SurfaceId::Fills);
-
-        self.surfaces
             .flush_and_submit(&mut self.gpu_state, SurfaceId::DropShadows);
-
-        self.surfaces
-            .flush_and_submit(&mut self.gpu_state, SurfaceId::InnerShadows);
 
         self.surfaces.draw_into(
             SurfaceId::DropShadows,
@@ -225,28 +221,26 @@ impl RenderState {
             Some(&skia::Paint::default()),
         );
 
+        self.surfaces
+            .flush_and_submit(&mut self.gpu_state, SurfaceId::Fills);
+
         self.surfaces.draw_into(
             SurfaceId::Fills,
             SurfaceId::Current,
             Some(&skia::Paint::default()),
         );
 
-        self.surfaces.draw_into(
-            SurfaceId::InnerShadows,
-            SurfaceId::Current,
-            Some(&skia::Paint::default()),
-        );
-
         let mut render_overlay_below_strokes = false;
         if let Some(shape) = shape {
-            render_overlay_below_strokes = shape.fills().len() > 0;
+            render_overlay_below_strokes = shape.has_fills();
         }
 
         if render_overlay_below_strokes {
             self.surfaces
-                .flush_and_submit(&mut self.gpu_state, SurfaceId::Overlay);
+                .flush_and_submit(&mut self.gpu_state, SurfaceId::InnerShadows);
+
             self.surfaces.draw_into(
-                SurfaceId::Overlay,
+                SurfaceId::InnerShadows,
                 SurfaceId::Current,
                 Some(&skia::Paint::default()),
             );
@@ -254,6 +248,7 @@ impl RenderState {
 
         self.surfaces
             .flush_and_submit(&mut self.gpu_state, SurfaceId::Strokes);
+
         self.surfaces.draw_into(
             SurfaceId::Strokes,
             SurfaceId::Current,
@@ -262,25 +257,22 @@ impl RenderState {
 
         if !render_overlay_below_strokes {
             self.surfaces
-                .flush_and_submit(&mut self.gpu_state, SurfaceId::Overlay);
+                .flush_and_submit(&mut self.gpu_state, SurfaceId::InnerShadows);
+
             self.surfaces.draw_into(
-                SurfaceId::Overlay,
+                SurfaceId::InnerShadows,
                 SurfaceId::Current,
                 Some(&skia::Paint::default()),
             );
         }
 
         self.surfaces
-            .draw_into(SurfaceId::Overlay, SurfaceId::Current, None);
-        self.surfaces
             .flush_and_submit(&mut self.gpu_state, SurfaceId::Current);
 
         self.surfaces.apply_mut(
             &[
-                SurfaceId::Shadow,
-                SurfaceId::InnerShadows,
                 SurfaceId::DropShadows,
-                SurfaceId::Overlay,
+                SurfaceId::InnerShadows,
                 SurfaceId::Fills,
                 SurfaceId::Strokes,
             ],
@@ -403,11 +395,13 @@ impl RenderState {
                 }
 
                 for stroke in shape.strokes().rev() {
-                    strokes::render(self, &shape, stroke, antialias);
+                    shadows::render_stroke_drop_shadows(self, &shape, stroke, antialias);
+                    strokes::render(self, &shape, stroke, None, None, antialias);
+                    shadows::render_stroke_inner_shadows(self, &shape, stroke, antialias);
                 }
 
-                shadows::render_inner_shadows(self, &shape, antialias);
-                shadows::render_drop_shadows(self, &shape, antialias);
+                shadows::render_fill_inner_shadows(self, &shape, antialias);
+                shadows::render_fill_drop_shadows(self, &shape, antialias);
             }
         };
 
@@ -457,27 +451,33 @@ impl RenderState {
             },
         );
 
+        // First we retrieve the extended area of the viewport that we could render.
+        let (isx, isy, iex, iey) = tiles::get_tiles_for_viewbox_with_interest(
+            self.viewbox,
+            VIEWPORT_INTEREST_AREA_THRESHOLD,
+        );
+        // Then we get the real amount of tiles rendered for the current viewbox.
         let (sx, sy, ex, ey) = tiles::get_tiles_for_viewbox(self.viewbox);
-        debug::render_debug_tiles_for_viewbox(self, sx, sy, ex, ey);
-        /*
-        // TODO: Instead of rendering only the visible area
-        // we could apply an offset to the viewbox to render
-        // more tiles.
-        sx - interest_delta
-        sy - interest_delta
-        ex + interest_delta
-        ey + interest_delta
-        */
+        debug::render_debug_tiles_for_viewbox(self, isx, isy, iex, iey);
+        let tile_center = ((iex - isx) / 2, (iey - isy) / 2);
         self.pending_tiles = vec![];
         self.surfaces.cache_clear_visited();
-        for y in sy..=ey {
-            for x in sx..=ex {
+        for y in isy..=iey {
+            for x in isx..=iex {
                 let tile = (x, y);
-                self.pending_tiles.push(tile);
-                self.surfaces.cache_visit(tile);
+                let distance = tiles::manhattan_distance(tile, tile_center);
+                self.pending_tiles.push((x, y, distance));
+                // We only need to mark as visited the visible
+                // tiles, the ones that are outside the viewport
+                // should not be rendered.
+                if x >= sx && x <= ex && y >= sy && y <= ey {
+                    self.surfaces.cache_visit(tile);
+                }
             }
         }
         self.pending_nodes = vec![];
+        // reorder by distance to the center.
+        self.pending_tiles.sort_by(|a, b| b.2.cmp(&a.2));
         self.current_tile = None;
         self.render_in_progress = true;
         self.apply_drawing_to_render_canvas(None);
@@ -752,7 +752,9 @@ impl RenderState {
 
             // If we finish processing every node rendering is complete
             // let's check if there are more pending nodes
-            if let Some(next_tile) = self.pending_tiles.pop() {
+            if let Some(next_tile_with_distance) = self.pending_tiles.pop() {
+                let (x, y, _) = next_tile_with_distance;
+                let next_tile = (x, y);
                 self.update_render_context(next_tile);
                 if !self.surfaces.has_cached_tile_surface(next_tile) {
                     if let Some(ids) = self.tiles.get_shapes_at(next_tile) {
@@ -845,6 +847,20 @@ impl RenderState {
                 for child_id in shape.children_ids().iter() {
                     nodes.push(*child_id);
                 }
+            }
+        }
+    }
+
+    pub fn rebuild_modifier_tiles(
+        &mut self,
+        tree: &mut HashMap<Uuid, Shape>,
+        modifiers: &HashMap<Uuid, Matrix>,
+    ) {
+        for (uuid, matrix) in modifiers {
+            if let Some(shape) = tree.get(uuid) {
+                let mut shape: Shape = shape.clone();
+                shape.apply_transform(matrix);
+                self.update_tile_for(&shape);
             }
         }
     }
