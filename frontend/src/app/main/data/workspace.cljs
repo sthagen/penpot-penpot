@@ -80,6 +80,7 @@
    [app.main.data.workspace.viewport :as dwv]
    [app.main.data.workspace.zoom :as dwz]
    [app.main.errors]
+   [app.main.features :as features]
    [app.main.features.pointer-map :as fpmap]
    [app.main.repo :as rp]
    [app.main.router :as rt]
@@ -305,7 +306,8 @@
              (rx/take-until stopper-s))))))
 
 (defn initialize-workspace
-  [file-id]
+  [team-id file-id]
+  (assert (uuid? team-id) "expected valud uuid for `team-id`")
   (assert (uuid? file-id) "expected valud uuid for `file-id`")
 
   (ptk/reify ::initialize-workspace
@@ -321,8 +323,7 @@
     (watch [_ state stream]
       (let [stoper-s     (rx/filter (ptk/type? ::finalize-workspace) stream)
             rparams      (rt/get-params state)
-            team-id      (get state :current-team-id)
-            features     (get state :features)
+            features     (features/get-enabled-features state team-id)
             render-wasm? (contains? features "render-wasm/v1")]
 
         (log/debug :hint "initialize-workspace"
@@ -417,7 +418,7 @@
         (unchecked-set ug/global "name" name)))))
 
 (defn finalize-workspace
-  [file-id]
+  [_team-id file-id]
   (ptk/reify ::finalize-workspace
     ptk/UpdateEvent
     (update [_ state]
@@ -450,8 +451,9 @@
   (ptk/reify ::reload-current-file
     ptk/WatchEvent
     (watch [_ state _]
-      (let [file-id (:current-file-id state)]
-        (rx/of (initialize-workspace file-id))))))
+      (let [file-id (:current-file-id state)
+            team-id (:current-team-id state)]
+        (rx/of (initialize-workspace team-id file-id))))))
 
 ;; Make this event callable through dynamic resolution
 (defmethod ptk/resolve ::reload-current-file [_ _] (reload-current-file))
@@ -492,18 +494,25 @@
 (defn initialize-page
   [file-id page-id]
   (assert (uuid? file-id) "expected valid uuid for `file-id`")
+  (assert (uuid? page-id) "expected valid uuid for `page-id`")
 
   (ptk/reify ::initialize-page
     ptk/WatchEvent
     (watch [_ state _]
       (if-let [page (dsh/lookup-page state file-id page-id)]
-        (rx/concat (rx/of (initialize-page* file-id page-id page)
-                          (dwth/watch-state-changes file-id page-id)
-                          (dwl/watch-component-changes))
-                   (let [profile (:profile state)
-                         props   (get profile :props)]
-                     (when (not (:workspace-visited props))
-                       (rx/of (select-frame-tool file-id page-id)))))
+        (rx/concat
+         (rx/of (initialize-page* file-id page-id page)
+                (dwth/watch-state-changes file-id page-id)
+                (dwl/watch-component-changes))
+         (let [profile (:profile state)
+               props   (get profile :props)]
+           (when (not (:workspace-visited props))
+             (rx/of (select-frame-tool file-id page-id)))))
+
+        ;; NOTE: this redirect is necessary for cases where user
+        ;; explicitly passes an non-existing page-id on the url
+        ;; params, so on check it we can detect that there are no data
+        ;; for the page and redirect user to an existing page
         (rx/of (dcm/go-to-workspace :file-id file-id ::rt/replace true))))))
 
 (defn finalize-page
@@ -582,7 +591,6 @@
                                                  component
                                                  fdata
                                                  (gpt/point (:x shape) (:y shape))
-                                                 true
                                                  {:keep-ids? true :force-frame-id (:frame-id shape)})
                     children (into {} (map (fn [shape] [(:id shape) shape]) new-shapes))
                     objs (assoc objs id new-shape)]
