@@ -19,6 +19,8 @@
 - Fix long file names being clipped when longer than allowed length [Taiga #10662](https://tree.taiga.io/project/penpot/issue/10662)
 - Fix problem with error detail in toast [Taiga #10519](https://tree.taiga.io/project/penpot/issue/10519)
 - Fix view mode error when an external user tries to export something from a prototype using a shared link [Taiga #10251](https://tree.taiga.io/project/penpot/issue/10251)
+- Fix merge path nodes with only one node selected [Taiga #9626](https://tree.taiga.io/project/penpot/issue/9626)
+- Fix problem with import errors [Taiga #10040](https://tree.taiga.io/project/penpot/issue/10040)
 
 ## 2.6.1
 
@@ -26,6 +28,7 @@
 
 - Fix webhooks not shown in list [Taiga #10763](https://tree.taiga.io/project/penpot/issue/10763)
 - Fix colorpicker scroll when dropdown displayed [Taiga #10696](https://tree.taiga.io/project/penpot/issue/10696)
+- Clean internal workspace state on exit or url changed [Taiga #10619](https://tree.taiga.io/project/penpot/issue/10619)
 
 ## 2.6.0
 

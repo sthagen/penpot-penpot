@@ -22,6 +22,7 @@
    [app.render-wasm.deserializers :as dr]
    [app.render-wasm.helpers :as h]
    [app.render-wasm.mem :as mem]
+   [app.render-wasm.performance :as perf]
    [app.render-wasm.serializers :as sr]
    [app.render-wasm.wasm :as wasm]
    [app.util.debug :as dbg]
@@ -190,6 +191,7 @@
   [shape-ids]
   (let [num-shapes (count shape-ids)]
     (when (> num-shapes 0)
+      (perf/begin-measure "set-shape-children")
       (let [offset (mem/alloc-bytes (* CHILD-ENTRY-SIZE num-shapes))
             heap (mem/get-heap-u32)]
 
@@ -200,7 +202,9 @@
               (sr/heapu32-set-uuid id heap (mem/ptr8->ptr32 current-offset))
               (recur (rest entries) (+ current-offset CHILD-ENTRY-SIZE)))))
 
-        (h/call wasm/internal-module "_set_children")))))
+        (let [result (h/call wasm/internal-module "_set_children")]
+          (perf/end-measure "set-shape-children")
+          result)))))
 
 (defn- get-string-length [string] (+ (count string) 1))
 
@@ -348,8 +352,6 @@
               (let [rgba (rgba-from-hex color opacity)]
                 (h/call wasm/internal-module "_add_shape_stroke_solid_fill" rgba)))))
         strokes))
-
-
 
 (defn set-shape-path-attrs
   [attrs]
@@ -704,6 +706,7 @@
 
 (defn set-object
   [objects shape]
+  (perf/begin-measure "set-object")
   (let [id           (dm/get-prop shape :id)
         parent-id    (dm/get-prop shape :parent-id)
         type         (dm/get-prop shape :type)
@@ -754,7 +757,8 @@
     (when (and (some? content)
                (or (= type :path)
                    (= type :bool)))
-      (set-shape-path-attrs svg-attrs)
+      (when (some? svg-attrs)
+        (set-shape-path-attrs svg-attrs))
       (set-shape-path-content content))
     (when (and (some? content) (= type :svg-raw))
       (set-shape-svg-raw-content (get-static-markup shape)))
@@ -773,12 +777,15 @@
     (when (ctl/grid-layout? shape)
       (set-grid-layout shape))
 
-    (into [] (concat
-              (if (and (= type :text) (some? content))
-                (set-shape-text-content content)
-                [])
-              (set-shape-fills fills)
-              (set-shape-strokes strokes)))))
+    (let [pending (into [] (concat
+                            (if (and (= type :text) (some? content))
+                              (set-shape-text-content content)
+                              [])
+                            (set-shape-fills fills)
+                            (set-shape-strokes strokes)))]
+      (perf/end-measure "set-object")
+      pending)))
+
 
 (defn process-object
   [shape]
@@ -793,6 +800,7 @@
 
 (defn set-objects
   [objects]
+  (perf/begin-measure "set-objects")
   (let [shapes        (into [] (vals objects))
         total-shapes  (count shapes)
         pending
@@ -802,6 +810,7 @@
                   pending' (set-object objects shape)]
               (recur (inc index) (into pending pending')))
             pending))]
+    (perf/end-measure "set-objects")
     (clear-drawing-cache)
     (request-render "set-objects")
     (when-let [pending (seq pending)]
