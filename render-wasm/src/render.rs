@@ -1,7 +1,7 @@
 use skia_safe::{self as skia, Matrix, RRect, Rect};
 
 use crate::uuid::Uuid;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::performance;
 #[cfg(target_arch = "wasm32")]
@@ -22,7 +22,7 @@ mod surfaces;
 mod text;
 mod tiles;
 
-use crate::shapes::{Corners, Shape, Type};
+use crate::shapes::{modified_children_ids, Corners, Shape, StructureEntry, Type};
 use gpu_state::GpuState;
 use options::RenderOptions;
 use surfaces::{SurfaceId, Surfaces};
@@ -430,6 +430,7 @@ impl RenderState {
         &mut self,
         tree: &mut HashMap<Uuid, Shape>,
         modifiers: &HashMap<Uuid, Matrix>,
+        structure: &HashMap<Uuid, Vec<StructureEntry>>,
         timestamp: i32,
     ) -> Result<(), String> {
         if self.render_in_progress {
@@ -487,7 +488,7 @@ impl RenderState {
         self.current_tile = None;
         self.render_in_progress = true;
         self.apply_drawing_to_render_canvas(None);
-        self.process_animation_frame(tree, modifiers, timestamp)?;
+        self.process_animation_frame(tree, modifiers, structure, timestamp)?;
         performance::end_measure!("start_render_loop");
         Ok(())
     }
@@ -496,11 +497,12 @@ impl RenderState {
         &mut self,
         tree: &mut HashMap<Uuid, Shape>,
         modifiers: &HashMap<Uuid, Matrix>,
+        structure: &HashMap<Uuid, Vec<StructureEntry>>,
         timestamp: i32,
     ) -> Result<(), String> {
         performance::begin_measure!("process_animation_frame");
         if self.render_in_progress {
-            self.render_shape_tree(tree, modifiers, timestamp)?;
+            self.render_shape_tree(tree, modifiers, structure, timestamp)?;
             self.flush();
 
             if self.render_in_progress {
@@ -594,11 +596,13 @@ impl RenderState {
         &mut self,
         tree: &mut HashMap<Uuid, Shape>,
         modifiers: &HashMap<Uuid, Matrix>,
+        structure: &HashMap<Uuid, Vec<StructureEntry>>,
         timestamp: i32,
     ) -> Result<(), String> {
         if !self.render_in_progress {
             return Ok(());
         }
+
         let scale = self.get_scale();
         let mut should_stop = false;
 
@@ -631,6 +635,7 @@ impl RenderState {
                             visited_mask,
                             mask,
                         } = node_render_state;
+
                         is_empty = false;
                         let element = tree.get_mut(&node_id).ok_or(
                             "Error: Element with root_id {node_render_state.id} not found in the tree."
@@ -709,7 +714,8 @@ impl RenderState {
                             let children_clip_bounds = node_render_state
                                 .get_children_clip_bounds(element, modifiers.get(&element.id));
 
-                            let mut children_ids = element.children_ids();
+                            let mut children_ids =
+                                modified_children_ids(element, structure.get(&element.id));
 
                             // Z-index ordering on Layouts
                             if element.has_layout() {
@@ -757,31 +763,28 @@ impl RenderState {
                 .canvas(SurfaceId::Current)
                 .clear(self.background_color);
 
+            let Some(root) = tree.get(&Uuid::nil()) else {
+                return Err(String::from("Root shape not found"));
+            };
+            let root_ids = modified_children_ids(&root, structure.get(&root.id));
+
             // If we finish processing every node rendering is complete
             // let's check if there are more pending nodes
             if let Some(next_tile_with_distance) = self.pending_tiles.pop() {
                 let (x, y, _) = next_tile_with_distance;
                 let next_tile = (x, y);
                 self.update_render_context(next_tile);
+
                 if !self.surfaces.has_cached_tile_surface(next_tile) {
                     if let Some(ids) = self.tiles.get_shapes_at(next_tile) {
                         // We only need first level shapes
                         let mut valid_ids: Vec<Uuid> = ids
                             .iter()
-                            .filter_map(|id| {
-                                tree.get(id)
-                                    .filter(|element| element.parent_id == Some(Uuid::nil()))
-                                    .map(|_| *id)
-                            })
+                            .filter_map(|id| root_ids.get(id).map(|_| *id))
                             .collect();
 
                         // These shapes for the tile should be ordered as they are in the parent node
-                        if let Some(root) = tree.get(&Uuid::nil()) {
-                            let root_ids = &root.children_ids();
-                            valid_ids.sort_by_key(|id| {
-                                root_ids.iter().rev().position(|root_id| root_id == id)
-                            });
-                        }
+                        valid_ids.sort_by_key(|id| root_ids.get_index_of(id));
 
                         self.pending_nodes.extend(valid_ids.into_iter().map(|id| {
                             NodeRenderState {
@@ -816,21 +819,26 @@ impl RenderState {
 
     pub fn update_tile_for(&mut self, shape: &Shape) {
         let (rsx, rsy, rex, rey) = self.get_tiles_for_rect(shape);
+        let new_tiles: HashSet<(i32, i32)> = (rsx..=rex)
+            .flat_map(|x| (rsy..=rey).map(move |y| (x, y)))
+            .collect();
 
         // Update tiles where the shape was
         if let Some(tiles) = self.tiles.get_tiles_of(shape.id) {
             for tile in tiles.iter() {
                 self.surfaces.remove_cached_tile_surface(*tile);
             }
+            // Remove shape from tiles not used
+            let diff: HashSet<_> = tiles.difference(&new_tiles).cloned().collect();
+            for tile in diff.iter() {
+                self.tiles.remove_shape_at(*tile, shape.id);
+            }
         }
 
         // Update tiles matching the actual selrect
-        for x in rsx..=rex {
-            for y in rsy..=rey {
-                let tile = (x, y);
-                self.tiles.add_shape_at(tile, shape.id);
-                self.surfaces.remove_cached_tile_surface(tile);
-            }
+        for tile in new_tiles {
+            self.tiles.add_shape_at(tile, shape.id);
+            self.surfaces.remove_cached_tile_surface(tile);
         }
     }
 
@@ -838,6 +846,7 @@ impl RenderState {
         &mut self,
         tree: &mut HashMap<Uuid, Shape>,
         modifiers: &HashMap<Uuid, Matrix>,
+        structure: &HashMap<Uuid, Vec<StructureEntry>>,
     ) {
         performance::begin_measure!("rebuild_tiles");
         self.tiles.invalidate();
@@ -852,7 +861,9 @@ impl RenderState {
                     }
                     self.update_tile_for(&shape);
                 }
-                for child_id in shape.children_ids().iter() {
+
+                let children = modified_children_ids(&shape, structure.get(&shape.id));
+                for child_id in children.iter() {
                     nodes.push(*child_id);
                 }
             }
