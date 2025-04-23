@@ -8,6 +8,7 @@
   (:require
    [app.common.data :as d]
    [app.common.files.helpers :as cfh]
+   [app.common.math :as math]
    [app.common.schema :as sm]
    [cuerdas.core :as str]))
 
@@ -231,3 +232,44 @@
          {:props (vec props1) :used-pos (matching-indices props1 props2)}
          props2)
         :props)))
+
+(defn compare-properties
+  "Compares vectors of properties keeping the value if it is the same for all
+   or setting a custom value where their values do not coincide"
+  ([props-list]
+   (compare-properties props-list nil))
+
+  ([props-list distinct-mark]
+   (let [grouped (group-by :name (apply concat props-list))
+         check-values (fn [values]
+                        (let [vals (map :value values)]
+                          (if (apply = vals)
+                            (first vals)
+                            distinct-mark)))]
+     (mapv (fn [[name values]]
+             {:name name :value (check-values values)})
+           grouped))))
+
+(defn same-variant?
+  "Determines if all elements belong to the same variant"
+  [components]
+  (let [variant-ids (distinct (map :variant-id components))
+        not-blank?  (complement str/blank?)]
+    (and
+     (= 1 (count variant-ids))
+     (not-blank? (first variant-ids)))))
+
+(defn distance
+  "Computes a weighted distance between two property lists `props1` and `props2`.
+   Latter properties weight less that previous ones"
+  [props1 props2]
+  (let [total-num-props (count props1)
+        xform           (map-indexed
+                         (fn [idx [p1 p2]]
+                           (if (not= p1 p2)
+                             (math/pow 2 (- total-num-props idx))
+                             0)))]
+    (transduce
+     xform
+     +
+     (map vector props1 props2))))
