@@ -10,12 +10,17 @@
 
 ### :sparkles: New features
 
+
 - Update board presets with a newer devices [Taiga #10610](https://tree.taiga.io/project/penpot/us/10610)
 - Propagate "sharing a prototype" to editors and viewers [Taiga #8853](https://tree.taiga.io/project/penpot/us/8853)
 - Design improvements to the Invitations page with an empty state [Taiga #4554](https://tree.taiga.io/project/penpot/us/4554)
+- Duplicate token sets [Taiga #10694](https://tree.taiga.io/project/penpot/issue/10694)
+- Add set selection in create Token themes flow [Taiga #10746](https://tree.taiga.io/project/penpot/issue/10746)
+- Display indicator on not active sets [Taiga #10668](https://tree.taiga.io/project/penpot/issue/10668)
 
 ### :bug: Bugs fixed
 
+- Fix positioning of comment drafts when near the right / bottom edges of viewport [Taiga #10534](https://tree.taiga.io/project/penpot/issue/10534)
 - Fix path having a wrong selrect [Taiga #10257](https://tree.taiga.io/project/penpot/issue/10257)
 - Fix SVG `stroke-linecap` property when importing SVGs [Taiga #9489](https://tree.taiga.io/project/penpot/issue/9489)
 - Fix position problems cutting-pasting a component [Taiga #10677](https://tree.taiga.io/project/penpot/issue/10677)
@@ -28,6 +33,14 @@
 - Fix color gradient on texts [Taiga Issue #7488](https://tree.taiga.io/project/penpot/issue/7488)
 - Add support for self mentions [Taiga #10809](https://tree.taiga.io/project/penpot/issue/10809)
 - Fix team info settings alignment [Taiga #10869](https://tree.taiga.io/project/penpot/issue/10869)
+- Fix left sidebar horizontal scroll on nested layers [Taiga #10791](https://tree.taiga.io/project/penpot/issue/10791)
+- Improve error message details importing tokens [Taiga Issue #10772](https://tree.taiga.io/project/penpot/issue/10772)
+- Fix no selected set after Drag & Drop [Github #71](https://github.com/tokens-studio/penpot/issues/71)
+- Styledictionary v5 Update [Github #6283](https://github.com/penpot/penpot/pull/6283)
+- Fix Rename a set throws an internal error [Github #78](https://github.com/tokens-studio/penpot/issues/78)
+- Fix Out of Sync Token Value & Color Picker [Github #102](https://github.com/tokens-studio/penpot/issues/102)
+- Fix Color should preserve color space [Github #69](https://github.com/tokens-studio/penpot/issues/69)
+- Fix cannot rename Design Token Sets when group of same name exists [Taiga Issue #10773](https://tree.taiga.io/project/penpot/issue/10773)
 
 ## 2.6.2 (Unreleased)
 
@@ -35,6 +48,7 @@
 
 - Increase the height of the right sidebar dropdowns [Taiga #10615](https://tree.taiga.io/project/penpot/issue/10615)
 - Fix scroll on token themes modal [Taiga #10745](https://tree.taiga.io/project/penpot/issue/10745)
+- Fix collapsing grouped sets in "edit Theme" closes the dialog [Taiga #10771](https://tree.taiga.io/project/penpot/issue/10771)
 - Fix unexpected exception on path editor on merge segments when undo stack is empty
 - Fix pricing CTA to be under a config flag [Taiga #10808](https://tree.taiga.io/project/penpot/issue/10808)
 - Fix allow moving a main component into another [Taiga #10818](https://tree.taiga.io/project/penpot/issue/10818)
