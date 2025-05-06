@@ -10,8 +10,8 @@
    ["react-dom/server" :as rds]
    [app.common.data :as d]
    [app.common.data.macros :as dm]
+   [app.common.types.path :as path]
    [app.common.types.shape.layout :as ctl]
-   [app.common.types.shape.path :as path]
    [app.common.uuid :as uuid]
    [app.config :as cf]
    [app.main.fonts :as fonts]
@@ -309,13 +309,14 @@
     (h/call wasm/internal-module "stringToUTF8" str offset size)
     (h/call wasm/internal-module "_set_shape_path_attrs" (count attrs))))
 
+;; FIXME: revisit on heap refactor is merged to use u32 instead u8
 (defn set-shape-path-content
   [content]
-  (let [pdata  (path/path-data content)
-        size   (* (count pdata) path/SEGMENT-BYTE-SIZE)
+  (let [pdata  (path/content content)
+        size   (path/get-byte-size content)
         offset (mem/alloc-bytes size)
         heap   (mem/get-heap-u8)]
-    (path/-write-to pdata (.-buffer heap) offset)
+    (path/write-to pdata (.-buffer heap) offset)
     (h/call wasm/internal-module "_set_shape_path_content")))
 
 (defn set-shape-svg-raw-content
@@ -767,28 +768,46 @@
 
 (defn propagate-modifiers
   [entries]
-  (let [offset (mem/alloc-bytes-32 (modifier-get-entries-size entries))
-        heapf32 (mem/get-heap-f32)
-        heapu32 (mem/get-heap-u32)]
-
-    (loop [entries (seq entries)
-           current-offset  offset]
-      (when-not (empty? entries)
-        (let [{:keys [id transform]} (first entries)]
-          (sr/heapu32-set-uuid id heapu32 current-offset)
-          (sr/heapf32-set-matrix transform heapf32 (+ current-offset (mem/ptr8->ptr32 MODIFIER-ENTRY-TRANSFORM-OFFSET)))
-          (recur (rest entries) (+ current-offset (mem/ptr8->ptr32 MODIFIER-ENTRY-SIZE))))))
-
-    (let [result-offset (h/call wasm/internal-module "_propagate_modifiers")
+  (when (d/not-empty? entries)
+    (let [offset (mem/alloc-bytes-32 (modifier-get-entries-size entries))
           heapf32 (mem/get-heap-f32)
-          heapu32 (mem/get-heap-u32)
-          len (aget heapu32 (mem/ptr8->ptr32 result-offset))
-          result
-          (->> (range 0 len)
-               (mapv #(dr/heap32->entry heapu32 heapf32 (mem/ptr8->ptr32 (+ result-offset 4 (* % MODIFIER-ENTRY-SIZE))))))]
-      (h/call wasm/internal-module "_free_bytes")
+          heapu32 (mem/get-heap-u32)]
 
-      result)))
+      (loop [entries (seq entries)
+             current-offset  offset]
+        (when-not (empty? entries)
+          (let [{:keys [id transform]} (first entries)]
+            (sr/heapu32-set-uuid id heapu32 current-offset)
+            (sr/heapf32-set-matrix transform heapf32 (+ current-offset (mem/ptr8->ptr32 MODIFIER-ENTRY-TRANSFORM-OFFSET)))
+            (recur (rest entries) (+ current-offset (mem/ptr8->ptr32 MODIFIER-ENTRY-SIZE))))))
+
+      (let [result-offset (h/call wasm/internal-module "_propagate_modifiers")
+            heapf32 (mem/get-heap-f32)
+            heapu32 (mem/get-heap-u32)
+            len (aget heapu32 (mem/ptr8->ptr32 result-offset))
+            result
+            (->> (range 0 len)
+                 (mapv #(dr/heap32->entry heapu32 heapf32 (mem/ptr8->ptr32 (+ result-offset 4 (* % MODIFIER-ENTRY-SIZE))))))]
+        (h/call wasm/internal-module "_free_bytes")
+
+        result))))
+
+(defn propagate-apply
+  [entries]
+  (when (d/not-empty? entries)
+    (let [offset (mem/alloc-bytes-32 (modifier-get-entries-size entries))
+          heapf32 (mem/get-heap-f32)
+          heapu32 (mem/get-heap-u32)]
+
+      (loop [entries (seq entries)
+             current-offset  offset]
+        (when-not (empty? entries)
+          (let [{:keys [id transform]} (first entries)]
+            (sr/heapu32-set-uuid id heapu32 current-offset)
+            (sr/heapf32-set-matrix transform heapf32 (+ current-offset (mem/ptr8->ptr32 MODIFIER-ENTRY-TRANSFORM-OFFSET)))
+            (recur (rest entries) (+ current-offset (mem/ptr8->ptr32 MODIFIER-ENTRY-SIZE))))))
+      (h/call wasm/internal-module "_propagate_apply")
+      (request-render "set-modifiers"))))
 
 (defn set-canvas-background
   [background]
