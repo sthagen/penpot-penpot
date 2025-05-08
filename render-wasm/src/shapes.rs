@@ -711,9 +711,9 @@ impl Shape {
     }
 
     pub fn clear_text(&mut self) {
-        match self.shape_type {
-            Type::Text(_) => {
-                let new_text_content = TextContent::new(self.selrect);
+        match &self.shape_type {
+            Type::Text(old_text_content) => {
+                let new_text_content = TextContent::new(self.selrect, old_text_content.grow_type());
                 self.shape_type = Type::Text(new_text_content);
             }
             _ => {}
@@ -827,10 +827,9 @@ impl Shape {
                 paint.set_blend_mode(skia::BlendMode::SrcATop);
                 paint.set_anti_alias(true);
                 paint.set_stroke_width(stroke.width * 2.0);
-                paint.set_color(match &stroke.fill {
-                    Fill::Solid(color) => *color,
-                    _ => Color::BLACK,
-                });
+                if let Fill::Solid(SolidColor(color)) = stroke.fill {
+                    paint.set_color(color);
+                }
                 paints.push(paint);
             }
             StrokeKind::CenterStroke => {
@@ -838,10 +837,9 @@ impl Shape {
                 paint.set_style(skia::PaintStyle::Stroke);
                 paint.set_anti_alias(true);
                 paint.set_stroke_width(stroke.width);
-                paint.set_color(match &stroke.fill {
-                    Fill::Solid(color) => *color,
-                    _ => Color::BLACK,
-                });
+                if let Fill::Solid(SolidColor(color)) = stroke.fill {
+                    paint.set_color(color);
+                }
                 paints.push(paint);
             }
             StrokeKind::OuterStroke => {
@@ -850,10 +848,9 @@ impl Shape {
                 paint.set_blend_mode(skia::BlendMode::DstOver);
                 paint.set_anti_alias(true);
                 paint.set_stroke_width(stroke.width * 2.0);
-                paint.set_color(match &stroke.fill {
-                    Fill::Solid(color) => *color,
-                    _ => Color::BLACK,
-                });
+                if let Fill::Solid(SolidColor(color)) = stroke.fill {
+                    paint.set_color(color);
+                }
                 paints.push(paint);
 
                 let mut paint = skia::Paint::default();
