@@ -6,6 +6,36 @@
 
 ### :boom: Breaking changes & Deprecations
 
+**Breaking changes on penpot library:**
+
+- Change the signature of the `addPage` method: it now accepts an object (as a single argument) where you can pass `id`,
+  `name`, and `background` props (instead of the previous positional arguments)
+- Rename the `file.createRect` method to `file.addRect`
+- Rename the `file.createCircle` method to `file.addCircle`
+- Rename the `file.createPath` method to `file.addPath`
+- Rename the `file.createText` method to `file.addText`
+- Rename `file.startComponent` to `file.addComponent` (to preserve the naming style)
+- Rename `file.createComponentInstance` to `file.addComponentInstance` (to preserve the naming style)
+- Rename `file.lookupShape` to `file.getShape`
+- Rename `file.asMap` to `file.toMap`
+- Remove `file.updateLibraryColor` (use `file.addLibraryColor` if you just need to replace a color)
+- Remove `file.deleteLibraryColor` (this library is intended to build files)
+- Remove `file.updateLibraryTypography` (use `file.addLibraryTypography` if you just need to replace a typography)
+- Remove `file.deleteLibraryTypography` (this library is intended to build files)
+- Remove `file.add/update/deleteLibraryMedia` (they are no longer supported by Penpot and have been replaced by components)
+- Remove `file.deleteObject` (this library is intended to build files)
+- Remove `file.updateObject` (this library is intended to build files)
+- Remove `file.finishComponent` (it is no longer necessary; see below for more details on component creation changes)
+- Change the `file.getCurrentPageId` function to a read-only `file.currentPageId` property
+- Add `file.currentFrameId` read-only property
+- Add `file.lastId` read-only property
+
+There are also relevant semantic changes in how components should be created: this refactor removes
+all notions of the old components (v1). Since v2, the shapes that are part of a component live on a
+page. So, from now on, to create a component, you should first create a frame, then add shapes
+and/or groups to that frame, and then create a component by declaring that frame as the component
+root.
+
 ### :heart: Community contributions (Thank you!)
 
 ### :sparkles: New features
@@ -23,6 +53,8 @@
 
 ### :heart: Community contributions (Thank you!)
 
+- Design improvements to the Invitations page with an empty state [GitHub #2608](https://github.com/penpot/penpot/issues/2608) by [@iprithvitharun](https://github.com/iprithvitharun)
+
 ### :sparkles: New features
 
 - Update board presets with a newer devices [Taiga #10610](https://tree.taiga.io/project/penpot/us/10610)
@@ -32,9 +64,10 @@
 - Add set selection in create Token themes flow [Taiga #10746](https://tree.taiga.io/project/penpot/issue/10746)
 - Display indicator on not active sets [Taiga #10668](https://tree.taiga.io/project/penpot/issue/10668)
 - Create `input*` wrapper component, and `label*`, `input-field*` and `hint-message*` components [Taiga #10713](https://tree.taiga.io/project/penpot/us/10713)
-- Fix problem in viewer with the back button [Taiga #10907](https://tree.taiga.io/project/penpot/issue/10907)
 
 ### :bug: Bugs fixed
+
+- Fix problem in viewer with the back button [Taiga #10907](https://tree.taiga.io/project/penpot/issue/10907)
 - Fix resize bar background on tokens panel [Taiga #10811](https://tree.taiga.io/project/penpot/issue/10811)
 - Fix shortcut for history version panel [Taiga #11006](https://tree.taiga.io/project/penpot/issue/11006)
 - Fix positioning of comment drafts when near the right / bottom edges of viewport [Taiga #10534](https://tree.taiga.io/project/penpot/issue/10534)
@@ -59,8 +92,9 @@
 - Fix Color should preserve color space [Github #69](https://github.com/tokens-studio/penpot/issues/69)
 - Fix cannot rename Design Token Sets when group of same name exists [Taiga Issue #10773](https://tree.taiga.io/project/penpot/issue/10773)
 - Fix problem when duplicating grid layout [Github #6391](https://github.com/penpot/penpot/issues/6391)
+- Fix issue that makes workspace shortcuts stop working [Taiga #11062](https://tree.taiga.io/project/penpot/issue/11062)
 
-## 2.6.2 (Unreleased)
+## 2.6.2
 
 ### :bug: Bugs fixed
 
