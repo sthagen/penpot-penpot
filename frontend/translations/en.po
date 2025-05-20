@@ -6484,6 +6484,10 @@ msgstr "Send backward"
 msgid "workspace.shape.menu.copy"
 msgstr "Copy"
 
+#: src/app/main/ui/workspace/context_menu.cljs
+msgid "workspace.shape.menu.copy-svg"
+msgstr "Copy as SVG"
+
 #: src/app/main/ui/workspace/context_menu.cljs:204
 msgid "workspace.shape.menu.copy-css"
 msgstr "Copy as CSS"
@@ -6932,10 +6936,6 @@ msgstr "Stroke width must be greater than or equal to 0."
 msgid "workspace.token.label.group"
 msgstr "Group"
 
-#: src/app/main/ui/workspace/tokens/modals/themes.cljs:197
-msgid "workspace.token.label.group-optional"
-msgstr "Optional"
-
 #: src/app/main/ui/workspace/tokens/modals/themes.cljs:199
 msgid "workspace.token.label.group-placeholder"
 msgstr "Add group (i.e. Mode)"
@@ -7127,6 +7127,22 @@ msgstr "The value is not valid"
 #: src/app/main/ui/workspace/tokens/form.cljs:520
 msgid "workspace.token.warning-name-change"
 msgstr "Renaming this token will break any reference to its old name."
+
+#: src/app/main/ui/workspace/tokens/modals/settings.cljs
+msgid "workspace.token.settings"
+msgstr "Tokens settings"
+
+#: src/app/main/ui/workspace/tokens/modals/settings.cljs
+msgid "workspace.token.base-font-size"
+msgstr "Base font size"
+
+#: src/app/main/ui/workspace/tokens/modals/settings.cljs
+msgid "workspace.token.setting-description"
+msgstr "Here you can configure the base font size, which defines the value of 1rem:"
+
+#: src/app/main/ui/workspace/tokens/modals/settings.cljs
+msgid "workspace.token.base-font-size.error"
+msgstr "Base font size must be a value in pixels or unitless."
 
 #: src/app/main/ui/workspace/sidebar.cljs:135, src/app/main/ui/workspace/sidebar.cljs:144
 msgid "workspace.toolbar.assets"
