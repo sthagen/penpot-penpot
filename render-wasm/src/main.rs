@@ -91,9 +91,19 @@ pub extern "C" fn set_canvas_background(raw_color: u32) {
 }
 
 #[no_mangle]
-pub extern "C" fn render(timestamp: i32) {
+pub extern "C" fn render(_: i32) {
     with_state!(state, {
-        state.start_render_loop(timestamp).expect("Error rendering");
+        state
+            .start_render_loop(performance::get_time())
+            .expect("Error rendering");
+    });
+}
+
+#[no_mangle]
+pub extern "C" fn render_from_cache(_: i32) {
+    with_state!(state, {
+        let render_state = state.render_state();
+        render_state.render_from_cache();
     });
 }
 
@@ -137,17 +147,16 @@ pub extern "C" fn resize_viewbox(width: i32, height: i32) {
 pub extern "C" fn set_view(zoom: f32, x: f32, y: f32) {
     with_state!(state, {
         let render_state = state.render_state();
-        let zoom_changed = zoom != render_state.viewbox.zoom;
         render_state.viewbox.set_all(zoom, x, y);
-        if zoom_changed {
-            with_state!(state, {
-                if state.render_state.options.is_profile_rebuild_tiles() {
-                    state.rebuild_tiles();
-                } else {
-                    state.rebuild_tiles_shallow();
-                }
-            });
-        }
+        with_state!(state, {
+            // We can have renders in progress
+            state.render_state.cancel_animation_frame();
+            if state.render_state.options.is_profile_rebuild_tiles() {
+                state.rebuild_tiles();
+            } else {
+                state.rebuild_tiles_shallow();
+            }
+        });
     });
 }
 
@@ -389,7 +398,7 @@ pub extern "C" fn set_shape_path_attrs(num_attrs: u32) {
 }
 
 #[no_mangle]
-pub extern "C" fn propagate_modifiers() -> *mut u8 {
+pub extern "C" fn propagate_modifiers(pixel_precision: bool) -> *mut u8 {
     let bytes = mem::bytes();
 
     let entries: Vec<_> = bytes
@@ -398,13 +407,13 @@ pub extern "C" fn propagate_modifiers() -> *mut u8 {
         .collect();
 
     with_state!(state, {
-        let (result, _) = shapes::propagate_modifiers(state, &entries);
+        let (result, _) = shapes::propagate_modifiers(state, &entries, pixel_precision);
         mem::write_vec(result)
     })
 }
 
 #[no_mangle]
-pub extern "C" fn propagate_apply() -> *mut u8 {
+pub extern "C" fn propagate_apply(pixel_precision: bool) -> *mut u8 {
     let bytes = mem::bytes();
 
     let entries: Vec<_> = bytes
@@ -413,7 +422,7 @@ pub extern "C" fn propagate_apply() -> *mut u8 {
         .collect();
 
     with_state!(state, {
-        let (result, bounds) = shapes::propagate_modifiers(state, &entries);
+        let (result, bounds) = shapes::propagate_modifiers(state, &entries, pixel_precision);
 
         for entry in result {
             state.modifiers.insert(entry.id, entry.transform);

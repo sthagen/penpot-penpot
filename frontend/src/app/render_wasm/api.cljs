@@ -30,8 +30,8 @@
    [app.render-wasm.serializers.fills :as sr-fills]
    [app.render-wasm.wasm :as wasm]
    [app.util.debug :as dbg]
+   [app.util.functions :as fns]
    [app.util.http :as http]
-   [app.util.perf :as uperf]
    [app.util.webapi :as wapi]
    [beicon.v2.core :as rx]
    [promesa.core :as p]
@@ -100,6 +100,8 @@
   [timestamp]
   (h/call wasm/internal-module "_render" timestamp)
   (set! wasm/internal-frame-id nil))
+
+(def debounce-render (fns/debounce render 100))
 
 (defn cancel-render
   [_]
@@ -654,14 +656,16 @@
    (let [offset (h/call wasm/internal-module "_get_text_dimensions")
          heapf32 (mem/get-heap-f32)
          width (aget heapf32 (mem/ptr8->ptr32 offset))
-         height (aget heapf32 (mem/ptr8->ptr32 (+ offset 4)))]
+         height (aget heapf32 (mem/ptr8->ptr32 (+ offset 4)))
+         max-width (aget heapf32 (mem/ptr8->ptr32 (+ offset 8)))]
      (h/call wasm/internal-module "_free_bytes")
-     {:width width :height height})))
+     {:width width :height height :max-width max-width})))
 
 (defn set-view-box
   [zoom vbox]
   (h/call wasm/internal-module "_set_view" zoom (- (:x vbox)) (- (:y vbox)))
-  (render (uperf/now)))
+  (h/call wasm/internal-module "_render_from_cache")
+  (debounce-render))
 
 (defn clear-drawing-cache []
   (h/call wasm/internal-module "_clear_drawing_cache"))
@@ -803,7 +807,7 @@
       (h/call wasm/internal-module "_set_structure_modifiers"))))
 
 (defn propagate-modifiers
-  [entries]
+  [entries pixel-precision]
   (when (d/not-empty? entries)
     (let [offset (mem/alloc-bytes-32 (modifier-get-entries-size entries))
           heapf32 (mem/get-heap-f32)
@@ -817,7 +821,7 @@
             (sr/heapf32-set-matrix transform heapf32 (+ current-offset (mem/ptr8->ptr32 MODIFIER-ENTRY-TRANSFORM-OFFSET)))
             (recur (rest entries) (+ current-offset (mem/ptr8->ptr32 MODIFIER-ENTRY-SIZE))))))
 
-      (let [result-offset (h/call wasm/internal-module "_propagate_modifiers")
+      (let [result-offset (h/call wasm/internal-module "_propagate_modifiers" pixel-precision)
             heapf32 (mem/get-heap-f32)
             heapu32 (mem/get-heap-u32)
             len (aget heapu32 (mem/ptr8->ptr32 result-offset))
@@ -829,7 +833,7 @@
         result))))
 
 (defn propagate-apply
-  [entries]
+  [entries pixel-precision]
   (when (d/not-empty? entries)
     (let [offset (mem/alloc-bytes-32 (modifier-get-entries-size entries))
           heapf32 (mem/get-heap-f32)
@@ -843,7 +847,7 @@
             (sr/heapf32-set-matrix transform heapf32 (+ current-offset (mem/ptr8->ptr32 MODIFIER-ENTRY-TRANSFORM-OFFSET)))
             (recur (rest entries) (+ current-offset (mem/ptr8->ptr32 MODIFIER-ENTRY-SIZE))))))
 
-      (let [offset (h/call wasm/internal-module "_propagate_apply")
+      (let [offset (h/call wasm/internal-module "_propagate_apply" pixel-precision)
             heapf32 (mem/get-heap-f32)
             width (aget heapf32 (mem/ptr8->ptr32 (+ offset 0)))
             height (aget heapf32 (mem/ptr8->ptr32 (+ offset 4)))
