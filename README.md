@@ -178,3 +178,4 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 Copyright (c) KALEIDOS INC
 ```
 Penpot is a Kaleidos’ [open source project](https://kaleidos.net/)
+# Trigger test
