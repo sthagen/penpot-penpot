@@ -935,6 +935,15 @@ msgstr "Cambiar el idioma de la interfaz"
 msgid "dashboard.select-ui-theme"
 msgstr "Selecciona un tema"
 
+msgid "dashboard.select-ui-theme.dark"
+msgstr "Penpot Dark (por defecto)"
+
+msgid "dashboard.select-ui-theme.light"
+msgstr "Penpot Light"
+
+msgid "dashboard.select-ui-theme.system"
+msgstr "Sistema"
+
 #: src/app/main/ui/settings/notifications.cljs:57
 msgid "dashboard.settings.notifications.dashboard-comments.all"
 msgstr "Todos los comentarios, menciones y respuestas"
@@ -1637,6 +1646,9 @@ msgstr "RGBA"
 #: src/app/main/ui/inspect/attributes/fill.cljs:57
 msgid "inspect.attributes.fill"
 msgstr "Relleno"
+
+msgid "inspect.attributes.color"
+msgstr "Color"
 
 #: src/app/main/ui/inspect/attributes/common.cljs:95, src/app/main/ui/inspect/attributes/image.cljs:51
 msgid "inspect.attributes.image.download"
@@ -5195,6 +5207,9 @@ msgstr "Cambiar a tema oscuro"
 msgid "workspace.header.menu.toggle-light-theme"
 msgstr "Cambiar a tema claro"
 
+msgid "workspace.header.menu.toggle-system-theme"
+msgstr "Cambiar a tema del sistema"
+
 #: src/app/main/ui/workspace/main_menu.cljs:457
 msgid "workspace.header.menu.undo"
 msgstr "Deshacer"
@@ -5646,7 +5661,7 @@ msgstr "Relleno"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/fill.cljs:151
 msgid "workspace.options.fill.add-fill"
-msgstr "Añadir color de relleno"
+msgstr "Añadir relleno"
 
 #: src/app/main/ui/workspace/sidebar/options/menus/fill.cljs:164
 msgid "workspace.options.fill.remove-fill"
